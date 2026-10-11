@@ -150,16 +150,17 @@ function signalGlyph(sig) {
 }
 
 /* vertical fade for area fills: the series colour (--vt-sc) at the
-   chart fill opacity at the top, transparent at the baseline. Returns the
-   paint reference for the fill attribute. */
+   chart fill opacity at the top, transparent at the baseline (flip: an
+   area hanging down from its baseline). Returns the paint reference for
+   the fill attribute. */
 var gradSeq = 0;
-function fadeFill(svg) {
+function fadeFill(svg, flip) {
 	var id = 'vt-fade-' + (++gradSeq);
 	var defs = document.createElementNS(SVGNS, 'defs');
 	var lg = document.createElementNS(SVGNS, 'linearGradient');
 	lg.setAttribute('id', id);
-	lg.setAttribute('x1', '0'); lg.setAttribute('y1', '0');
-	lg.setAttribute('x2', '0'); lg.setAttribute('y2', '1');
+	lg.setAttribute('x1', '0'); lg.setAttribute('y1', flip ? '1' : '0');
+	lg.setAttribute('x2', '0'); lg.setAttribute('y2', flip ? '0' : '1');
 	[ [ '0', 'vt-fade-top' ], [ '1', 'vt-fade-end' ] ].forEach(function(st) {
 		var stop = document.createElementNS(SVGNS, 'stop');
 		stop.setAttribute('offset', st[0]);
@@ -435,7 +436,7 @@ return view.extend({
 			wireless: null,
 			lastOk: 0, lastErr: null, paused: false
 		};
-		this.ui = { sort: 'live', dir: -1, filter: '', chip: 'all', chart: 'down', drawer: null, editing: null, hover: null };
+		this.ui = { sort: 'live', dir: -1, filter: '', chip: 'all', drawer: null, editing: null, hover: null };
 		this.folds = readFolds();
 		this.foldEls = {};
 		this.foldBtns = {};
@@ -1118,13 +1119,8 @@ return view.extend({
 		el.chartTip = E('div', { 'class': 'vt-tip', 'hidden': 'hidden' });
 		el.chartOver = E('div', { 'class': 'vt-mult-over', 'aria-hidden': 'true' }, [ el.chartCursor, el.chartTip ]);
 		el.chartX = E('div', { 'class': 'vt-mult-x', 'aria-hidden': 'true' });
-		el.chartBtns = {};
-		var seg = E('div', { 'class': 'vt-seg-ctl', 'role': 'group', 'aria-label': _('Direction') }, [ 'down', 'up' ].map(function(k) {
-			return el.chartBtns[k] = E('button', { 'type': 'button', 'class': 'vt-seg-btn', 'aria-pressed': 'false',
-				'click': function() { self.ui.chart = k; self.paintChart(); } }, [ icon(k), E('span', {}, [ k === 'down' ? _('Download') : _('Upload') ]) ]);
-		}));
 		var plot = E('div', { 'class': 'vt-mult-wrap', 'tabindex': '0', 'role': 'group',
-			'aria-label': _('Throughput per link; arrow keys read the values over time') }, [ el.chartRows, el.chartOver, el.chartX ]);
+			'aria-label': _('Throughput per link, download above the line and upload below; arrow keys read the values over time') }, [ el.chartRows, el.chartOver, el.chartX ]);
 		plot.addEventListener('pointermove', function(ev) { self.chartPointer(ev); });
 		plot.addEventListener('pointerleave', function() { if (!self.ui.hover || self.ui.hover.x != null) self.chartHide(); });
 		plot.addEventListener('keydown', function(ev) { self.chartKey(ev); });
@@ -1134,27 +1130,33 @@ return view.extend({
 		return this.foldable('chart', E('section', { 'class': 'vt-tile vt-chart', 'aria-label': _('Throughput') }, [
 			E('header', { 'class': 'vt-tile-head' }, [
 				E('h3', { 'class': 'vt-tile-title' }, [ icon('pulse'), E('span', {}, [ _('Throughput') ]), el.chartSub ]),
-				E('div', { 'class': 'vt-tile-extra' }, [ seg, this.foldButton('chart', _('Show or hide the throughput chart')) ])
+				E('div', { 'class': 'vt-tile-extra' }, [ this.foldButton('chart', _('Show or hide the throughput chart')) ])
 			]),
 			plot,
 			el.chartLive
 		]));
 	},
 
-	/* one small multiple per link: the uplink, then each radio. Each has
-	   its own y scale (a busy uplink would flatten an idle radio), labelled
-	   with its unit, on a shared time axis and crosshair. */
+	/* one small multiple per link: the uplink, then each radio. Download
+	   (towards the clients) rises above the middle line, upload hangs
+	   below it; each half has its own y scale (upload is often a hundredth
+	   of download, and a busy uplink would flatten an idle radio), labelled
+	   with its unit, on a shared time axis and crosshair. Columns of a
+	   history point [ t, rx, tx ]: the uplink receives what clients
+	   download, a radio sends it. */
 	chartSeries: function() {
-		var m = this.m, down = this.ui.chart === 'down';
-		var list = [ { key: 'uplink', label: m.uplink ? _('Uplink %s').format(m.uplink.dev) : _('Uplink'), cls: 'vt-c-up', col: down ? 1 : 2 } ];
-		m.radios.forEach(function(r) { list.push({ key: r.id, label: _('%s radio').format(r.bandLabel), cls: 'vt-c-' + (r.band || 'x'), col: down ? 2 : 1 }); });
+		var m = this.m;
+		var list = [ { key: 'uplink', label: m.uplink ? _('Uplink %s').format(m.uplink.dev) : _('Uplink'), cls: 'vt-c-up', dn: 1, up: 2 } ];
+		m.radios.forEach(function(r) { list.push({ key: r.id, label: _('%s radio').format(r.bandLabel), cls: 'vt-c-' + (r.band || 'x'), dn: 2, up: 1 }); });
 		return list;
 	},
 
 	paintChart: function() {
-		var self = this, el = this.el, net = this.st.hist.net, W = 600, H = 100, now = Date.now();
-		var list = this.chartSeries(), down = this.ui.chart === 'down';
-		Object.keys(el.chartBtns).forEach(function(k) { el.chartBtns[k].setAttribute('aria-pressed', String(self.ui.chart === k)); });
+		var el = this.el, net = this.st.hist.net, W = 600, H = 100, M = H / 2, now = Date.now();
+		var list = this.chartSeries();
+		/* sample times follow the device's clock (model.sampleClock) and
+		   can run ahead of the browser's: the axis ends at the newest one */
+		list.forEach(function(s) { var h = net[s.key]; if (h && h.length) now = Math.max(now, h[h.length - 1][0]); });
 
 		var dm = series.domain(list.map(function(s) { return net[s.key]; }), now, 60000, WINDOW_MS);
 		var ticks = [];
@@ -1164,42 +1166,54 @@ return view.extend({
 
 		dom.content(el.chartRows, list.map(function(s) {
 			var d = (net[s.key] || []).filter(function(p) { return p[0] >= dm.t0 - POLL_S * 1000; });
-			var st = series.stats(d, s.col, dm.t0);
+			var sd = series.stats(d, s.dn, dm.t0), su = series.stats(d, s.up, dm.t0);
 			var last = d.length ? d[d.length - 1] : null, fresh = !!(last && now - last[0] < POLL_S * 3000);
-			var vmax = series.niceCeil(Math.max((st.peak || 0) * 1.05, 1000));
-			samples = Math.max(samples, st.n);
+			var vd = series.niceCeil(Math.max((sd.peak || 0) * 1.05, 1000)), vu = series.niceCeil(Math.max((su.peak || 0) * 1.05, 1000));
+			samples = Math.max(samples, sd.n);
 
 			var svg = svgRoot('vt-mult-svg', '0 0 ' + W + ' ' + H);
 			svg.setAttribute('preserveAspectRatio', 'none');
-			svg.appendChild(svgPath('M0 0.5H' + W + 'M0 ' + (H / 2) + 'H' + W, 'vt-chart-grid'));
+			svg.appendChild(svgPath('M0 0.5H' + W + 'M0 ' + (H - 0.5) + 'H' + W, 'vt-chart-grid'));
 			ticks.forEach(function(k) {
 				var x = (1 - k * 60000 / dm.span) * W;
 				svg.appendChild(svgPath('M' + x.toFixed(1) + ' 0V' + H, 'vt-chart-vgrid'));
 			});
-			var segs = series.segments(d, s.col, dm.t0, dm.t1, vmax, W, H, POLL_S * 3500);
-			var area = svgPath(series.areaPath(segs, H), 'vt-series-area');
-			area.setAttribute('fill', fadeFill(svg));
-			svg.appendChild(area);
-			svg.appendChild(svgPath(series.linePath(segs), 'vt-series-line'));
+			/* download: y in [0, M] with 0 at the line; upload mirrored below */
+			var segD = series.segments(d, s.dn, dm.t0, dm.t1, vd, W, M, POLL_S * 3500);
+			var segU = series.segments(d, s.up, dm.t0, dm.t1, vu, W, M, POLL_S * 3500).map(function(seg) {
+				return seg.map(function(pt) { return [ pt[0], H - pt[1] ]; });
+			});
+			[ [ segD, false, '' ], [ segU, true, ' vt-dir-up' ] ].forEach(function(h) {
+				var area = svgPath(series.areaPath(h[0], M), 'vt-series-area' + h[2]);
+				area.setAttribute('fill', fadeFill(svg, h[1]));
+				svg.appendChild(area);
+				svg.appendChild(svgPath(series.linePath(h[0]), 'vt-series-line' + h[2]));
+			});
+			svg.appendChild(svgPath('M0 ' + M + 'H' + W, 'vt-chart-mid'));
 
-			var tail = segs.length ? segs[segs.length - 1] : null, pt = tail && tail[tail.length - 1];
-			var dot = E('span', { 'class': 'vt-mult-dot', 'hidden': 'hidden' });
-			rows.push({ s: s, d: d, vmax: vmax, dot: dot });
+			function tailDot(segs, cls) {
+				var tail = segs.length ? segs[segs.length - 1] : null, pt = tail && tail[tail.length - 1];
+				return pt && fresh ? pos(E('span', { 'class': 'vt-sk-dot' + cls }), pt[0] / W * 100, pt[1] / H * 100) : '';
+			}
+			var dotD = E('span', { 'class': 'vt-mult-dot', 'hidden': 'hidden' }), dotU = E('span', { 'class': 'vt-mult-dot vt-dir-up', 'hidden': 'hidden' });
+			rows.push({ s: s, d: d, vd: vd, vu: vu, dotD: dotD, dotU: dotU });
 			return E('div', { 'class': 'vt-mult ' + s.cls }, [
 				E('div', { 'class': 'vt-mult-head' }, [
 					E('span', { 'class': 'vt-mult-name' }, [ E('span', { 'class': 'vt-lg-key' }), E('span', {}, [ s.label ]) ]),
-					E('b', { 'class': 'vt-mult-now vt-tn' }, [ fresh && st.now != null ? fmt.bits(last[s.col]) : fmt.DASH ]),
-					E('span', { 'class': 'vt-mult-stats vt-tn' }, st.n > 1 ? [
-						E('span', {}, [ _('peak'), ' ', E('b', {}, [ fmt.bits(st.peak) ]) ]),
-						E('span', {}, [ _('avg'), ' ', E('b', {}, [ fmt.bits(st.avg) ]) ])
+					E('b', { 'class': 'vt-mult-now vt-tn', 'title': _('Download') }, [ '↓ ', fresh && sd.now != null ? fmt.bits(last[s.dn]) : fmt.DASH ]),
+					E('b', { 'class': 'vt-mult-now-up vt-tn', 'title': _('Upload') }, [ '↑ ', fresh && su.now != null ? fmt.bits(last[s.up]) : fmt.DASH ]),
+					E('span', { 'class': 'vt-mult-stats vt-tn' }, sd.n > 1 ? [
+						E('span', {}, [ _('peak'), ' ', E('b', {}, [ '↓ ' + fmt.bitsShort(sd.peak) ]), ' ', E('b', {}, [ '↑ ' + fmt.bitsShort(su.peak) ]) ])
 					] : [ E('span', {}, [ _('measuring…') ]) ])
 				]),
 				E('div', { 'class': 'vt-mult-plot' }, [
 					svg,
-					st.n ? E('span', { 'class': 'vt-mult-max vt-tn' }, [ bitsLabel(vmax) ]) : '',
-					st.n < 2 ? E('span', { 'class': 'vt-sk-note' }, [ _('collecting…') ]) : '',
-					pt && fresh ? pos(E('span', { 'class': 'vt-sk-dot' }), pt[0] / W * 100, pt[1] / H * 100) : '',
-					dot
+					sd.n ? E('span', { 'class': 'vt-mult-max vt-tn' }, [ '↓ ' + bitsLabel(vd) ]) : '',
+					sd.n ? E('span', { 'class': 'vt-mult-max vt-mult-max-up vt-tn' }, [ '↑ ' + bitsLabel(vu) ]) : '',
+					sd.n < 2 ? E('span', { 'class': 'vt-sk-note' }, [ _('collecting…') ]) : '',
+					tailDot(segD, ''),
+					tailDot(segU, ' vt-dir-up'),
+					dotD, dotU
 				])
 			]);
 		}));
@@ -1215,8 +1229,8 @@ return view.extend({
 		})).concat([ E('span', { 'class': 'vt-mx vt-mx-1' }, [ _('now') ]) ]));
 
 		var age = dm.age;
-		txt(el.chartSub, (down ? _('to clients') : _('from clients')) + ' · ' + (dm.full ? _('last 5 min')
-			: samples < 2 ? _('collecting · first samples') : _('collecting · %s of data').format(spanShort(age))));
+		txt(el.chartSub, dm.full ? _('last 5 min')
+			: samples < 2 ? _('collecting · first samples') : _('collecting · %s of data').format(spanShort(age)));
 		el.plot.classList.toggle('vt-collecting', !dm.full);
 		if (this.ui.hover) this.chartShow(this.ui.hover);
 	},
@@ -1247,10 +1261,16 @@ return view.extend({
 		el.chartCursor.hidden = false;
 		el.chartCursor.style.left = x.toFixed(2) + '%';
 		var tipRows = meta.rows.map(function(r) {
-			var j = series.nearest(r.d, tp), v = (j >= 0 && Math.abs(r.d[j][0] - tp) < POLL_S * 1000) ? r.d[j][r.s.col] : null;
-			r.dot.hidden = v == null;
-			if (v != null) pos(r.dot, x, (1 - Math.min(1, v / r.vmax)) * 100);
-			return E('div', { 'class': 'vt-tip-row ' + r.s.cls }, [ E('span', { 'class': 'vt-lg-key' }), E('b', { 'class': 'vt-tn' }, [ v == null ? fmt.DASH : fmt.bits(v) ]), E('span', { 'class': 'vt-tip-label' }, [ r.s.label ]) ]);
+			var j = series.nearest(r.d, tp), p = (j >= 0 && Math.abs(r.d[j][0] - tp) < POLL_S * 1000) ? r.d[j] : null;
+			var vd = p ? p[r.s.dn] : null, vu = p ? p[r.s.up] : null;
+			r.dotD.hidden = vd == null;
+			r.dotU.hidden = vu == null;
+			if (vd != null) pos(r.dotD, x, (1 - Math.min(1, vd / r.vd)) * 50);
+			if (vu != null) pos(r.dotU, x, 50 + Math.min(1, vu / r.vu) * 50);
+			return E('div', { 'class': 'vt-tip-row ' + r.s.cls }, [ E('span', { 'class': 'vt-lg-key' }),
+				E('b', { 'class': 'vt-tn' }, [ '↓ ' + (vd == null ? fmt.DASH : fmt.bits(vd)) ]),
+				E('b', { 'class': 'vt-tn vt-tip-up' }, [ '↑ ' + (vu == null ? fmt.DASH : fmt.bits(vu)) ]),
+				E('span', { 'class': 'vt-tip-label' }, [ r.s.label ]) ]);
 		});
 		dom.content(el.chartTip, [ E('div', { 'class': 'vt-tip-time vt-tn' }, [ new Date(tp).toLocaleTimeString(), E('span', {}, [ fmt.ago(Date.now() - tp) ]) ]) ].concat(tipRows));
 		el.chartTip.hidden = false;
@@ -1264,7 +1284,7 @@ return view.extend({
 		this.ui.hover = null;
 		el.chartCursor.hidden = true;
 		el.chartTip.hidden = true;
-		(this.chartMeta ? this.chartMeta.rows : []).forEach(function(r) { r.dot.hidden = true; });
+		(this.chartMeta ? this.chartMeta.rows : []).forEach(function(r) { r.dotD.hidden = true; r.dotU.hidden = true; });
 	},
 
 	chartKey: function(ev) {

@@ -35,9 +35,6 @@ present) and results must be built as text nodes like everything else.
 
 ## Later
 
-- **Combined throughput chart:** download and upload of a link on one
-  time axis (download above, upload mirrored below) instead of a toggle
-  ([#7](https://github.com/anothaDev/luci-theme-vantage/issues/7)).
 - **Tunnels and proxies in the network path:** show active tunnel
   interfaces (TUN, WireGuard, OpenVPN) between the device and the
   internet with their live rates, and name known proxy suites (OpenClash,
