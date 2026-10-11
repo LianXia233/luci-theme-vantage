@@ -124,3 +124,20 @@ test('saving a name: set_alias with the normalised MAC, names reloaded after eve
 	assert.equal(calls.length, n);
 	delete REPLIES['luci.vantage set_alias'];
 });
+
+test('wired-only: decided by an answered empty wireless status, never by a failed call', () => {
+	const self = Object.create(view);
+	self.st = { wireless: null };
+	const m = radios => ({ radios: radios });
+	let x = m([]);
+	self.markWired(x, { wifi: null });
+	assert.equal(x.wired, false, 'a failed call proves nothing');
+	self.markWired(x = m([]), { wifi: {} });
+	assert.equal(x.wired, true, 'answered, no radios');
+	self.markWired(x = m([ { id: 'radio0' } ]), { wifi: { radio0: {} } });
+	assert.equal(x.wired, false, 'radios appeared');
+	self.markWired(x = m([]), { wifi: {} });
+	assert.equal(x.wired, false, 'radios seen once keep the Wi-Fi layout');
+	self.markWired(x = m([]), null);
+	assert.equal(x.wired, false, 'a rebuild keeps the decision');
+});

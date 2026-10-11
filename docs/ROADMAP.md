@@ -5,13 +5,6 @@ promised; issues and pull requests for any of it are welcome.
 
 ## Next
 
-### Wired-only routers
-
-On a device without radios (x86 boxes, wired routers), hide the Radios
-tile, the wireless branch of the network path and the Wi-Fi health check
-instead of showing them empty
-([#7](https://github.com/anothaDev/luci-theme-vantage/issues/7)).
-
 ### Multiple access points (planned for 1.1)
 
 Show the radios, SSIDs and clients of other OpenWrt access points on the

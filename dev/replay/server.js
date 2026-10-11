@@ -20,6 +20,9 @@
    --demo pseudonymises the recording as it is loaded (demo.js): documentation
    MACs/addresses, neutral hostname/SSIDs/client names, for screenshots.
 
+   --wired serves the device as a router without Wi-Fi (wired.js): no
+   radios, the uplink renamed wan, synthetic lan/vpn/guest interfaces.
+
    --lang previews a translation: the UI runs in that language with the
    theme's and apps' po/<lang>/*.po (compiled the way po2lmo does, read on
    every request) over the recorded catalogue of that language.
@@ -45,6 +48,7 @@ const { Engine } = require('./ut');
 const { Store, safe } = require('./store');
 const i18n = require('../i18n/catalog');
 const policy = require('../mirror/policy');
+const wired = require('./wired');
 
 /* ------------------------------------------------------------ arguments */
 
@@ -52,7 +56,7 @@ function parseArgs(argv) {
 	const o = { port: 8025, synthetic: true };
 	for (let i = 0; i < argv.length; i++) {
 		const m = /^--(mirror|port|theme-dir|theme|templates|rootfs|app-dir|lang)(?:=(.*))?$/.exec(argv[i]);
-		if (!m) { if (argv[i] === '--keep-uniwrt') o.keepUniwrt = true; else if (argv[i] === '--synthetic') o.synthetic = true; else if (argv[i] === '--no-synthetic') o.synthetic = false; else if (argv[i] === '--demo') o.demo = true; else if (argv[i] === '-h' || argv[i] === '--help') o.help = true; else o.bad = argv[i]; continue; }
+		if (!m) { if (argv[i] === '--keep-uniwrt') o.keepUniwrt = true; else if (argv[i] === '--synthetic') o.synthetic = true; else if (argv[i] === '--no-synthetic') o.synthetic = false; else if (argv[i] === '--demo') o.demo = true; else if (argv[i] === '--wired') o.wired = true; else if (argv[i] === '-h' || argv[i] === '--help') o.help = true; else o.bad = argv[i]; continue; }
 		const v = (m[2] !== undefined) ? m[2] : argv[++i];
 		if (m[1] === 'app-dir') (o.appDirs = o.appDirs || []).push(v);
 		else o[m[1].replace(/-(\w)/g, (_, c) => c.toUpperCase())] = v;
@@ -60,7 +64,7 @@ function parseArgs(argv) {
 	return o;
 }
 
-const USAGE = 'usage: server.js --mirror <dir> [--port 8025] [--theme-dir <htdocs/luci-static/name>] [--theme <name>] [--templates <dir>] [--rootfs <dir>] [--app-dir <pkg>]... [--keep-uniwrt] [--no-synthetic] [--demo] [--lang <lang>]';
+const USAGE = 'usage: server.js --mirror <dir> [--port 8025] [--theme-dir <htdocs/luci-static/name>] [--theme <name>] [--templates <dir>] [--rootfs <dir>] [--app-dir <pkg>]... [--keep-uniwrt] [--no-synthetic] [--demo] [--wired] [--lang <lang>]';
 const opts = parseArgs(process.argv.slice(2));
 if (opts.help || opts.bad || !opts.mirror) {
 	console.error(opts.bad ? `unknown argument ${opts.bad}\n${USAGE}` : USAGE);
@@ -530,7 +534,8 @@ function ubusReply(msg) {
 		if (object === 'session' && method === 'access')
 			return Object.assign(reply, { result: [ 0, { access: !!(args && args.scope === 'ubus' && anonAllowed(args.object, args.function)) } ] });
 	}
-	return Object.assign(reply, store.call(object, method, args || {}));
+	const r = store.call(object, method, args || {});
+	return Object.assign(reply, opts.wired ? wired.transform(object, method, args, r) : r);
 }
 
 async function handleUbus(req, res) {

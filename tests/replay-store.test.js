@@ -78,3 +78,24 @@ test('store: request-derived log text has no control characters', () => {
 	assert.equal(lines.length, 1);
 	assert.doesNotMatch(lines[0], /[\x00-\x1f\x7f-\x9f]/);
 });
+
+test('--wired: no radios, the uplink renamed wan, synthetic networks with growing counters', () => {
+	const wired = require('../dev/replay/wired');
+	const ok = data => ({ result: [ 0, data ] });
+	assert.deepEqual(wired.transform('luci.vantage', 'wireless', {}, ok({ radio0: {} })), ok({}));
+	assert.deepEqual(wired.transform('network.wireless', 'status', {}, ok({ radio0: {} })), ok({}));
+	const dump = wired.transform('network.interface', 'dump', {}, ok({ interface: [
+		{ interface: 'loopback', up: true, l3_device: 'lo' },
+		{ interface: 'lan', up: true, l3_device: 'br-lan', proto: 'static', route: [ { target: '0.0.0.0', mask: 0, nexthop: '192.0.2.1' } ] },
+		{ interface: 'lan6', up: true, l3_device: 'br-lan' }
+	] })).result[1].interface;
+	assert.deepEqual(dump.map(i => i.interface), [ 'loopback', 'wan', ...wired.NETS.map(n => n.iface) ]);
+	assert.equal(dump[1].l3_device, 'br-lan');
+	const devs = () => wired.transform('network.device', 'status', {}, ok({ 'br-lan': {} })).result[1];
+	const a = devs()['br-lan0'].statistics.tx_bytes;
+	assert.ok(devs()['br-lan0'].statistics.tx_bytes >= a);
+	assert.ok('br-lan' in devs());
+	/* one device asked by name, errors: untouched */
+	assert.deepEqual(wired.transform('network.device', 'status', { name: 'eth0' }, ok({ up: true })), ok({ up: true }));
+	assert.deepEqual(wired.transform('luci.vantage', 'wireless', {}, { error: 'x' }), { error: 'x' });
+});

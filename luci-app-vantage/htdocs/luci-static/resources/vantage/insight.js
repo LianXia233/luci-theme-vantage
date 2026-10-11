@@ -32,6 +32,7 @@ return baseclass.extend({
 	/* ------------------------------------------------------------ health */
 
 	/* model + { cpu: { pct, cores } | null, uplinkRate: { rx, tx } | null }
+	   (model.wired: no Wi-Fi checks)
 	   -> [ { id, level, title, value, reason, detail, page } ]
 	   value and reason are short enough for a health chip; detail is the
 	   full sentence (tooltip / accessible description). */
@@ -79,7 +80,20 @@ return baseclass.extend({
 				detail: _('%s of %s available (%s in use)').format(fmt.bytes(mem.available), fmt.bytes(mem.total), fmt.pct(mem.usedPct)), page: PAGES.processes });
 		}
 
-		/* radios; an SSID without clients is normal, not a fault */
+		/* radios and signal; neither applies to a wired-only device */
+		if (!model.wired) this.wifiHealth(model, out);
+
+		/* storage */
+		var root = (dev.storage || [])[0];
+		if (root) out.push({ id: 'storage', level: root.usedPct >= 95 ? 'err' : root.usedPct >= 85 ? 'warn' : 'ok', title: _('Storage'), value: _('%s used').format(fmt.pct(root.usedPct)),
+			reason: _('%s free').format(fmt.bytes(root.free)), detail: _('%s free on the overlay (%s used)').format(fmt.bytes(root.free), fmt.pct(root.usedPct)), page: PAGES.mounts });
+
+		return out;
+	},
+
+	/* the Wi-Fi and Signal checks, appended to out; an SSID without
+	   clients is normal, not a fault */
+	wifiHealth: function(model, out) {
 		var radios = model.radios || [], nSsid = (model.ssids || []).length;
 		var off = radios.filter(function(r) { return r.disabled; }), down = radios.filter(function(r) { return !r.disabled && !r.up; });
 		var idle = (model.ssids || []).filter(function(s) { return s.up && !s.clients; });
@@ -102,13 +116,6 @@ return baseclass.extend({
 			detail: _('%s at %s; below %s roaming and throughput suffer').format(weak[0].name, fmt.dbm(weak[0].signal), fmt.dbm(WEAK_DBM)), page: PAGES.wireless, client: weak[0].mac });
 		else out.push({ id: 'signal', level: 'ok', title: _('Signal'), value: _('All good'), reason: _('All above %s').format(fmt.dbm(WEAK_DBM)),
 			detail: _('All %d clients above %s').format(clients.length, fmt.dbm(WEAK_DBM)), page: PAGES.wireless });
-
-		/* storage */
-		var root = (dev.storage || [])[0];
-		if (root) out.push({ id: 'storage', level: root.usedPct >= 95 ? 'err' : root.usedPct >= 85 ? 'warn' : 'ok', title: _('Storage'), value: _('%s used').format(fmt.pct(root.usedPct)),
-			reason: _('%s free').format(fmt.bytes(root.free)), detail: _('%s free on the overlay (%s used)').format(fmt.bytes(root.free), fmt.pct(root.usedPct)), page: PAGES.mounts });
-
-		return out;
 	},
 
 	/* -> { level, count (warn+err), headline } */

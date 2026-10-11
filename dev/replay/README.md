@@ -8,7 +8,7 @@ Nothing is forwarded anywhere; there is no upstream.
         [--theme-dir <pkg>/htdocs/luci-static/<name>] [--theme <name>] \
         [--templates <pkg>/ucode/template] [--rootfs <device rootfs dump>] \
         [--app-dir <luci-app package dir>]... [--keep-uniwrt] [--no-synthetic] \
-        [--demo] [--lang <lang>]
+        [--demo] [--wired] [--lang <lang>]
 
 Open <http://127.0.0.1:8025/>. Any username/password logs in; the session
 lasts until the replay restarts (log in again after a restart).
@@ -173,6 +173,15 @@ calls then answer from the recording or NOT_FOUND as before).
 - `iwinfo info radioN` when the mirror only recorded it for the radio's
   first interface (`phy6g-ap0`): answered with that interface's recorded
   sample, as iwinfo itself resolves a radio name.
+
+## Wired router (`--wired`)
+
+Serves the recorded access point as a router without Wi-Fi, to work on
+the dashboard's wired-only layout (`wired.js`): the wireless status lists
+no radios, the recorded uplink is renamed `wan` (proto `dhcp`), and
+synthetic `lan`, `vpn` (WireGuard) and `guest` (down) interfaces with
+documentation addresses and growing counters are added. Combine it with
+`--demo` as usual.
 
 ## Translation preview (`--lang`)
 

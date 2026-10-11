@@ -72,6 +72,14 @@ test('health: missing data degrades to info, never throws', () => {
 	assert.equal(insight.summary([]).level, 'ok');
 });
 
+test('health: a wired-only device has no Wi-Fi or Signal check', () => {
+	const m = Object.assign(baseModel(), { wired: true, radios: [], ssids: [], clients: [] });
+	const ids = insight.health(m, { cpu: { pct: 7, cores: [ 1 ] } }).map(c => c.id);
+	assert.deepEqual(ids, [ 'uplink', 'cpu', 'memory', 'storage' ]);
+	/* no radios without the wired flag (unknown yet): the info checks stay */
+	assert.equal(byId(insight.health(Object.assign(baseModel(), { radios: [], clients: [] }), {}), 'radios').level, 'info');
+});
+
 test('experience: strong active client is excellent with a positive reason', () => {
 	const e = insight.experience({ signal: -48, rx: { rate: 576400 }, tx: { rate: 720600 }, txPackets: 1000, txFailed: 3, inactive: 0 });
 	assert.equal(e.score, 100);

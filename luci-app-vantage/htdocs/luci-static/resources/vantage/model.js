@@ -227,6 +227,34 @@ return baseclass.extend({
 		};
 	},
 
+	/* The device's other networks (lan, guest, a VPN, ...): every
+	   interface except loopback and the uplink (wan6 shares wan's device).
+	   One entry per device, by interface name.
+	   -> [ { name, proto, dev, up, ipv4 } ] */
+	networks: function(ifaces, uplink) {
+		var seen = Object.create(null);
+		return arr(ifaces).filter(function(i) {
+			return i && typeof i.interface === 'string' && i.interface !== 'loopback';
+		}).sort(function(a, b) {
+			return a.interface < b.interface ? -1 : a.interface > b.interface ? 1 : 0;
+		}).map(function(i) {
+			var dev = i.l3_device || i.device;
+			var a4 = arr(i['ipv4-address']).filter(function(a) { return a && a.address; })[0];
+			return {
+				name: fmt.safeText(i.interface, 32),
+				proto: typeof i.proto === 'string' ? fmt.safeText(i.proto, 24) : null,
+				dev: typeof dev === 'string' && dev ? dev : null,
+				up: !!i.up,
+				ipv4: a4 ? a4.address + '/' + a4.mask : null
+			};
+		}).filter(function(n) {
+			if (uplink && (n.name === uplink.iface || (n.dev && n.dev === uplink.l3dev))) return false;
+			if (n.dev && seen[n.dev]) return false;
+			if (n.dev) seen[n.dev] = true;
+			return true;
+		});
+	},
+
 	/* The device tree model is sometimes the SoC reference design
 	   ("Qualcomm Technologies, Inc. IPQ5332/RDP442/..."); board_name
 	   ("zyxel,nwa50be") names the actual product then. */
@@ -463,6 +491,7 @@ return baseclass.extend({
 				storage: [ this.mount(info.root, _('Root (overlay)')), this.mount(info.tmp, _('Temporary (RAM)')) ].filter(Boolean)
 			},
 			uplink: uplink,
+			networks: this.networks(raw.ifaces, uplink),
 			radios: radios,
 			ssids: ssids,
 			clients: clients

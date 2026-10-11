@@ -265,6 +265,14 @@ function kv(label, value, mono) {
 	]);
 }
 
+/* one of the four numbers under the network path */
+function kpi(label, value, sub, tone, onclick) {
+	var body = [ E('span', { 'class': 'vt-kpi-label' }, [ label ]), E('span', { 'class': 'vt-kpi-value vt-tn' }, [ value ]), E('span', { 'class': 'vt-kpi-sub' }, [ sub ]) ];
+	return onclick
+		? E('button', { 'type': 'button', 'class': 'vt-kpi vt-kpi-' + (tone || 'plain'), 'click': onclick }, body)
+		: E('div', { 'class': 'vt-kpi vt-kpi-' + (tone || 'plain') }, body);
+}
+
 function tileHead(ic, title, extra) {
 	return E('header', { 'class': 'vt-tile-head' }, [
 		E('h3', { 'class': 'vt-tile-title' }, [ icon(ic), E('span', {}, [ title ]) ]),
@@ -361,12 +369,13 @@ return view.extend({
 			L.resolveDefault(callRead('/proc/stat'), ''),
 			L.resolveDefault(callIfDump(), []),
 			L.resolveDefault(callDevs(), {}),
-			L.resolveDefault(callWifi(), {}),
+			/* null when the call fails: no answer is not "no radios" */
+			L.resolveDefault(callWifi(), null),
 			L.resolveDefault(callHints(), {})
 		]).then(function(r) {
-			var wifiDevs = (r[4] && typeof r[4] === 'object') ? r[4] : {};
+			var wifiDevs = (r[4] && typeof r[4] === 'object') ? r[4] : null;
 			var ifnames = [];
-			Object.keys(wifiDevs).forEach(function(rn) {
+			Object.keys(wifiDevs || {}).forEach(function(rn) {
 				var ifs = (wifiDevs[rn] && Array.isArray(wifiDevs[rn].interfaces)) ? wifiDevs[rn].interfaces : [];
 				ifs.forEach(function(i) {
 					if (i && typeof i.ifname === 'string' && HOSTAPD_OBJ.test(i.ifname) && ifnames.indexOf(i.ifname) < 0) ifnames.push(i.ifname);
@@ -423,6 +432,7 @@ return view.extend({
 			rdns: Object.create(null), rdnsBusy: false, rdnsOff: !data.canRdns,
 			mdns: Object.create(null), mdnsOff: true, mdnsAt: 0,
 			oui: null, ouiLoading: false,
+			wireless: null,
 			lastOk: 0, lastErr: null, paused: false
 		};
 		this.ui = { sort: 'live', dir: -1, filter: '', chip: 'all', chart: 'down', drawer: null, editing: null, hover: null };
@@ -461,6 +471,7 @@ return view.extend({
 			aliases: this.aliases, rdns: st.rdns, mdns: st.mdns,
 			vendor: st.oui ? function(k) { return k ? st.oui.lookup(k) : null; } : null
 		});
+		this.markWired(m, raw);
 		if (m.device.memory) series.push(st.hist.mem, [ at, m.device.memory.usedPct ], WINDOW_MS, HIST_MAX);
 
 		/* interface counters */
@@ -530,6 +541,18 @@ return view.extend({
 		return m;
 	},
 
+	/* Wired-only: the wireless status answered and lists no radios. A
+	   failed call proves nothing, and radios seen once keep the Wi-Fi
+	   layout for the session, so one bad poll cannot reshuffle the page. */
+	markWired: function(m, raw) {
+		var st = this.st;
+		if (raw && raw.wifi) {
+			if (m.radios.length) st.wireless = true;
+			else if (st.wireless !== true) st.wireless = false;
+		}
+		m.wired = st.wireless === false;
+	},
+
 	/* The generation shown is the best standard a station used this
 	   session: single frames (management, retries) go out at legacy
 	   rates and would make the badge flicker. */
@@ -592,6 +615,7 @@ return view.extend({
 			aliases: this.aliases, rdns: st.rdns, mdns: st.mdns,
 			vendor: st.oui ? function(k) { return k ? st.oui.lookup(k) : null; } : null
 		});
+		this.markWired(m, null);
 		this.stickyGen(m);
 		m.clients.forEach(function(c) { c.exp = insight.experience(c); c.firstSeen = st.presence && st.presence.firstSeen[c.mac]; c.isNew = !!st.isNew[c.mac]; });
 		st.talkers = insight.topTalkers(m.clients, st.staRates, 5);
@@ -660,6 +684,7 @@ return view.extend({
 	},
 
 	paint: function() {
+		this.el.root.classList.toggle('vt-wired', !!this.m.wired);
 		this.paintHead();
 		this.paintHealth();
 		this.paintHero();
@@ -728,7 +753,7 @@ return view.extend({
 		txt(this.el.headline, s.headline);
 		var clients = this.m.clients.length;
 		txt(this.el.subline, [ d.model, d.hostname, d.firmware ? d.firmware.replace(/\s+r\d+-[0-9a-f]+$/, '') : null,
-			clients === 1 ? _('1 client') : _('%d clients').format(clients) ].filter(Boolean).join('  ·  '));
+			this.m.wired ? null : clients === 1 ? _('1 client') : _('%d clients').format(clients) ].filter(Boolean).join('  ·  '));
 	},
 
 	paintLive: function() {
@@ -809,7 +834,7 @@ return view.extend({
 		var ap = E('button', { 'type': 'button', 'class': 'vt-node vt-node-ap', 'click': function() { self.openDrawer('device', 'device'); } }, [
 			E('span', { 'class': 'vt-node-ico' }, [ icon('ap') ]),
 			E('span', { 'class': 'vt-node-body' }, [
-				E('span', { 'class': 'vt-node-kicker' }, [ _('This access point') ]),
+				E('span', { 'class': 'vt-node-kicker' }, [ m.wired ? _('This device') : _('This access point') ]),
 				E('span', { 'class': 'vt-node-title' }, [ d.model ]),
 				E('span', { 'class': 'vt-node-sub vt-mono' }, [ up && up.ipv4[0] ? up.ipv4[0].split('/')[0] : fmt.DASH ]),
 				E('span', { 'class': 'vt-node-sub' }, [ d.uptime != null ? _('up %s').format(fmt.duration(d.uptime)) : '' ])
@@ -850,7 +875,8 @@ return view.extend({
 			self.nodes.radios.push({ el: rnode, ssids: ssNodes, active: !!(rr && rr.rx + rr.tx > 50e3), rate: rr ? rr.rx + rr.tx : 0 });
 			branches.appendChild(E('div', { 'class': 'vt-branch' }, [ rnode, ssidCol ]));
 		});
-		if (!m.radios.length) branches.appendChild(E('div', { 'class': 'vt-empty-inline' }, [ _('No radios reported') ]));
+		if (m.wired) this.netBranches(branches);
+		else if (!m.radios.length) branches.appendChild(E('div', { 'class': 'vt-empty-inline' }, [ _('No radios reported') ]));
 
 		this.nodes.upActive = !!(up_r && up_r.rx + up_r.tx > 50e3);
 		this.nodes.upRate = up_r ? up_r.rx + up_r.tx : 0;
@@ -861,10 +887,33 @@ return view.extend({
 		this.paintKpis();
 	},
 
+	/* wired-only: the device's other networks take the radios' place,
+	   wired into the path the same way (nodes.radios) */
+	netBranches: function(branches) {
+		var st = this.st, self = this;
+		var nets = this.m.networks.filter(function(n) { return n.up; }).slice(0, 8);
+		nets.forEach(function(n) {
+			var r = n.dev ? st.devRates[n.dev] : null;
+			var node = E('a', { 'class': 'vt-node vt-node-radio vt-node-net', 'href': L.url.apply(L, insight.PAGES.network),
+				'title': [ n.name, n.dev, n.ipv4 ].filter(Boolean).join(' · ') }, [
+				E('span', { 'class': 'vt-node-body' }, [
+					E('span', { 'class': 'vt-node-kicker' }, [ n.proto || _('Interface') ]),
+					E('span', { 'class': 'vt-node-title' }, [ n.name ]),
+					E('span', { 'class': 'vt-node-sub vt-mono' }, [ n.ipv4 ? n.ipv4.split('/')[0] : (n.dev || fmt.DASH) ]),
+					E('span', { 'class': 'vt-node-sub vt-tn' }, [ r ? '↓ ' + fmt.bitsShort(r.tx) + '  ↑ ' + fmt.bitsShort(r.rx) : fmt.DASH ])
+				])
+			]);
+			self.nodes.radios.push({ el: node, ssids: [], active: !!(r && r.rx + r.tx > 50e3), rate: r ? r.rx + r.tx : 0 });
+			branches.appendChild(E('div', { 'class': 'vt-branch' }, [ node ]));
+		});
+		if (!nets.length) branches.appendChild(E('div', { 'class': 'vt-empty-inline' }, [ _('No other interfaces are up') ]));
+	},
+
 	/* four numbers under the path: who is here, what flows, where, and
 	   who is worst off */
 	paintKpis: function() {
 		var self = this, m = this.m, st = this.st, up = st.uplinkRate;
+		if (m.wired) return this.paintNetKpis();
 		var byBand = {};
 		m.clients.forEach(function(c) { byBand[c.band] = (byBand[c.band] || 0) + 1; });
 		var bandText = Object.keys(byBand).sort().map(function(b) { return _('%d on %s').format(byBand[b], wifi.bandLabel(b)); }).join(' · ');
@@ -872,12 +921,6 @@ return view.extend({
 		m.radios.forEach(function(r) { var i = st.radioInsights[r.id]; if (i && i.busiest) busiest = { r: r, share: i.share }; });
 		var weakest = m.clients.filter(function(c) { return c.signal != null; }).sort(function(a, b) { return a.signal - b.signal; })[0];
 
-		function kpi(label, value, sub, tone, onclick) {
-			var body = [ E('span', { 'class': 'vt-kpi-label' }, [ label ]), E('span', { 'class': 'vt-kpi-value vt-tn' }, [ value ]), E('span', { 'class': 'vt-kpi-sub' }, [ sub ]) ];
-			return onclick
-				? E('button', { 'type': 'button', 'class': 'vt-kpi vt-kpi-' + (tone || 'plain'), 'click': onclick }, body)
-				: E('div', { 'class': 'vt-kpi vt-kpi-' + (tone || 'plain') }, body);
-		}
 		dom.content(this.el.kpis, [
 			kpi(_('Clients'), String(m.clients.length), bandText || _('none connected'), 'plain', function() { self.el.clients.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }); }),
 			kpi(_('Traffic now'), up ? '↓ ' + fmt.bits(up.rx) : fmt.DASH, up ? _('↑ %s · via %s').format(fmt.bits(up.tx), m.uplink ? m.uplink.dev : '') : _('measuring'), 'plain', function() { self.openDrawer('uplink', 'uplink'); }),
@@ -885,6 +928,26 @@ return view.extend({
 				: kpi(_('Busiest radio'), fmt.DASH, _('no Wi-Fi traffic yet'), 'plain'),
 			weakest ? kpi(_('Weakest signal'), fmt.dbm(weakest.signal), weakest.name, weakest.signal < insight.WEAK_DBM ? 'warn' : 'plain', function() { self.openDrawer('client', weakest.mac); })
 				: kpi(_('Weakest signal'), fmt.DASH, _('no clients'), 'plain')
+		]);
+	},
+
+	/* wired-only: what flows, how long the uplink has held, which
+	   networks are up and which is busiest */
+	paintNetKpis: function() {
+		var self = this, m = this.m, st = this.st, up = st.uplinkRate, link = m.uplink;
+		var nets = m.networks, upNets = nets.filter(function(n) { return n.up; });
+		var busiest = null;
+		upNets.forEach(function(n) {
+			var r = n.dev ? st.devRates[n.dev] : null;
+			if (r && r.rx + r.tx > 0 && (!busiest || r.rx + r.tx > busiest.r.rx + busiest.r.tx)) busiest = { n: n, r: r };
+		});
+		function toNetwork() { window.location.href = L.url.apply(L, insight.PAGES.network); }
+		dom.content(this.el.kpis, [
+			kpi(_('Traffic now'), up ? '↓ ' + fmt.bits(up.rx) : fmt.DASH, up ? _('↑ %s · via %s').format(fmt.bits(up.tx), link ? link.dev : '') : _('measuring'), 'plain', function() { self.openDrawer('uplink', 'uplink'); }),
+			kpi(_('Connected for'), link && link.uptime != null ? fmt.duration(link.uptime) : fmt.DASH, link ? [ link.iface, link.proto ].filter(Boolean).join(' · ') : _('no uplink'), 'plain', function() { self.openDrawer('uplink', 'uplink'); }),
+			kpi(_('Networks'), String(upNets.length), nets.length > upNets.length ? _('%d down').format(nets.length - upNets.length) : _('all up'), 'plain', toNetwork),
+			busiest ? kpi(_('Busiest network'), busiest.n.name, '↓ ' + fmt.bits(busiest.r.tx) + '  ↑ ' + fmt.bits(busiest.r.rx), 'plain', toNetwork)
+				: kpi(_('Busiest network'), fmt.DASH, _('no traffic yet'), 'plain')
 		]);
 	},
 
@@ -1958,7 +2021,7 @@ return view.extend({
 			return;
 		}
 		/* 'f' focuses the client filter; '/' and Ctrl+K belong to the theme */
-		if ((ev.key === 'f' || ev.key === 'F') && !typing && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !this.ui.drawer) {
+		if ((ev.key === 'f' || ev.key === 'F') && !typing && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !this.ui.drawer && !this.m.wired) {
 			ev.preventDefault();
 			this.el.filter.focus();
 			this.el.filter.select();

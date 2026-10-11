@@ -312,6 +312,16 @@ html[data-darkmode="true"] .vt-app {
 	}
 }
 
+/* wired-only devices: no Wi-Fi tiles; path, chart and system remain */
+.vt-app.vt-wired .vt-radios, .vt-app.vt-wired .vt-clients, .vt-app.vt-wired .vt-side { display: none; }
+.vt-app.vt-wired .vt-grid { grid-template-areas: "hero" "chart" "sys"; }
+@container vt (min-width: 700px) {
+	.vt-app.vt-wired .vt-grid { grid-template-areas: "hero hero" "chart chart" "sys sys"; }
+}
+@container vt (min-width: 1100px) {
+	.vt-app.vt-wired .vt-grid { grid-template-areas: "hero hero hero sys" "chart chart chart chart"; }
+}
+
 .vt-app .vt-tile {
 	position: relative;
 	min-width: 0;
@@ -429,6 +439,9 @@ html[data-darkmode="true"] .vt-app {
 }
 @container vt (min-width: 700px) { .vt-app .vt-health { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @container vt (min-width: 1100px) { .vt-app .vt-health { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+/* wired-only: four checks */
+@container vt (min-width: 700px) { .vt-app.vt-wired .vt-health { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container vt (min-width: 1100px) { .vt-app.vt-wired .vt-health { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .vt-app .vt-chip {
 	display: flex; align-items: flex-start; gap: 10px; min-width: 0;
 	padding: 11px 12px; border-radius: var(--vt-r);
@@ -538,6 +551,7 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-node-ap .vt-node-title { font-size: 14.5px; }
 .vt-app .vt-node-gen { text-transform: none; letter-spacing: 0; font-weight: 560; }
 .vt-app .vt-node-radio { padding: 8px 11px; }
+.vt-app .vt-node-net, .vt-app .vt-node-net:hover { text-decoration: none; color: var(--vt-text); }
 .vt-app .vt-node-ssid { padding: 7px 10px; }
 .vt-app .vt-node-ssid .vt-node-title { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .vt-app .vt-node-ssid .vt-node-title .vt-ico { color: var(--vt-text-3); }

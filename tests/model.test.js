@@ -120,6 +120,27 @@ test('resolveUplink: router prefers wan, DSA offload uses conduit', () => {
 	assert.equal(u.statsDev, 'eth1');
 });
 
+test('networks: other interfaces, not loopback or the uplink, one per device', () => {
+	const ifaces = [
+		{ interface: 'wan6', up: true, l3_device: 'eth1', proto: 'dhcpv6' },
+		{ interface: 'wan', up: true, l3_device: 'eth1', proto: 'dhcp' },
+		{ interface: 'loopback', up: true, l3_device: 'lo' },
+		{ interface: 'vpn', up: true, l3_device: 'wg0', proto: 'wireguard', 'ipv4-address': [ { address: '203.0.113.1', mask: 24 } ] },
+		{ interface: 'lan', up: true, l3_device: 'br-lan', device: 'br-lan', proto: 'static', 'ipv4-address': [ { address: '198.51.100.1', mask: 24 } ] },
+		{ interface: 'lan6', up: true, l3_device: 'br-lan', proto: 'dhcpv6' },
+		{ interface: 'guest', up: false, device: 'br-guest', proto: 'static' },
+		null, { up: true }
+	];
+	const up = model.resolveUplink(ifaces, {});
+	assert.equal(up.iface, 'wan');
+	assert.deepEqual(model.networks(ifaces, up), [
+		{ name: 'guest', proto: 'static', dev: 'br-guest', up: false, ipv4: null },
+		{ name: 'lan', proto: 'static', dev: 'br-lan', up: true, ipv4: '198.51.100.1/24' },
+		{ name: 'vpn', proto: 'wireguard', dev: 'wg0', up: true, ipv4: '203.0.113.1/24' }
+	]);
+	assert.deepEqual(model.networks(null, null), []);
+});
+
 test('deviceModel: board_name beats a reference-design model string', () => {
 	assert.equal(model.deviceModel({ model: 'Qualcomm Technologies, Inc. IPQ5332/RDP442/AP-MI01.3', board_name: 'zyxel,nwa50be' }), 'Zyxel NWA50BE');
 	assert.equal(model.deviceModel({ model: 'Example Router X1', board_name: 'example,x1' }), 'Example Router X1');
