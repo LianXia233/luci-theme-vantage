@@ -5,6 +5,13 @@ promised; issues and pull requests for any of it are welcome.
 
 ## Next
 
+### Wired-only routers
+
+On a device without radios (x86 boxes, wired routers), hide the Radios
+tile, the wireless branch of the network path and the Wi-Fi health check
+instead of showing them empty
+([#7](https://github.com/anothaDev/luci-theme-vantage/issues/7)).
+
 ### Multiple access points (planned for 1.1)
 
 Show the radios, SSIDs and clients of other OpenWrt access points on the
@@ -35,6 +42,17 @@ present) and results must be built as text nodes like everything else.
 
 ## Later
 
+- **Combined throughput chart:** download and upload of a link on one
+  time axis (download above, upload mirrored below) instead of a toggle
+  ([#7](https://github.com/anothaDev/luci-theme-vantage/issues/7)).
+- **Tunnels and proxies in the network path:** show active tunnel
+  interfaces (TUN, WireGuard, OpenVPN) between the device and the
+  internet with their live rates, and name known proxy suites (OpenClash,
+  PassWall, Mihomo, sing-box) with their running state, from a small
+  table of service names. Needs one read-only ACL addition (the list of
+  running services). Suite internals (nodes, rules) stay in their own
+  pages for now; reading them would mean API secrets and HTTP calls from
+  rpcd ([#7](https://github.com/anothaDev/luci-theme-vantage/issues/7)).
 - **One-click actions (v2):** restart a radio, disconnect or block a
   client, enable or disable an SSID. Each action gets its own narrow ACL
   group and a confirmation; the read-only dashboard stays the default.
@@ -52,8 +70,6 @@ present) and results must be built as text nodes like everything else.
   dashboard when it is installed.
 - **OpenWrt 24.10 support:** test the `.ipk` build and the widget
   differences listed in `docs/luci-contract.md`.
-- **Translations:** the strings already go through `_()`; add `po/`
-  catalogues.
 
 ## Upstream
 
