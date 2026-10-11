@@ -110,6 +110,13 @@ visible focus, reduced-motion respected.
 - **Health**: simple, explainable scores (e.g. signal < −75 dBm, uplink
   down, memory > 90 %, radio disabled) each with a one-line reason and a
   link to the page that fixes it.
+- **Layout**: tiles are packed into columns (four, two or one by width);
+  each tile has a column, a width and a place in the order, and stacks
+  under the earlier tiles in its columns. "Layout" lets the viewer drag
+  tiles, move them with buttons or arrow keys, change their width within
+  a per-tile minimum and hide them. Saved in `localStorage` per screen
+  class (and separately for wired devices), validated on read; never on
+  the device.
 - Polling via `poll.add` with sane intervals; pauses when the tab is hidden.
 - ACL: three groups. `luci-app-vantage` (read): `system info/board`,
   `network.interface dump`, `network.device status`, `iwinfo

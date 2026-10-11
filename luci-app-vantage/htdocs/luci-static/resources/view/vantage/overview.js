@@ -10,6 +10,7 @@
 'require vantage.model as model';
 'require vantage.insight as insight';
 'require vantage.series as series';
+'require vantage.layout as layout';
 
 /* Vantage dashboard (luci-app-vantage): a live, read-only overview of the
    device, its uplink, radios, SSIDs and stations. The only write is the
@@ -104,7 +105,13 @@ var ICONS = {
 	watch: [ 'M8.5 6h7A1.5 1.5 0 0 1 17 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 16.5v-9A1.5 1.5 0 0 1 8.5 6Z', 'M9 6l.5-3h5l.5 3M9 18l.5 3h5l.5-3' ],
 	iot: [ 'M9 18h6', 'M10 21h4', 'M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3Z' ],
 	router: [ 'M4.5 13h15a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1Z', 'M7 16h.01M10 16h.01', 'M8 13 6 6.5M16 13l2-6.5' ],
-	device: [ 'M7 3.5h10A1.5 1.5 0 0 1 18.5 5v14a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5Z', 'M10 17.5h4', 'M9 7.5h6' ]
+	device: [ 'M7 3.5h10A1.5 1.5 0 0 1 18.5 5v14a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5Z', 'M10 17.5h4', 'M9 7.5h6' ],
+	layout: [ 'M4.5 4.5h6v7h-6zM13.5 4.5h6v4h-6zM13.5 11.5h6v8h-6zM4.5 14.5h6v5h-6z' ],
+	grip: [ 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01' ],
+	left: [ 'M14.5 6l-6 6 6 6' ],
+	plus: [ 'M12 5.5v13M5.5 12h13' ],
+	minus: [ 'M5.5 12h13' ],
+	hide: [ 'M3.5 12s3-6 8.5-6 8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6Z', 'M12 9.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5Z', 'M4.5 19.5l15-15' ]
 };
 
 function svgRoot(cls, viewBox) {
@@ -329,6 +336,26 @@ function writeFolds(v) {
 	try { window.localStorage.setItem(FOLD_KEY, JSON.stringify(v)); } catch (e) {}
 }
 
+/* Tile layouts the viewer arranged, per screen class, in this browser;
+   vantage.layout validates whatever comes back */
+var LAYOUT_KEY = 'vantage.layout.v1';
+
+function readLayouts() {
+	var v = null;
+	try { v = JSON.parse(window.localStorage.getItem(LAYOUT_KEY) || 'null'); } catch (e) { v = null; }
+	var out = Object.create(null);
+	if (v && typeof v === 'object' && !Array.isArray(v))
+		Object.keys(v).forEach(function(k) { if (/^(wide|mid|narrow)(-wired)?$/.test(k) && Array.isArray(v[k])) out[k] = v[k]; });
+	return out;
+}
+
+function writeLayouts(v) {
+	try {
+		if (Object.keys(v).length) window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(v));
+		else window.localStorage.removeItem(LAYOUT_KEY);
+	} catch (e) {}
+}
+
 /* ================================================================= view */
 
 return view.extend({
@@ -440,6 +467,9 @@ return view.extend({
 		this.folds = readFolds();
 		this.foldEls = {};
 		this.foldBtns = {};
+		this.layouts = readLayouts();
+		this.editing = false;
+		this.drag = null;
 		this.applyMdns(data.mdns);
 		this.aliases = this.aliases || {};
 	},
@@ -656,14 +686,8 @@ return view.extend({
 			E('div', { 'class': 'vt-body' }, [
 				this.buildHead(),
 				this.el.health = E('div', { 'class': 'vt-health', 'role': 'list', 'aria-label': _('Health checks') }),
-				E('div', { 'class': 'vt-grid' }, [
-					this.buildHero(),
-					this.buildSystem(),
-					this.buildChart(),
-					this.buildRadios(),
-					this.buildClients(),
-					E('div', { 'class': 'vt-side' }, [ this.buildTalkers(), this.buildSsids() ])
-				])
+				this.buildEditBar(),
+				this.el.grid = E('div', { 'class': 'vt-grid vt-grid-wait' }, this.buildTiles())
 			]),
 			this.buildDrawer()
 		]);
@@ -679,6 +703,12 @@ return view.extend({
 		document.addEventListener('keydown', L.bind(this.handleKey, this));
 		window.setInterval(function() { self.paintLive(); }, 1000);
 		if (window.ResizeObserver) new ResizeObserver(function() { self.scheduleWires(); }).observe(this.el.path);
+		if (window.ResizeObserver) {
+			var ro = new ResizeObserver(function() { self.scheduleLayout(); });
+			ro.observe(this.el.grid);
+			layout.TILES.forEach(function(id) { ro.observe(self.tiles[id]); });
+		}
+		window.addEventListener('resize', function() { self.scheduleLayout(); });
 		window.addEventListener('hashchange', function() { self.openFromHash(); });
 		window.requestAnimationFrame(function() { self.drawWires(); self.openFromHash(); });
 		return root;
@@ -698,6 +728,7 @@ return view.extend({
 		this.paintDrawer();
 		this.paintLive();
 		this.scheduleWires();
+		this.scheduleLayout();
 	},
 
 	/* ------------------------------------------------------------ folds */
@@ -727,8 +758,336 @@ return view.extend({
 		this.folds[key] = !this.folds[key];
 		writeFolds(this.folds);
 		this.applyFold(key);
+		if (this.held) delete this.held[key];
 		if (key === 'hero') this.scheduleWires();
 		if (key === 'chart') this.paintChart();
+	},
+
+	/* ----------------------------------------------------------- layout */
+
+	/* the tiles in a fixed set; vantage.layout decides order and size */
+	buildTiles: function() {
+		var self = this;
+		this.tiles = {
+			hero: this.buildHero(), chart: this.buildChart(), radios: this.buildRadios(), clients: this.buildClients(),
+			sys: this.buildSystem(), talk: this.buildTalkers(), ssids: this.buildSsids()
+		};
+		this.tileNames = {
+			hero: _('Network path'), chart: _('Throughput'), radios: _('Radios'), clients: _('Clients'),
+			sys: _('System'), talk: _('Top talkers'), ssids: _('Wireless networks')
+		};
+		this.ov = {};
+		this.el.ghost = E('div', { 'class': 'vt-drop-ghost', 'aria-hidden': 'true' });
+		return [ this.el.ghost ].concat(layout.TILES.map(function(id) {
+			var t = self.tiles[id];
+			t.classList.add('vt-cell');
+			t.appendChild(self.buildOverlay(id));
+			return t;
+		}));
+	},
+
+	/* the stored layout for this screen class, or the default */
+	layoutFor: function(tier, wired) {
+		var k = layout.key(tier, wired);
+		return layout.normalize(this.layouts[k] || null, tier, wired);
+	},
+
+	scheduleLayout: function() {
+		if (this.layoutRaf || !this.el || !this.el.grid) return;
+		var self = this;
+		this.layoutRaf = window.requestAnimationFrame(function() { self.layoutRaf = null; self.doLayout(); });
+	},
+
+	/* measure the shown tiles at their widths, pack them, place them;
+	   widths and columns come from CSS (--c, --w, --cols), only the
+	   vertical positions from here */
+	doLayout: function() {
+		var self = this, grid = this.el.grid, tiles = this.tiles;
+		var width = grid.clientWidth;
+		if (!width || !this.m) return;
+		var tier = layout.tier(width), cols = layout.cols(tier), wired = !!this.m.wired;
+		var list = this.drag ? this.drag.list : this.layoutFor(tier, wired);
+		var gap = parseFloat(window.getComputedStyle(grid).getPropertyValue('--vt-gap')) || 14;
+		var shown = list.filter(function(e) { return !e.hide; });
+		var on = Object.create(null);
+		shown.forEach(function(e) { on[e.id] = true; });
+
+		/* keep what the viewer is reading in place when tiles above change */
+		var sc = document.scrollingElement || document.documentElement, anchor = null, before = 0;
+		if (sc.scrollTop > 0 && !this.drag) {
+			for (var i = 0; i < shown.length && !anchor; i++) {
+				var r0 = tiles[shown[i].id].getBoundingClientRect();
+				if (r0.height && r0.bottom > 0) { anchor = tiles[shown[i].id]; before = r0.top; }
+			}
+		}
+
+		grid.style.setProperty('--cols', cols.toFixed(0));
+		layout.TILES.forEach(function(id) { tiles[id].classList.toggle('vt-cell-off', !on[id]); });
+		shown.forEach(function(e) {
+			var t = tiles[e.id];
+			t.style.setProperty('--c', Math.min(e.c, cols - 1).toFixed(0));
+			t.style.setProperty('--w', Math.min(e.w, cols).toFixed(0));
+			t.style.minHeight = '';
+		});
+		/* live content changes hold a tile's height for a while; a new
+		   width or an edit shows true sizes at once */
+		if (this.heldWidth !== width || this.drag) { this.held = Object.create(null); this.heldWidth = width; }
+		var held = this.held, now = Date.now();
+		var items = shown.map(function(e) {
+			var nat = tiles[e.id].getBoundingClientRect().height;
+			held[e.id] = layout.settle(held[e.id], nat, now);
+			return { id: e.id, c: e.c, w: e.w, h: held[e.id].h, nat: nat };
+		});
+		var p = layout.pack(items, cols, gap);
+		items.forEach(function(it) {
+			var r = p.rects[it.id], t = tiles[it.id];
+			if (r.h > it.nat + 0.5) t.style.minHeight = r.h.toFixed(1) + 'px';
+			t.style.setProperty('--y', r.top.toFixed(1) + 'px');
+		});
+		grid.style.height = p.height.toFixed(1) + 'px';
+		var g = this.drag && p.rects[this.drag.id], ghost = this.el.ghost;
+		ghost.classList.toggle('vt-on', !!g);
+		if (g) {
+			ghost.style.setProperty('--c', g.c.toFixed(0));
+			ghost.style.setProperty('--w', g.w.toFixed(0));
+			ghost.style.setProperty('--y', g.top.toFixed(1) + 'px');
+			ghost.style.height = g.h.toFixed(1) + 'px';
+		}
+		this.lay = { tier: tier, cols: cols, wired: wired, list: list, rects: p.rects, gap: gap, width: width };
+
+		/* reading and tab order follow the layout; not while dragging,
+		   moving the dragged tile would end the drag */
+		if (!this.drag) {
+			var want = shown.map(function(e) { return tiles[e.id]; });
+			var have = Array.prototype.filter.call(grid.children, function(c) { return c.classList.contains('vt-cell') && !c.classList.contains('vt-cell-off'); });
+			if (want.some(function(t, k) { return have[k] !== t; })) {
+				var focus = document.activeElement;
+				want.forEach(function(t) { grid.appendChild(t); });
+				if (focus && focus !== document.activeElement && grid.contains(focus)) focus.focus();
+			}
+		}
+		if (anchor) {
+			var d = anchor.getBoundingClientRect().top - before;
+			if (Math.abs(d) > 0.5) sc.scrollTop += d;
+		}
+		grid.classList.remove('vt-grid-wait');
+		if (this.editing) this.paintEdit();
+	},
+
+	setLayout: function(list) {
+		var l = this.lay;
+		if (!l) return;
+		var k = layout.key(l.tier, l.wired);
+		if (layout.same(list, layout.defaults(l.tier, l.wired))) delete this.layouts[k];
+		else this.layouts[k] = layout.compact(list);
+		writeLayouts(this.layouts);
+		this.held = Object.create(null);
+		this.doLayout();
+	},
+
+	editTile: function(id, fn, say) {
+		var l = this.lay;
+		if (!l) return;
+		var next = fn(l.list);
+		if (layout.same(next, l.list)) return;
+		this.setLayout(next);
+		if (say) this.announce(say);
+	},
+
+	announce: function(text) {
+		var s = this.el.editSay;
+		dom.content(s, []);
+		window.setTimeout(function() { txt(s, text); }, 30);
+	},
+
+	setEditing: function(on) {
+		this.editing = !!on;
+		this.el.root.classList.toggle('vt-editing', this.editing);
+		this.el.layoutBtn.setAttribute('aria-pressed', String(this.editing));
+		this.el.editBar.hidden = !this.editing;
+		if (this.editing) {
+			this.doLayout();
+			this.el.editDone.focus();
+		}
+		else this.el.layoutBtn.focus();
+	},
+
+	buildEditBar: function() {
+		var self = this, el = this.el;
+		el.editHint = E('span', { 'class': 'vt-hint' });
+		el.editHidden = E('div', { 'class': 'vt-edit-hidden' });
+		el.editSay = E('span', { 'class': 'vt-sr', 'role': 'status', 'aria-live': 'polite' });
+		el.editBar = E('div', { 'class': 'vt-editbar', 'role': 'region', 'aria-label': _('Arrange the dashboard'), 'hidden': 'hidden' }, [
+			E('div', { 'class': 'vt-editbar-text' }, [ E('strong', {}, [ _('Arrange the dashboard') ]), el.editHint ]),
+			el.editHidden,
+			E('div', { 'class': 'vt-editbar-actions' }, [
+				E('button', { 'type': 'button', 'class': 'vt-btn', 'click': function() {
+					var l = self.lay;
+					if (!l) return;
+					delete self.layouts[layout.key(l.tier, l.wired)];
+					writeLayouts(self.layouts);
+					self.held = Object.create(null);
+					self.doLayout();
+					self.announce(_('Layout reset'));
+				} }, [ _('Reset') ]),
+				el.editDone = E('button', { 'type': 'button', 'class': 'vt-btn vt-btn-primary', 'click': function() { self.setEditing(false); } }, [ _('Done') ])
+			]),
+			el.editSay
+		]);
+		return el.editBar;
+	},
+
+	/* the controls laid over a tile while arranging */
+	buildOverlay: function(id) {
+		var self = this, name = this.tileNames[id], o = {};
+		function btn(cls, ic, label, fn) {
+			return E('button', { 'type': 'button', 'class': 'vt-ov-btn ' + cls, 'aria-label': label, 'title': label, 'click': fn }, [ icon(ic) ]);
+		}
+		o.grip = E('button', { 'type': 'button', 'class': 'vt-ov-grip', 'aria-label': _('Move %s: drag, or use the arrow keys').format(name), 'title': _('Drag to move') }, [ icon('grip') ]);
+		o.grip.addEventListener('pointerdown', function(ev) { self.dragStart(id, ev); });
+		o.grip.addEventListener('keydown', function(ev) {
+			var k = ev.key, act = k === 'ArrowLeft' ? o.left : k === 'ArrowRight' ? o.right : k === 'ArrowUp' ? o.up : k === 'ArrowDown' ? o.down : null;
+			if (!act) return;
+			ev.preventDefault();
+			if (!act.disabled) act.click();
+		});
+		o.left = btn('vt-ov-col', 'left', _('Move %s left').format(name), function() {
+			self.editTile(id, function(l) { return layout.shift(l, id, -1, self.lay.tier); }, _('%s moved left').format(name));
+		});
+		o.right = btn('vt-ov-col vt-ov-flip', 'left', _('Move %s right').format(name), function() {
+			self.editTile(id, function(l) { return layout.shift(l, id, 1, self.lay.tier); }, _('%s moved right').format(name));
+		});
+		o.up = btn('', 'up', _('Move %s up').format(name), function() {
+			self.editTile(id, function(l) { return layout.move(l, id, -1); }, _('%s moved up').format(name));
+		});
+		o.down = btn('', 'down', _('Move %s down').format(name), function() {
+			self.editTile(id, function(l) { return layout.move(l, id, 1); }, _('%s moved down').format(name));
+		});
+		o.narrow = btn('vt-ov-col', 'minus', _('Make %s narrower').format(name), function() {
+			self.editTile(id, function(l) { return layout.resize(l, id, -1, self.lay.tier); }, _('%s is narrower').format(name));
+		});
+		o.wide = btn('vt-ov-col', 'plus', _('Make %s wider').format(name), function() {
+			self.editTile(id, function(l) { return layout.resize(l, id, 1, self.lay.tier); }, _('%s is wider').format(name));
+		});
+		o.size = E('span', { 'class': 'vt-ov-size vt-ov-col vt-tn' });
+		o.hide = btn('vt-ov-hide', 'hide', _('Hide %s').format(name), function() {
+			self.editTile(id, function(l) { return layout.setHidden(l, id, true); }, _('%s hidden').format(name));
+			self.el.editDone.focus();
+		});
+		o.root = E('div', { 'class': 'vt-ov vt-fold-keep', 'role': 'group', 'aria-label': name }, [
+			E('div', { 'class': 'vt-ov-bar' }, [
+				o.grip,
+				E('span', { 'class': 'vt-ov-name' }, [ name ]),
+				E('span', { 'class': 'vt-ov-btns' }, [ o.up, o.down, o.left, o.right, o.narrow, o.size, o.wide, o.hide ])
+			])
+		]);
+		this.ov[id] = o;
+		return o.root;
+	},
+
+	/* button states, sizes and the hidden-tile list for the current layout */
+	paintEdit: function() {
+		var self = this, l = this.lay;
+		if (!l) return;
+		var shown = l.list.filter(function(e) { return !e.hide; });
+		txt(this.el.editHint, l.tier === 'wide' ? _('Drag a tile by its handle or use its buttons. Saved in this browser for wide screens.')
+			: l.tier === 'mid' ? _('Drag a tile by its handle or use its buttons. Saved in this browser for medium screens.')
+			: _('Drag a tile by its handle or use its buttons. Saved in this browser for narrow screens.'));
+		this.el.root.classList.toggle('vt-edit-1col', l.cols === 1);
+		shown.forEach(function(e, i) {
+			var o = self.ov[e.id];
+			o.up.disabled = i === 0;
+			o.down.disabled = i === shown.length - 1;
+			o.left.disabled = e.c <= 0;
+			o.right.disabled = e.c + e.w >= l.cols;
+			o.narrow.disabled = e.w <= layout.minW(e.id, l.tier);
+			o.wide.disabled = e.w >= l.cols;
+			o.hide.disabled = shown.length <= 1;
+			txt(o.size, e.w + '/' + l.cols);
+			o.size.setAttribute('title', _('%d of %d columns').format(e.w, l.cols));
+		});
+		var hidden = l.list.filter(function(e) { return e.hide; });
+		dom.content(this.el.editHidden, hidden.length ? [ E('span', { 'class': 'vt-label' }, [ _('Hidden') ]) ].concat(hidden.map(function(e) {
+			var name = self.tileNames[e.id];
+			return E('button', { 'type': 'button', 'class': 'vt-fchip', 'title': _('Show %s').format(name), 'click': function() {
+				self.editTile(e.id, function(list) { return layout.setHidden(list, e.id, false); }, _('%s shown').format(name));
+			} }, [ icon('plus'), E('span', {}, [ name ]) ]);
+		})) : []);
+	},
+
+	/* dragging by the handle: the tile follows the pointer, the others
+	   make room where it would land */
+	dragStart: function(id, ev) {
+		if (ev.button !== 0 || !this.lay || this.drag) return;
+		ev.preventDefault();
+		var self = this, t = this.tiles[id], grip = this.ov[id].grip, tr = t.getBoundingClientRect();
+		try { grip.setPointerCapture(ev.pointerId); } catch (e) {}
+		this.drag = { id: id, list: layout.copy(this.lay.list), start: layout.copy(this.lay.list), gx: ev.clientX - tr.left, gy: ev.clientY - tr.top, x: ev.clientX, y: ev.clientY, raf: null };
+		t.classList.add('vt-dragging');
+		this.el.root.classList.add('vt-drag-on');
+		function move(e) { self.drag.x = e.clientX; self.drag.y = e.clientY; self.dragMove(); }
+		function end(e) {
+			grip.removeEventListener('pointermove', move);
+			grip.removeEventListener('pointerup', end);
+			grip.removeEventListener('pointercancel', end);
+			self.dragEnd(e.type === 'pointercancel');
+		}
+		grip.addEventListener('pointermove', move);
+		grip.addEventListener('pointerup', end);
+		grip.addEventListener('pointercancel', end);
+		this.dragMove();
+		this.dragScroll();
+	},
+
+	dragMove: function() {
+		var d = this.drag, l = this.lay;
+		if (!d || !l) return;
+		var t = this.tiles[d.id], gr = this.el.grid.getBoundingClientRect();
+		var x = d.x - gr.left - d.gx, y = d.y - gr.top - d.gy;
+		t.style.left = x.toFixed(1) + 'px';
+		t.style.top = y.toFixed(1) + 'px';
+
+		var step = (l.width + l.gap) / l.cols, me = d.list[layout.indexOf(d.list, d.id)];
+		var c = Math.max(0, Math.min(l.cols - me.w, Math.round(x / step)));
+		var px = d.x - gr.left, py = d.y - gr.top, target = null, after = false;
+		d.list.forEach(function(e) {
+			var r = l.rects[e.id];
+			if (e.hide || e.id === d.id || !r) return;
+			var rx = r.c * step, rw = r.w * step - l.gap;
+			if (px >= rx && px <= rx + rw && py >= r.top && py <= r.top + r.h) {
+				target = e.id;
+				after = py > r.top + r.h / 2;
+			}
+		});
+		var next = layout.drop(d.list, d.id, c, target, after, l.tier);
+		if (!layout.same(next, d.list)) { d.list = next; this.doLayout(); }
+	},
+
+	/* scroll while the pointer rests near the top or bottom edge */
+	dragScroll: function() {
+		var self = this, d = this.drag;
+		if (!d) return;
+		var edge = 64, v = d.y < edge ? -(edge - d.y) / 4 : d.y > window.innerHeight - edge ? (d.y - window.innerHeight + edge) / 4 : 0;
+		if (v) { window.scrollBy(0, Math.round(v)); this.dragMove(); }
+		d.raf = window.requestAnimationFrame(function() { self.dragScroll(); });
+	},
+
+	dragEnd: function(cancel) {
+		var d = this.drag;
+		if (!d) return;
+		if (d.raf) window.cancelAnimationFrame(d.raf);
+		var t = this.tiles[d.id];
+		t.classList.remove('vt-dragging');
+		this.el.root.classList.remove('vt-drag-on');
+		t.style.left = '';
+		t.style.top = '';
+		var list = cancel ? d.start : d.list;
+		this.drag = null;
+		if (!layout.same(list, d.start)) {
+			this.setLayout(list);
+			this.announce(_('%s moved').format(this.tileNames[d.id]));
+		}
+		else this.doLayout();
 	},
 
 	/* ------------------------------------------------------------- head */
@@ -744,6 +1103,10 @@ return view.extend({
 			el.live = E('div', { 'class': 'vt-livepill', 'role': 'status', 'aria-live': 'off' }, [
 				E('span', { 'class': 'vt-live-beat' }),
 				el.liveText = E('span', { 'class': 'vt-live-text' })
+			]),
+			el.layoutBtn = E('button', { 'type': 'button', 'class': 'vt-btn vt-btn-ghost vt-layout-btn', 'aria-pressed': 'false',
+				'title': _('Arrange the dashboard'), 'click': L.bind(function() { this.setEditing(!this.editing); }, this) }, [
+				icon('layout'), E('span', {}, [ _('Layout') ])
 			])
 		]);
 	},
@@ -2038,6 +2401,10 @@ return view.extend({
 		var t = ev.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 		if (ev.key === 'Escape' && this.ui.drawer && !document.body.classList.contains('modal-overlay-active')) {
 			this.closeDrawer();
+			return;
+		}
+		if (ev.key === 'Escape' && this.editing && !this.drag) {
+			this.setEditing(false);
 			return;
 		}
 		/* 'f' focuses the client filter; '/' and Ctrl+K belong to the theme */

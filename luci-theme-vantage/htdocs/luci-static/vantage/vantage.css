@@ -140,6 +140,8 @@ html[data-darkmode="true"] {
 	--v-r: var(--r);
 	--v-r-lg: var(--r-lg);
 	--v-shadow: 0 1px 2px rgba(20, 23, 26, .06), 0 1px 0 rgba(20, 23, 26, .03);
+	/* where sticky content may start: below the top bar and page tabs */
+	--v-stick-top: var(--stick-top);
 
 	/* charts (stock realtime graphs, channel analysis, the dashboard app).
 	   Categorical, fixed order, never cycled by rank: lime (the accent, series 1

@@ -277,56 +277,80 @@ html[data-darkmode="true"] .vt-app {
 
 /* ------------------------------------------------------------ 3. layout */
 
-.vt-app .vt-grid {
-	display: grid;
-	gap: 14px;
-	grid-template-columns: minmax(0, 1fr);
-	grid-template-areas: "clients" "talk" "radios" "hero" "ssids" "chart" "sys";
+/* Tiles are placed by the view (vantage/layout.js): it sets each tile's
+   column (--c), width in columns (--w) and top (--y), and the grid's
+   column count (--cols) and height. Widths and columns follow the grid
+   width here, so only heights wait for script. */
+.vt-app .vt-grid { --vt-gap: 14px; --cols: 1; position: relative; min-height: 200px; }
+.vt-app .vt-grid-wait { visibility: hidden; }
+.vt-app .vt-grid > .vt-cell, .vt-app .vt-grid > .vt-drop-ghost {
+	--c: 0; --w: 1; --y: 0px; --vt-cw: calc((100% - (var(--cols) - 1) * var(--vt-gap)) / var(--cols));
+	position: absolute; top: var(--y); box-sizing: border-box; min-width: 0;
+	left: calc(var(--vt-cw) * var(--c) + var(--vt-gap) * var(--c));
+	width: calc(var(--vt-cw) * var(--w) + var(--vt-gap) * (var(--w) - 1));
 }
-.vt-app .vt-hero { grid-area: hero; }
-.vt-app .vt-sys { grid-area: sys; }
-.vt-app .vt-chart { grid-area: chart; }
-.vt-app .vt-radios { grid-area: radios; }
-.vt-app .vt-clients { grid-area: clients; }
-.vt-app .vt-side { grid-area: side; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-/* phones: the side column dissolves so Top talkers can follow Clients */
+.vt-app .vt-cell-off { display: none !important; }
+.vt-app .vt-drop-ghost { display: none; border: 2px dashed var(--vt-accent-line); border-radius: var(--vt-r-lg); background: var(--vt-accent-soft); }
+.vt-app .vt-drop-ghost.vt-on { display: block; }
+
+/* ----------------------------------------------- 3b. arranging the tiles */
+
+.vt-app .vt-layout-btn { flex: none; height: 30px; gap: 6px; font-size: 12px; }
+.vt-app .vt-layout-btn .vt-ico { width: 16px; height: 16px; }
+.vt-app .vt-layout-btn[aria-pressed="true"] { background: var(--vt-accent-soft); color: var(--vt-text); }
+@container vt (max-width: 699px) { .vt-app .vt-layout-btn span { display: none; } }
+
+.vt-app .vt-editbar {
+	position: sticky; top: calc(var(--v-stick-top, 48px) + 8px); z-index: 6;
+	display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+	margin: 0 0 14px; padding: 12px 14px; border-radius: var(--vt-r-lg);
+	border: 1px solid var(--vt-accent-line); background: var(--vt-surface); box-shadow: var(--vt-shadow);
+}
+.vt-app .vt-editbar[hidden] { display: none; }
+.vt-app .vt-editbar-text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; min-width: 0; }
+.vt-app .vt-editbar-text strong { font-size: 13px; font-weight: 650; }
+.vt-app .vt-edit-hidden { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vt-app .vt-edit-hidden:empty { display: none; }
+.vt-app .vt-edit-hidden .vt-fchip .vt-ico { width: 13px; height: 13px; }
+.vt-app .vt-editbar-actions { display: flex; gap: 8px; margin-left: auto; }
 @container vt (max-width: 699px) {
-	.vt-app .vt-side { display: contents; }
-	.vt-app .vt-talk { grid-area: talk; }
-	.vt-app .vt-ssid-tile { grid-area: ssids; }
+	.vt-app .vt-editbar { padding: 8px 8px 8px 12px; gap: 8px; }
+	.vt-app .vt-editbar-text { flex-basis: 0; }
+	.vt-app .vt-editbar-text .vt-hint { display: none; }
 }
 
-@container vt (min-width: 700px) {
-	.vt-app .vt-grid {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		grid-template-areas: "hero hero" "radios radios" "clients clients" "chart chart" "sys side";
-	}
+.vt-app .vt-ov { display: none; }
+.vt-app.vt-editing .vt-ov {
+	display: block; position: absolute; inset: 0; z-index: 4;
+	border: 2px dashed var(--vt-accent-line); border-radius: var(--vt-r-lg);
+	background: color-mix(in oklab, var(--vt-surface) 55%, transparent);
 }
-@container vt (min-width: 1100px) {
-	.vt-app .vt-grid {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		/* the path takes the full width at its natural height; System
-		   heads the right column, and the last row soaks up the space
-		   when Clients is the taller side */
-		grid-template-rows: auto auto auto 1fr;
-		grid-template-areas:
-			"hero hero hero hero"
-			"chart chart radios radios"
-			"clients clients clients sys"
-			"clients clients clients side";
-	}
-	.vt-app .vt-clients { align-self: start; }
+.vt-app .vt-ov-bar {
+	display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+	margin: 8px; padding: 6px; border-radius: var(--vt-r-sm);
+	background: var(--vt-surface); border: 1px solid var(--vt-line-2); box-shadow: var(--vt-shadow);
 }
+.vt-app .vt-ov-name { flex: 1 1 auto; min-width: 0; font-weight: 650; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vt-app .vt-ov-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.vt-app .vt-ov-grip, .vt-app .vt-ov-btn {
+	display: inline-flex; align-items: center; justify-content: center; flex: none;
+	width: 30px; height: 30px; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 8px;
+	background: transparent; color: var(--vt-text-2); box-shadow: none; cursor: pointer;
+}
+.vt-app .vt-ov-grip { cursor: grab; touch-action: none; background: var(--vt-surface-3); color: var(--vt-text); }
+.vt-app .vt-ov-btn:hover:not([disabled]), .vt-app .vt-ov-grip:hover { background: var(--vt-surface-3); color: var(--vt-text); }
+.vt-app .vt-ov-btn[disabled] { opacity: .3; cursor: default; }
+.vt-app .vt-ov-btn .vt-ico, .vt-app .vt-ov-grip .vt-ico { width: 16px; height: 16px; }
+.vt-app .vt-ov-grip .vt-ico { stroke-width: 3.2; }
+.vt-app .vt-ov-flip .vt-ico { transform: scaleX(-1); }
+.vt-app .vt-ov-hide { margin-left: 4px; }
+.vt-app .vt-ov-size { min-width: 26px; text-align: center; font-size: 11.5px; font-weight: 650; color: var(--vt-text-2); }
+.vt-app.vt-edit-1col .vt-ov-col { display: none; }
 
-/* wired-only devices: no Wi-Fi tiles; path, chart and system remain */
-.vt-app.vt-wired .vt-radios, .vt-app.vt-wired .vt-clients, .vt-app.vt-wired .vt-side { display: none; }
-.vt-app.vt-wired .vt-grid { grid-template-areas: "hero" "chart" "sys"; }
-@container vt (min-width: 700px) {
-	.vt-app.vt-wired .vt-grid { grid-template-areas: "hero hero" "chart chart" "sys sys"; }
-}
-@container vt (min-width: 1100px) {
-	.vt-app.vt-wired .vt-grid { grid-template-rows: none; grid-template-areas: "hero hero hero hero" "chart chart chart sys"; }
-}
+.vt-app.vt-editing .vt-cell { transition: top .2s ease, left .2s ease; }
+.vt-app .vt-cell.vt-dragging { z-index: 8; transition: none; opacity: .92; box-shadow: 0 18px 40px rgba(0, 0, 0, .28); }
+.vt-app .vt-dragging .vt-ov-grip { cursor: grabbing; }
+.vt-app.vt-drag-on { user-select: none; -webkit-user-select: none; }
 
 .vt-app .vt-tile {
 	position: relative;

@@ -52,6 +52,8 @@ without the app.
   retries; rename a device in place
 - Top talkers, wireless networks, system tile (CPU per core, memory,
   storage, firmware)
+- Your own layout: drag tiles, change their width or hide them; saved in
+  the browser for each screen size, with a reset to the default
 
 ## Screenshots
 
