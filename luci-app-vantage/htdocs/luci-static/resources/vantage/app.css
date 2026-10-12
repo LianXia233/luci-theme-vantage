@@ -37,9 +37,18 @@
 	--vt-info-soft: var(--v-info-soft, rgba(31, 99, 198, .1));
 	--vt-font: var(--v-font, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
 	--vt-mono: var(--v-mono, ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace);
+	--vt-fs-micro: var(--v-fs-micro, 10.5px);   /* the theme's type scale */
+	--vt-fs-sm: var(--v-fs-sm, 12px);
+	--vt-fs-base: var(--v-fs-base, 13px);
+	--vt-fs-md: var(--v-fs-md, 14px);
+	--vt-fs-lg: var(--v-fs-lg, 16px);
+	--vt-fs-xl: var(--v-fs-xl, 20px);
+	--vt-fs-2xl: var(--v-fs-2xl, 24px);
 	--vt-r-sm: var(--v-r-sm, 6px);
 	--vt-r: var(--v-r, 10px);
 	--vt-r-lg: var(--v-r-lg, 14px);
+	--vt-ctl: var(--v-ctl-h, 36px);       /* every control: buttons, fields, chips */
+	--vt-r-ctl: var(--v-r, 6px);          /* their corners, as the theme's controls */
 	--vt-shadow: var(--v-shadow, 0 1px 2px rgba(16, 20, 24, .05), 0 1px 1px rgba(16, 20, 24, .03));
 
 	/* derived: readable accent for text/strokes on surfaces (a lime or
@@ -74,6 +83,12 @@
 	--vt-av-ink-l: 34%;
 	--vt-scrim: rgba(12, 14, 17, .32);
 	--vt-sheet-shadow: -18px 0 48px rgba(12, 14, 17, .16), -2px 0 8px rgba(12, 14, 17, .06);
+}
+
+/* touch: controls follow the pointer, not the width (the theme sets
+   --v-ctl-h the same way; this is the fallback under other themes) */
+@media (pointer: coarse) {
+	.vt-app { --vt-ctl: var(--v-ctl-h, 44px); }
 }
 
 html[data-darkmode="true"] .vt-app {
@@ -121,7 +136,7 @@ html[data-darkmode="true"] .vt-app {
 .vt-app {
 	color: var(--vt-text);
 	font-family: var(--vt-font);
-	font-size: 13.5px;
+	font-size: var(--vt-fs-base);
 	line-height: 1.45;
 	font-variant-numeric: tabular-nums;
 	-webkit-font-smoothing: antialiased;
@@ -154,11 +169,11 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-mono { font-family: var(--vt-mono); font-size: .92em; letter-spacing: -.01em; }
 .vt-app .vt-tn { font-variant-numeric: tabular-nums; }
 .vt-app .vt-muted { color: var(--vt-text-3); }
-.vt-app .vt-hint { color: var(--vt-text-3); font-size: 12px; }
+.vt-app .vt-hint { color: var(--vt-text-3); font-size: var(--vt-fs-sm); }
 .vt-app .vt-t-warn { color: var(--vt-warn); }
 .vt-app .vt-t-err { color: var(--vt-err); }
-.vt-app .vt-label { display: block; color: var(--vt-text-3); font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-.vt-app .vt-big { font-size: 30px; font-weight: 680; letter-spacing: -.02em; line-height: 1.05; }
+.vt-app .vt-label { display: block; color: var(--vt-text-3); font-size: var(--vt-fs-micro); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.vt-app .vt-big { font-size: var(--vt-fs-2xl); font-weight: 680; letter-spacing: -.02em; line-height: 1.05; }
 
 .vt-app .vt-ico {
 	width: 18px; height: 18px; flex: none;
@@ -174,10 +189,10 @@ html[data-darkmode="true"] .vt-app {
 /* buttons of the app (the theme's global button look is reset here) */
 .vt-app .vt-btn {
 	display: inline-flex; align-items: center; gap: 6px;
-	height: 32px; padding: 0 12px;
-	border: 1px solid var(--vt-line-2); border-radius: var(--vt-r-sm);
+	height: var(--vt-ctl); padding: 0 12px;
+	border: 1px solid var(--vt-line-2); border-radius: var(--vt-r-ctl);
 	background: var(--vt-surface); color: var(--vt-text);
-	font-size: 13px; font-weight: 560; line-height: 1;
+	font-size: var(--vt-fs-base); font-weight: 560; line-height: 1;
 	cursor: pointer; box-shadow: none; text-transform: none; min-width: 0;
 	transition: background .15s, border-color .15s;
 }
@@ -190,7 +205,7 @@ html[data-darkmode="true"] .vt-app {
 
 .vt-app .vt-link {
 	display: inline-flex; align-items: center; gap: 2px;
-	color: var(--vt-accent-text); font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap;
+	color: var(--vt-accent-text); font-size: var(--vt-fs-sm); font-weight: 600; text-decoration: none; white-space: nowrap;
 }
 .vt-app .vt-link .vt-ico { width: 14px; height: 14px; transition: transform .15s; }
 .vt-app .vt-link:hover { text-decoration: none; color: var(--vt-text); }
@@ -198,7 +213,7 @@ html[data-darkmode="true"] .vt-app {
 
 .vt-app .vt-pill {
 	display: inline-flex; align-items: center; height: 18px; padding: 0 6px;
-	border-radius: 999px; font-size: 10.5px; font-weight: 650; letter-spacing: .02em; white-space: nowrap;
+	border-radius: 999px; font-size: var(--vt-fs-micro); font-weight: 650; letter-spacing: .02em; white-space: nowrap;
 	background: var(--vt-surface-3); color: var(--vt-text-2);
 }
 .vt-app .vt-pill-accent { background: var(--vt-accent); color: var(--vt-accent-ink); }
@@ -206,7 +221,7 @@ html[data-darkmode="true"] .vt-app {
 
 .vt-app .vt-band {
 	display: inline-flex; align-items: center; height: 18px; padding: 0 6px;
-	border-radius: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .01em; white-space: nowrap;
+	border-radius: 5px; font-size: var(--vt-fs-micro); font-weight: 700; letter-spacing: .01em; white-space: nowrap;
 	--vt-bc: var(--vt-b60);
 	background: color-mix(in oklab, var(--vt-bc) 14%, transparent);
 	color: color-mix(in oklab, var(--vt-bc) 78%, var(--vt-text));
@@ -215,11 +230,11 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-band-5g { --vt-bc: var(--vt-b5); }
 .vt-app .vt-band-6g { --vt-bc: var(--vt-b6); }
 
-.vt-app .vt-gen { font-size: 11px; color: var(--vt-text-3); white-space: nowrap; }
+.vt-app .vt-gen { font-size: var(--vt-fs-micro); color: var(--vt-text-3); white-space: nowrap; }
 
 .vt-app .vt-src {
 	display: inline-flex; align-items: center; height: 16px; padding: 0 5px;
-	border-radius: 4px; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+	border-radius: 4px; font-size: var(--vt-fs-micro); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
 	background: var(--vt-surface-3); color: var(--vt-text-3); white-space: nowrap;
 }
 .vt-app .vt-src-alias { background: var(--vt-accent-soft); color: var(--vt-accent-text); }
@@ -263,20 +278,20 @@ html[data-darkmode="true"] .vt-app {
 }
 .vt-app .vt-sk-max {
 	position: absolute; right: 0; top: -2px; transform: translateY(-100%);
-	font-size: 10px; line-height: 1; color: var(--vt-chart-axis); white-space: nowrap; pointer-events: none;
+	font-size: var(--vt-fs-micro); line-height: 1; color: var(--vt-chart-axis); white-space: nowrap; pointer-events: none;
 }
 .vt-app .vt-sk-thresh {
 	position: absolute; transform: translate(-100%, -120%);
-	font-size: 10px; line-height: 1; color: var(--vt-warn); white-space: nowrap; pointer-events: none;
+	font-size: var(--vt-fs-micro); line-height: 1; color: var(--vt-warn); white-space: nowrap; pointer-events: none;
 }
-.vt-app .vt-sk-note { position: absolute; right: 0; bottom: 4px; font-size: 10.5px; color: var(--vt-chart-axis); }
+.vt-app .vt-sk-note { position: absolute; right: 0; bottom: 4px; font-size: var(--vt-fs-micro); color: var(--vt-chart-axis); }
 .vt-app .vt-spark-cpu { --vt-sc: var(--vt-chart-5); }
 .vt-app .vt-spark-2g { --vt-sc: var(--vt-b2); }
 .vt-app .vt-spark-5g { --vt-sc: var(--vt-b5); }
 .vt-app .vt-spark-6g { --vt-sc: var(--vt-b6); }
 .vt-app .vt-spark-x { --vt-sc: var(--vt-text-3); }
 .vt-app .vt-spark-up { --vt-sc: var(--vt-series-up); }
-.vt-app .vt-cap { display: block; margin-top: 3px; font-size: 10px; line-height: 1.1; color: var(--vt-chart-axis); letter-spacing: .02em; white-space: nowrap; }
+.vt-app .vt-cap { display: block; margin-top: 3px; font-size: var(--vt-fs-micro); line-height: 1.1; color: var(--vt-chart-axis); letter-spacing: .02em; white-space: nowrap; }
 .vt-app .vt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* ------------------------------------------------------------ 3. layout */
@@ -299,7 +314,7 @@ html[data-darkmode="true"] .vt-app {
 
 /* ----------------------------------------------- 3b. arranging the tiles */
 
-.vt-app .vt-layout-btn { flex: none; height: 30px; gap: 6px; font-size: 12px; }
+.vt-app .vt-layout-btn { flex: none; gap: 6px; font-size: var(--vt-fs-sm); }
 .vt-app .vt-layout-btn .vt-ico { width: 16px; height: 16px; }
 .vt-app .vt-layout-btn[aria-pressed="true"] { background: var(--vt-accent-soft); color: var(--vt-text); }
 @container vt (max-width: 699px) { .vt-app .vt-layout-btn span { display: none; } }
@@ -312,7 +327,7 @@ html[data-darkmode="true"] .vt-app {
 }
 .vt-app .vt-editbar[hidden] { display: none; }
 .vt-app .vt-editbar-text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; min-width: 0; }
-.vt-app .vt-editbar-text strong { font-size: 13px; font-weight: 650; }
+.vt-app .vt-editbar-text strong { font-size: var(--vt-fs-base); font-weight: 650; }
 .vt-app .vt-edit-hidden { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .vt-app .vt-edit-hidden:empty { display: none; }
 .vt-app .vt-edit-hidden .vt-fchip .vt-ico { width: 13px; height: 13px; }
@@ -334,11 +349,11 @@ html[data-darkmode="true"] .vt-app {
 	margin: 8px; padding: 6px; border-radius: var(--vt-r-sm);
 	background: var(--vt-surface); border: 1px solid var(--vt-line-2); box-shadow: var(--vt-shadow);
 }
-.vt-app .vt-ov-name { flex: 1 1 auto; min-width: 0; font-weight: 650; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vt-app .vt-ov-name { flex: 1 1 auto; min-width: 0; font-weight: 650; font-size: var(--vt-fs-base); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vt-app .vt-ov-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
 .vt-app .vt-ov-grip, .vt-app .vt-ov-btn {
 	display: inline-flex; align-items: center; justify-content: center; flex: none;
-	width: 30px; height: 30px; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 8px;
+	width: var(--vt-ctl); height: var(--vt-ctl); min-width: 0; margin: 0; padding: 0; border: 0; border-radius: var(--vt-r-ctl);
 	background: transparent; color: var(--vt-text-2); box-shadow: none; cursor: pointer;
 }
 .vt-app .vt-ov-grip { cursor: grab; touch-action: none; background: var(--vt-surface-3); color: var(--vt-text); }
@@ -348,7 +363,7 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-ov-grip .vt-ico { stroke-width: 3.2; }
 .vt-app .vt-ov-flip .vt-ico { transform: scaleX(-1); }
 .vt-app .vt-ov-hide { margin-left: 4px; }
-.vt-app .vt-ov-size { min-width: 26px; text-align: center; font-size: 11.5px; font-weight: 650; color: var(--vt-text-2); }
+.vt-app .vt-ov-size { min-width: 26px; text-align: center; font-size: var(--vt-fs-micro); font-weight: 650; color: var(--vt-text-2); }
 .vt-app.vt-edit-1col .vt-ov-col { display: none; }
 
 .vt-app.vt-editing .vt-cell { transition: top .2s ease, left .2s ease; }
@@ -371,7 +386,7 @@ html[data-darkmode="true"] .vt-app {
 }
 .vt-app .vt-tile-title {
 	display: inline-flex; align-items: center; gap: 8px; min-width: 0;
-	font-size: 13px; font-weight: 650; letter-spacing: .005em; color: var(--vt-text);
+	font-size: var(--vt-fs-base); font-weight: 650; letter-spacing: .005em; color: var(--vt-text);
 	white-space: nowrap;
 }
 .vt-app .vt-tile-title .vt-ico { color: var(--vt-text-3); width: 17px; height: 17px; }
@@ -382,7 +397,7 @@ html[data-darkmode="true"] .vt-app {
 @container vt (max-width: 699px) {
 	.vt-app .vt-fold-btn {
 		display: inline-flex; align-items: center; justify-content: center; flex: none;
-		width: 32px; height: 32px; margin: -4px -8px -4px 0; padding: 0; border: 0; border-radius: 8px;
+		width: var(--vt-ctl); height: var(--vt-ctl); margin: -4px -8px -4px 0; padding: 0; border: 0; border-radius: var(--vt-r-ctl);
 		background: transparent; color: var(--vt-text-3); cursor: pointer; box-shadow: none; min-width: 0;
 	}
 	.vt-app .vt-fold-btn:hover { background: var(--vt-surface-3); color: var(--vt-text); }
@@ -412,9 +427,9 @@ html[data-darkmode="true"] .vt-app {
 }
 .vt-app .vt-rsum:hover { background: var(--vt-surface-2); }
 .vt-app .vt-rsum .vt-status { margin: 0; }
-.vt-app .vt-rsum-main { font-weight: 650; font-size: 13px; white-space: nowrap; }
-.vt-app .vt-rsum-sub { font-size: 12px; color: var(--vt-text-3); white-space: nowrap; }
-.vt-app .vt-rsum-rate { margin-left: auto; font-size: 12px; color: var(--vt-text-2); white-space: nowrap; }
+.vt-app .vt-rsum-main { font-weight: 650; font-size: var(--vt-fs-base); white-space: nowrap; }
+.vt-app .vt-rsum-sub { font-size: var(--vt-fs-sm); color: var(--vt-text-3); white-space: nowrap; }
+.vt-app .vt-rsum-rate { margin-left: auto; font-size: var(--vt-fs-sm); color: var(--vt-text-2); white-space: nowrap; }
 .vt-app .vt-rsum > .vt-ico { color: var(--vt-text-3); }
 
 .vt-app .vt-empty {
@@ -422,9 +437,9 @@ html[data-darkmode="true"] .vt-app {
 	padding: 32px 16px; text-align: center; color: var(--vt-text-3);
 }
 .vt-app .vt-empty > .vt-ico { width: 28px; height: 28px; stroke-width: 1.4; margin-bottom: 4px; }
-.vt-app .vt-empty-title { color: var(--vt-text); font-weight: 620; font-size: 14px; }
+.vt-app .vt-empty-title { color: var(--vt-text); font-weight: 620; font-size: var(--vt-fs-md); }
 .vt-app .vt-empty .vt-btn { margin-top: 8px; }
-.vt-app .vt-empty-inline { color: var(--vt-text-3); font-size: 12.5px; padding: 4px 0; }
+.vt-app .vt-empty-inline { color: var(--vt-text-3); font-size: var(--vt-fs-sm); padding: 4px 0; }
 
 /* ----------------------------------------------------- 4. head, health */
 
@@ -451,16 +466,16 @@ html[data-darkmode="true"] .vt-app {
 
 .vt-app .vt-head-text { min-width: 0; flex: 1; }
 .vt-app .vt-headline {
-	font-size: 21px; font-weight: 680; letter-spacing: -.015em; line-height: 1.2; color: var(--vt-text);
+	font-size: var(--vt-fs-xl); font-weight: 680; letter-spacing: -.015em; line-height: 1.2; color: var(--vt-text);
 	margin: 0; padding: 0; border: 0; text-transform: none;
 }
-.vt-app .vt-subline { color: var(--vt-text-3); font-size: 12.5px; margin-top: 2px; }
+.vt-app .vt-subline { color: var(--vt-text-3); font-size: var(--vt-fs-sm); margin-top: 2px; }
 
 .vt-app .vt-livepill {
 	flex: none; display: inline-flex; align-items: center; gap: 8px;
 	height: 30px; padding: 0 12px 0 10px; border-radius: 999px;
 	border: 1px solid var(--vt-line); background: var(--vt-surface);
-	font-size: 12px; font-weight: 560; color: var(--vt-text-2); white-space: nowrap;
+	font-size: var(--vt-fs-sm); font-weight: 560; color: var(--vt-text-2); white-space: nowrap;
 }
 .vt-app .vt-live-beat { width: 8px; height: 8px; border-radius: 50%; background: var(--vt-ok); box-shadow: 0 0 0 0 color-mix(in oklab, var(--vt-ok) 50%, transparent); animation: vt-beat 2s infinite; }
 .vt-app .vt-live-paused .vt-live-beat { background: var(--vt-text-3); animation: none; }
@@ -497,10 +512,10 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-chip-ico .vt-ico { width: 15px; height: 15px; stroke-width: 2.1; }
 .vt-app .vt-chip-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .vt-app .vt-chip-top { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-.vt-app .vt-chip-title { font-size: 11px; line-height: 1.3; font-weight: 650; color: var(--vt-text-3); text-transform: uppercase; letter-spacing: .05em; }
-.vt-app .vt-chip-value { font-size: 15px; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.vt-app .vt-chip-title { font-size: var(--vt-fs-micro); line-height: 1.3; font-weight: 650; color: var(--vt-text-3); text-transform: uppercase; letter-spacing: .05em; }
+.vt-app .vt-chip-value { font-size: var(--vt-fs-md); font-weight: 700; letter-spacing: -.01em; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .vt-app .vt-chip-reason {
-	font-size: 12px; color: var(--vt-text-2); margin-top: 2px;
+	font-size: var(--vt-fs-sm); color: var(--vt-text-2); margin-top: 2px;
 	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
@@ -521,9 +536,9 @@ html[data-darkmode="true"] .vt-app {
 .vt-app button.vt-kpi { cursor: pointer; }
 .vt-app button.vt-kpi:hover { background: var(--vt-surface-2); }
 .vt-app .vt-kpi + .vt-kpi { box-shadow: -1px 0 0 var(--vt-line); border-radius: 0 var(--vt-r-sm) var(--vt-r-sm) 0; }
-.vt-app .vt-kpi-label { font-size: 11px; font-weight: 650; color: var(--vt-text-3); text-transform: uppercase; letter-spacing: .05em; }
-.vt-app .vt-kpi-value { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; white-space: nowrap; }
-.vt-app .vt-kpi-sub { font-size: 12px; color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vt-app .vt-kpi-label { font-size: var(--vt-fs-micro); font-weight: 650; color: var(--vt-text-3); text-transform: uppercase; letter-spacing: .05em; }
+.vt-app .vt-kpi-value { font-size: var(--vt-fs-xl); font-weight: 700; letter-spacing: -.02em; line-height: 1.2; white-space: nowrap; }
+.vt-app .vt-kpi-sub { font-size: var(--vt-fs-sm); color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vt-app .vt-kpi-warn .vt-kpi-value { color: var(--vt-warn); }
 @container vthero (max-width: 700px) {
 	.vt-app .vt-kpis { grid-template-columns: 1fr 1fr; }
@@ -570,9 +585,9 @@ html[data-darkmode="true"] .vt-app {
 }
 .vt-app .vt-node:hover { border-color: color-mix(in oklab, var(--vt-accent-line) 60%, var(--vt-line)); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(12, 14, 17, .08); background: var(--vt-surface); }
 .vt-app .vt-node-body { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-.vt-app .vt-node-kicker { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--vt-text-3); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
-.vt-app .vt-node-title { font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vt-app .vt-node-sub { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vt-app .vt-node-kicker { display: flex; align-items: center; gap: 6px; font-size: var(--vt-fs-micro); font-weight: 600; color: var(--vt-text-3); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.vt-app .vt-node-title { font-size: var(--vt-fs-base); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vt-app .vt-node-sub { display: flex; align-items: center; gap: 6px; font-size: var(--vt-fs-sm); color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vt-app .vt-node-ico {
 	flex: none; width: 32px; height: 32px; border-radius: 9px;
 	display: inline-flex; align-items: center; justify-content: center;
@@ -582,12 +597,12 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-node-gw { justify-self: stretch; align-self: center; }
 .vt-app .vt-node-ap { justify-self: stretch; align-self: center; padding: 12px 13px; border-color: color-mix(in oklab, var(--vt-accent-line) 40%, var(--vt-line)); }
 .vt-app .vt-node-ap .vt-node-ico { background: var(--vt-accent); color: var(--vt-accent-ink); }
-.vt-app .vt-node-ap .vt-node-title { font-size: 14.5px; }
+.vt-app .vt-node-ap .vt-node-title { font-size: var(--vt-fs-md); }
 .vt-app .vt-node-gen { text-transform: none; letter-spacing: 0; font-weight: 560; }
 .vt-app .vt-node-radio { padding: 8px 11px; }
 .vt-app .vt-node-net, .vt-app .vt-node-net:hover { text-decoration: none; color: var(--vt-text); }
 .vt-app .vt-node-ssid { padding: 7px 10px; }
-.vt-app .vt-node-ssid .vt-node-title { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.vt-app .vt-node-ssid .vt-node-title { display: flex; align-items: center; gap: 6px; font-size: var(--vt-fs-base); }
 .vt-app .vt-node-ssid .vt-node-title .vt-ico { color: var(--vt-text-3); }
 .vt-app .vt-ssid-name span { overflow: hidden; text-overflow: ellipsis; }
 .vt-app .vt-node-idle { background: var(--vt-surface-2); box-shadow: none; }
@@ -611,14 +626,14 @@ html[data-darkmode="true"] .vt-app {
 	padding: 0 6px; border-radius: 6px; background: var(--vt-surface);
 }
 .vt-app .vt-link-rate .vt-ico { width: 13px; height: 13px; align-self: center; stroke-width: 2.2; }
-.vt-app .vt-link-rate b { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
-.vt-app .vt-link-rate small { font-size: 11px; color: var(--vt-text-3); font-weight: 600; }
+.vt-app .vt-link-rate b { font-size: var(--vt-fs-lg); font-weight: 700; letter-spacing: -.01em; }
+.vt-app .vt-link-rate small { font-size: var(--vt-fs-micro); color: var(--vt-text-3); font-weight: 600; }
 .vt-app .vt-link-down { grid-row: 1; align-self: end; }
 .vt-app .vt-link-down .vt-ico { color: var(--vt-accent-text); }
-.vt-app .vt-link-up { font-size: 12px; }
-.vt-app .vt-link-up b { font-size: 13px; font-weight: 650; color: var(--vt-text-2); }
+.vt-app .vt-link-up { font-size: var(--vt-fs-sm); }
+.vt-app .vt-link-up b { font-size: var(--vt-fs-base); font-weight: 650; color: var(--vt-text-2); }
 .vt-app .vt-link-up .vt-ico { color: var(--vt-text-3); }
-.vt-app .vt-link-meta { font-size: 11px; color: var(--vt-text-3); font-family: var(--vt-mono); white-space: nowrap; margin-top: 2px; }
+.vt-app .vt-link-meta { font-size: var(--vt-fs-micro); color: var(--vt-text-3); font-family: var(--vt-mono); white-space: nowrap; margin-top: 2px; }
 
 /* the branches spread over the height the tile gets from its row, so a
    tall neighbour leaves no empty band above or below the diagram */
@@ -657,8 +672,8 @@ html[data-darkmode="true"] .vt-app {
 
 .vt-app .vt-sys-mem { display: flex; flex-direction: column; gap: 7px; }
 .vt-app .vt-mem-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.vt-app .vt-mem-avail { font-size: 17px; font-weight: 680; }
-.vt-app .vt-mem-of { font-size: 12px; color: var(--vt-text-3); }
+.vt-app .vt-mem-avail { font-size: var(--vt-fs-lg); font-weight: 680; }
+.vt-app .vt-mem-of { font-size: var(--vt-fs-sm); color: var(--vt-text-3); }
 .vt-app .vt-seg { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--vt-surface-3); gap: 2px; }
 .vt-app .vt-seg-part { height: 100%; min-width: 0; transition: width .7s cubic-bezier(.2, .7, .2, 1); }
 .vt-app .vt-seg-used { background: var(--vt-mem); border-radius: 6px 2px 2px 6px; }
@@ -668,24 +683,24 @@ html[data-darkmode="true"] .vt-app {
 	border-radius: 2px;
 }
 .vt-app .vt-seg-free { background: transparent; }
-.vt-app .vt-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--vt-text-2); }
+.vt-app .vt-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--vt-fs-sm); color: var(--vt-text-2); }
 .vt-app .vt-legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .vt-app .vt-legend-item b { font-weight: 650; color: var(--vt-text); }
 .vt-app .vt-key { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .vt-app .vt-key.vt-seg-free { background: var(--vt-surface-3); box-shadow: inset 0 0 0 1px var(--vt-line-2); }
-.vt-app .vt-swap { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.vt-app .vt-swap { display: flex; align-items: center; gap: 8px; font-size: var(--vt-fs-sm); }
 .vt-app .vt-swap:empty { display: none; }
 .vt-app .vt-thin { flex: 1; height: 4px; border-radius: 2px; background: var(--vt-surface-3); overflow: hidden; }
 .vt-app .vt-thin-fill { display: block; height: 100%; background: var(--vt-mem); }
 
 .vt-app .vt-sys-store { display: flex; flex-direction: column; gap: 8px; }
 .vt-app .vt-storage { display: flex; flex-direction: column; gap: 8px; }
-.vt-app .vt-mount-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; margin-bottom: 4px; }
+.vt-app .vt-mount-top { display: flex; justify-content: space-between; gap: 8px; font-size: var(--vt-fs-sm); margin-bottom: 4px; }
 .vt-app .vt-bar { height: 6px; border-radius: 3px; background: var(--vt-surface-3); overflow: hidden; }
 .vt-app .vt-bar-fill { display: block; height: 100%; border-radius: 3px; background: var(--vt-mem); transition: width .7s ease; }
 .vt-app .vt-bg-warn { background: var(--vt-warn); }
 .vt-app .vt-bg-err { background: var(--vt-err); }
-.vt-app .vt-fw { display: flex; flex-direction: column; gap: 1px; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--vt-line); font-size: 12px; color: var(--vt-text-2); }
+.vt-app .vt-fw { display: flex; flex-direction: column; gap: 1px; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--vt-line); font-size: var(--vt-fs-sm); color: var(--vt-text-2); }
 
 /* ------------------------------------------------------------- 7. chart */
 
@@ -693,7 +708,7 @@ html[data-darkmode="true"] .vt-app {
    a shared time axis and one crosshair across all rows */
 .vt-app .vt-chart { display: flex; flex-direction: column; --vt-mh: 136px; --vt-mg: 16px; }
 .vt-app .vt-chart .vt-tile-title { flex-wrap: wrap; row-gap: 0; }
-.vt-app .vt-chart-sub { font-size: 12px; font-weight: 500; color: var(--vt-text-3); }
+.vt-app .vt-chart-sub { font-size: var(--vt-fs-sm); font-weight: 500; color: var(--vt-text-3); }
 .vt-app .vt-chart-sub::before { content: "·"; margin: 0 6px 0 0; }
 .vt-app .vt-lg-key { width: 12px; height: 3px; border-radius: 2px; background: var(--vt-sc); flex: none; }
 /* one colour per direction in every row (series, gradients, dots, keys) */
@@ -702,7 +717,7 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-arr { font-weight: 700; }
 .vt-app .vt-arr-dn { color: color-mix(in oklab, var(--vt-dir-dn) 70%, var(--vt-text)); }
 .vt-app .vt-arr-up { color: color-mix(in oklab, var(--vt-dir-up) 70%, var(--vt-text)); }
-.vt-app .vt-dir-legend { font-size: 11.5px; gap: 4px 12px; }
+.vt-app .vt-dir-legend { font-size: var(--vt-fs-micro); gap: 4px 12px; }
 
 .vt-app .vt-mult-wrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 300px; border-radius: var(--vt-r-sm); outline-offset: 4px; }
 .vt-app .vt-mults { flex: 1; display: grid; grid-auto-rows: minmax(100px, 1fr); }
@@ -712,11 +727,11 @@ html[data-darkmode="true"] .vt-app {
 }
 .vt-app .vt-mult:first-child { border-top: 0; padding-top: 2px; }
 .vt-app .vt-mult-head { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
-.vt-app .vt-mult-name { font-size: 11.5px; font-weight: 600; color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vt-app .vt-mult-now { display: flex; align-items: center; gap: 6px; font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; white-space: nowrap; }
+.vt-app .vt-mult-name { font-size: var(--vt-fs-micro); font-weight: 600; color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vt-app .vt-mult-now { display: flex; align-items: center; gap: 6px; font-size: var(--vt-fs-lg); font-weight: 700; letter-spacing: -.01em; line-height: 1.25; white-space: nowrap; }
 .vt-app .vt-mult-now b { font-weight: inherit; }
-.vt-app .vt-mult-now-up { font-size: 13px; font-weight: 650; line-height: 1.3; color: var(--vt-text-2); }
-.vt-app .vt-mult-stats { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 11px; color: var(--vt-text-3); white-space: nowrap; }
+.vt-app .vt-mult-now-up { font-size: var(--vt-fs-base); font-weight: 650; line-height: 1.3; color: var(--vt-text-2); }
+.vt-app .vt-mult-stats { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: var(--vt-fs-micro); color: var(--vt-text-3); white-space: nowrap; }
 .vt-app .vt-mult-stats b { font-weight: 600; color: var(--vt-text-2); }
 .vt-app .vt-mult-plot { position: relative; min-height: 72px; margin: 12px 0; --vt-sc: inherit; }
 .vt-app .vt-mult-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
@@ -727,7 +742,7 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-chart-mid { fill: none; stroke: color-mix(in oklab, var(--vt-chart-axis) 55%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .vt-app .vt-mult-max {
 	position: absolute; right: 0; top: -3px; transform: translateY(-100%);
-	font-size: 10.5px; line-height: 1; color: var(--vt-chart-axis); white-space: nowrap; pointer-events: none;
+	font-size: var(--vt-fs-micro); line-height: 1; color: var(--vt-chart-axis); white-space: nowrap; pointer-events: none;
 }
 .vt-app .vt-mult-max-up { top: auto; bottom: -3px; transform: translateY(100%); }
 .vt-app .vt-mult-dot {
@@ -736,7 +751,7 @@ html[data-darkmode="true"] .vt-app {
 }
 .vt-app .vt-mult-over { position: absolute; top: 0; bottom: 20px; left: calc(var(--vt-mh) + var(--vt-mg)); right: 0; pointer-events: none; z-index: 3; }
 .vt-app .vt-mult-x { position: relative; height: 20px; margin-left: calc(var(--vt-mh) + var(--vt-mg)); }
-.vt-app .vt-mx { position: absolute; top: 5px; font-size: 10.5px; line-height: 1; color: var(--vt-chart-axis); white-space: nowrap; transform: translateX(-50%); }
+.vt-app .vt-mx { position: absolute; top: 5px; font-size: var(--vt-fs-micro); line-height: 1; color: var(--vt-chart-axis); white-space: nowrap; transform: translateX(-50%); }
 .vt-app .vt-mx-0 { left: 0; transform: none; }
 .vt-app .vt-mx-1 { right: 0; transform: none; }
 .vt-app .vt-mult-wrap { cursor: crosshair; touch-action: pan-y; }
@@ -746,11 +761,11 @@ html[data-darkmode="true"] .vt-app {
 	width: max-content; min-width: 180px; padding: 8px 10px 7px; border-radius: var(--vt-r);
 	background: var(--vt-surface); border: 1px solid var(--vt-line-2);
 	box-shadow: 0 10px 28px rgba(12, 14, 17, .16), 0 2px 6px rgba(12, 14, 17, .06);
-	font-size: 12px; pointer-events: none;
+	font-size: var(--vt-fs-sm); pointer-events: none;
 }
-.vt-app .vt-tip-time { display: flex; justify-content: space-between; gap: 12px; color: var(--vt-text-3); font-size: 11px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid var(--vt-line); }
+.vt-app .vt-tip-time { display: flex; justify-content: space-between; gap: 12px; color: var(--vt-text-3); font-size: var(--vt-fs-micro); margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid var(--vt-line); }
 .vt-app .vt-tip-link + .vt-tip-link { margin-top: 5px; }
-.vt-app .vt-tip-label { color: var(--vt-text-3); font-size: 11px; white-space: nowrap; }
+.vt-app .vt-tip-label { color: var(--vt-text-3); font-size: var(--vt-fs-micro); white-space: nowrap; }
 .vt-app .vt-tip-row { display: grid; grid-template-columns: 12px auto minmax(0, 1fr); align-items: center; column-gap: 8px; line-height: 1.6; color: var(--vt-text-2); }
 .vt-app .vt-tip-row b { font-weight: 700; color: var(--vt-text); white-space: nowrap; text-align: right; }
 
@@ -765,36 +780,36 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-radio::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--vt-bc); opacity: .85; }
 .vt-app .vt-radio-off { opacity: .75; }
 .vt-app .vt-radio-head { display: flex; align-items: center; gap: 8px; }
-.vt-app .vt-radio-name { font-weight: 650; font-size: 13px; }
-.vt-app .vt-status { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--vt-text-2); }
+.vt-app .vt-radio-name { font-weight: 650; font-size: var(--vt-fs-base); }
+.vt-app .vt-status { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: var(--vt-fs-micro); font-weight: 600; color: var(--vt-text-2); }
 .vt-app .vt-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--vt-ok); }
 .vt-app .vt-status-warn::before { background: var(--vt-warn); }
 .vt-app .vt-status-err::before { background: var(--vt-err); }
 .vt-app .vt-icon-action {
 	display: inline-flex; align-items: center; justify-content: center; flex: none;
-	width: 26px; height: 26px; padding: 0; margin: 0; border: 0; border-radius: 7px;
+	width: var(--vt-ctl); height: var(--vt-ctl); padding: 0; margin: 0; border: 0; border-radius: var(--vt-r-ctl);
 	background: transparent; color: var(--vt-text-3); cursor: pointer; box-shadow: none; min-width: 0;
 }
 .vt-app .vt-icon-action:hover { background: var(--vt-surface-3); color: var(--vt-text); }
 .vt-app .vt-radio-chan { display: flex; align-items: baseline; gap: 8px; }
-.vt-app .vt-radio-width { font-size: 14px; font-weight: 600; color: var(--vt-text-2); }
+.vt-app .vt-radio-width { font-size: var(--vt-fs-md); font-weight: 600; color: var(--vt-text-2); }
 .vt-app .vt-spectrum { position: relative; height: 8px; border-radius: 4px; background: var(--vt-surface-3); margin-bottom: 12px; }
 .vt-app .vt-spectrum-blk { position: absolute; top: -2px; bottom: -2px; border-radius: 3px; background: var(--vt-bc); box-shadow: 0 0 0 2px var(--vt-surface); }
-.vt-app .vt-spectrum-lo, .vt-app .vt-spectrum-hi { position: absolute; top: 11px; font-size: 10px; color: var(--vt-text-3); }
+.vt-app .vt-spectrum-lo, .vt-app .vt-spectrum-hi { position: absolute; top: 11px; font-size: var(--vt-fs-micro); color: var(--vt-text-3); }
 .vt-app .vt-spectrum-lo { left: 0; }
 .vt-app .vt-spectrum-hi { right: 0; }
 .vt-app .vt-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
-.vt-app .vt-kv dt { font-size: 11px; color: var(--vt-text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.vt-app .vt-kv dd { font-size: 13.5px; font-weight: 600; margin: 1px 0 0; }
-.vt-app .vt-kv dd .vt-muted { font-weight: 500; font-size: 12.5px; }
+.vt-app .vt-kv dt { font-size: var(--vt-fs-micro); color: var(--vt-text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.vt-app .vt-kv dd { font-size: var(--vt-fs-base); font-weight: 600; margin: 1px 0 0; }
+.vt-app .vt-kv dd .vt-muted { font-weight: 500; font-size: var(--vt-fs-sm); }
 .vt-app .vt-radio-live { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 10px; border-radius: var(--vt-r-sm); background: var(--vt-surface-2); }
 .vt-app .vt-radio-live .vt-spark { height: 30px; }
 .vt-app .vt-rates { display: flex; flex-direction: column; gap: 1px; }
-.vt-app .vt-rate { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.vt-app .vt-rate { display: inline-flex; align-items: center; gap: 4px; font-size: var(--vt-fs-sm); font-weight: 650; white-space: nowrap; }
 .vt-app .vt-rate .vt-ico { width: 12px; height: 12px; stroke-width: 2.3; color: var(--vt-text-3); }
 .vt-app .vt-rate-up { font-weight: 500; color: var(--vt-text-2); }
 .vt-app .vt-notes { display: flex; flex-direction: column; gap: 4px; }
-.vt-app .vt-note { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: var(--vt-text-2); }
+.vt-app .vt-note { display: flex; align-items: flex-start; gap: 6px; font-size: var(--vt-fs-sm); color: var(--vt-text-2); }
 .vt-app .vt-note .vt-ico { margin-top: 2px; color: var(--vt-text-3); }
 .vt-app .vt-note-warn .vt-ico { color: var(--vt-warn); }
 .vt-app .vt-note-err .vt-ico { color: var(--vt-err); }
@@ -808,38 +823,38 @@ html[data-darkmode="true"] .vt-app {
 /* ----------------------------------------------------------- 9. clients */
 
 .vt-app .vt-clients { padding-bottom: 8px; }
-.vt-app .vt-count { font-size: 12px; color: var(--vt-text-3); font-weight: 560; }
+.vt-app .vt-count { font-size: var(--vt-fs-sm); color: var(--vt-text-3); font-weight: 560; }
 .vt-app .vt-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
 .vt-app .vt-filter {
 	position: relative; display: flex; align-items: center; flex: 1 1 260px; max-width: 380px;
-	height: 34px; padding: 0 8px 0 10px; gap: 6px;
-	border: 1px solid var(--vt-line-2); border-radius: var(--vt-r-sm); background: var(--vt-surface);
+	height: var(--vt-ctl); padding: 0 8px 0 10px; gap: 6px;
+	border: 1px solid var(--vt-line-2); border-radius: var(--vt-r-ctl); background: var(--vt-surface);
 	color: var(--vt-text-3); cursor: text;
 }
 .vt-app .vt-filter:focus-within { border-color: var(--vt-accent-line); box-shadow: 0 0 0 3px var(--vt-accent-soft); }
 .vt-app .vt-filter .vt-ico { width: 16px; height: 16px; }
 .vt-app .vt-filter .vt-filter-input {
-	flex: 1; min-width: 0; width: auto; height: 32px; padding: 0; margin: 0;
+	flex: 1; min-width: 0; width: auto; height: calc(var(--vt-ctl) - 2px); padding: 0; margin: 0;
 	border: 0; background: transparent; box-shadow: none; outline: none;
-	color: var(--vt-text); font: inherit; font-size: 13px;
+	color: var(--vt-text); font: inherit; font-size: var(--vt-fs-base);
 }
 .vt-app .vt-filter .vt-filter-input::placeholder { color: var(--vt-text-3); opacity: 1; }
-.vt-app .vt-key-hint { font: 600 10.5px/1 var(--vt-mono); padding: 3px 5px; border-radius: 4px; border: 1px solid var(--vt-line-2); color: var(--vt-text-3); background: var(--vt-surface-2); }
+.vt-app .vt-key-hint { font: 600 var(--vt-fs-micro)/1 var(--vt-mono); padding: 3px 5px; border-radius: 4px; border: 1px solid var(--vt-line-2); color: var(--vt-text-3); background: var(--vt-surface-2); }
 .vt-app .vt-filter:focus-within .vt-key-hint { display: none; }
 .vt-app .vt-filter-clear {
-	display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; margin: 0;
-	border: 0; border-radius: 5px; background: transparent; color: var(--vt-text-3); cursor: pointer; box-shadow: none; min-width: 0;
+	display: inline-flex; align-items: center; justify-content: center; width: calc(var(--vt-ctl) - 10px); height: calc(var(--vt-ctl) - 10px); padding: 0; margin: 0;
+	border: 0; border-radius: var(--vt-r-ctl); background: transparent; color: var(--vt-text-3); cursor: pointer; box-shadow: none; min-width: 0;
 }
 .vt-app .vt-filter-clear:hover { background: var(--vt-surface-3); color: var(--vt-text); }
 .vt-app .vt-filter-clear .vt-ico { width: 14px; height: 14px; }
 .vt-app .vt-fchips { display: flex; flex-wrap: wrap; gap: 6px; }
 .vt-app .vt-fchip {
-	display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; margin: 0;
+	display: inline-flex; align-items: center; gap: 6px; height: var(--vt-ctl); padding: 0 12px; margin: 0;
 	border: 1px solid var(--vt-line); border-radius: 999px; background: var(--vt-surface);
-	color: var(--vt-text-2); font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: none; min-width: 0; text-transform: none;
+	color: var(--vt-text-2); font-size: var(--vt-fs-sm); font-weight: 600; cursor: pointer; box-shadow: none; min-width: 0; text-transform: none;
 }
 .vt-app .vt-fchip:hover { border-color: var(--vt-line-2); color: var(--vt-text); background: var(--vt-surface-2); }
-.vt-app .vt-fchip-n { font-size: 11px; color: var(--vt-text-3); font-weight: 600; }
+.vt-app .vt-fchip-n { font-size: var(--vt-fs-micro); color: var(--vt-text-3); font-weight: 600; }
 .vt-app .vt-fchip-warn .vt-fchip-n { color: var(--vt-warn); }
 .vt-app .vt-fchip.vt-fchip-on { background: var(--vt-text); border-color: var(--vt-text); color: var(--vt-surface); }
 .vt-app .vt-fchip.vt-fchip-on .vt-fchip-n { color: color-mix(in oklab, var(--vt-surface) 70%, transparent); }
@@ -848,18 +863,18 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-ctable { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: auto; min-width: 800px; }
 .vt-app .vt-ctable th {
 	position: sticky; top: 0; z-index: 1;
-	padding: 0 10px; height: 34px; text-align: left; white-space: nowrap; letter-spacing: normal; text-transform: none;
+	padding: 0 10px; height: var(--vt-ctl); text-align: left; white-space: nowrap; letter-spacing: normal; text-transform: none;
 	background: var(--vt-surface); border-bottom: 1px solid var(--vt-line);
 	font-weight: 400;
 }
 .vt-app .vt-sort {
-	display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px; margin: 0 -4px;
-	border: 0; border-radius: 5px; background: transparent; box-shadow: none; min-width: 0;
-	color: var(--vt-text-3); font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; cursor: pointer;
+	display: inline-flex; align-items: center; gap: 4px; height: var(--vt-ctl); padding: 0 4px; margin: 0 -4px;
+	border: 0; border-radius: var(--vt-r-ctl); background: transparent; box-shadow: none; min-width: 0;
+	color: var(--vt-text-3); font-size: var(--vt-fs-micro); font-weight: 650; letter-spacing: .05em; text-transform: uppercase; cursor: pointer;
 }
 .vt-app .vt-sort:hover { color: var(--vt-text); background: var(--vt-surface-2); }
 .vt-app .vt-sort-on { color: var(--vt-text); }
-.vt-app .vt-sort-ind { font-size: 11px; width: 8px; }
+.vt-app .vt-sort-ind { font-size: var(--vt-fs-micro); width: 8px; }
 .vt-app .vt-ctable td {
 	height: auto; line-height: 1.4; overflow-wrap: normal; text-align: left;
 	padding: 9px 8px; vertical-align: middle;
@@ -881,36 +896,36 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-who-text { min-width: 0; }
 /* names get two lines before they are cut; the full name is the title */
 .vt-app .vt-who-label {
-	font-weight: 640; font-size: 13.5px; line-height: 1.3; max-width: 280px; overflow-wrap: anywhere;
+	font-weight: 640; font-size: var(--vt-fs-base); line-height: 1.3; max-width: 280px; overflow-wrap: anywhere;
 	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.vt-app .vt-who-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; margin-top: 3px; color: var(--vt-text-3); font-size: 11.5px; }
+.vt-app .vt-who-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; margin-top: 3px; color: var(--vt-text-3); font-size: var(--vt-fs-micro); }
 .vt-app .vt-who-id { white-space: nowrap; }
 .vt-app .vt-td-name { min-width: 250px; }
 .vt-app .vt-net { display: flex; flex-direction: column; gap: 3px; }
 .vt-app .vt-net-ssid { font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
 .vt-app .vt-net-badges { display: flex; align-items: center; gap: 6px; }
-.vt-app .vt-phy { display: flex; align-items: center; gap: 4px; font-size: 12.5px; white-space: nowrap; }
+.vt-app .vt-phy { display: flex; align-items: center; gap: 4px; font-size: var(--vt-fs-sm); white-space: nowrap; }
 .vt-app .vt-phy b { font-weight: 620; }
 .vt-app .vt-phy .vt-ico { color: var(--vt-text-3); stroke-width: 2.2; width: 12px; height: 12px; }
-.vt-app .vt-phy-up { color: var(--vt-text-3); font-size: 11.5px; padding-left: 16px; }
+.vt-app .vt-phy-up { color: var(--vt-text-3); font-size: var(--vt-fs-micro); padding-left: 16px; }
 .vt-app .vt-live-cell { display: grid; grid-template-columns: auto; gap: 3px; min-width: 96px; }
 .vt-app .vt-live-total { font-weight: 650; }
 .vt-app .vt-mini { display: block; height: 4px; border-radius: 2px; background: var(--vt-surface-3); overflow: hidden; }
 .vt-app .vt-mini-fill { display: block; height: 100%; background: var(--vt-info); border-radius: 2px; transition: width .6s ease; }
-.vt-app .vt-live-split { font-size: 11px; color: var(--vt-text-3); white-space: nowrap; }
+.vt-app .vt-live-split { font-size: var(--vt-fs-micro); color: var(--vt-text-3); white-space: nowrap; }
 .vt-app .vt-exp { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .vt-app .vt-score {
 	flex: none; display: inline-flex; align-items: center; justify-content: center;
-	width: 32px; height: 26px; border-radius: 7px; font-size: 12.5px; font-weight: 700;
+	width: 32px; height: 26px; border-radius: 7px; font-size: var(--vt-fs-sm); font-weight: 700;
 	--vt-xc: var(--vt-ok); background: color-mix(in oklab, var(--vt-xc) 15%, transparent); color: color-mix(in oklab, var(--vt-xc) 85%, var(--vt-text));
 }
 .vt-app .vt-score-warn { --vt-xc: var(--vt-warn); }
 .vt-app .vt-score-err { --vt-xc: var(--vt-err); }
 .vt-app .vt-exp-text { display: flex; flex-direction: column; min-width: 0; }
-.vt-app .vt-exp-text b { font-size: 12.5px; font-weight: 650; }
+.vt-app .vt-exp-text b { font-size: var(--vt-fs-sm); font-weight: 650; }
 .vt-app .vt-exp-text span {
-	font-size: 11.5px; line-height: 1.35; color: var(--vt-text-3); max-width: 170px;
+	font-size: var(--vt-fs-micro); line-height: 1.35; color: var(--vt-text-3); max-width: 170px;
 	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .vt-app .vt-td-time { white-space: nowrap; color: var(--vt-text-2); }
@@ -928,15 +943,15 @@ html[data-darkmode="true"] .vt-app {
 	text-align: left; cursor: pointer; color: var(--vt-text); height: auto; min-width: 0; text-transform: none; font-weight: 400;
 }
 .vt-app .vt-talk-row:hover, .vt-app .vt-ssid:hover, .vt-app .vt-dlist-row:hover { background: var(--vt-surface-2); }
-.vt-app .vt-talk-rank { width: 14px; font-size: 12px; color: var(--vt-text-3); font-weight: 650; text-align: center; flex: none; }
+.vt-app .vt-talk-rank { width: 14px; font-size: var(--vt-fs-sm); color: var(--vt-text-3); font-weight: 650; text-align: center; flex: none; }
 .vt-app .vt-talk-main { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 .vt-app .vt-talk-top { display: flex; justify-content: space-between; gap: 10px; }
 .vt-app .vt-talk-name { font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.vt-app .vt-talk-share { font-size: 12px; font-weight: 650; color: var(--vt-text-2); white-space: nowrap; }
+.vt-app .vt-talk-share { font-size: var(--vt-fs-sm); font-weight: 650; color: var(--vt-text-2); white-space: nowrap; }
 .vt-app .vt-talk-sub b { color: var(--vt-text); font-weight: 650; }
 .vt-app .vt-talk-bar { height: 5px; border-radius: 3px; background: var(--vt-surface-3); overflow: hidden; }
 .vt-app .vt-talk-fill { display: block; height: 100%; border-radius: 3px; background: var(--vt-info); transition: width .6s ease; }
-.vt-app .vt-talk-sub { display: flex; gap: 8px; align-items: baseline; font-size: 11px; color: var(--vt-text-3); white-space: nowrap; overflow: hidden; }
+.vt-app .vt-talk-sub { display: flex; gap: 8px; align-items: baseline; font-size: var(--vt-fs-micro); color: var(--vt-text-3); white-space: nowrap; overflow: hidden; }
 
 .vt-app .vt-ssids { display: flex; flex-direction: column; gap: 2px; }
 .vt-app .vt-ssid-ico { flex: none; width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: var(--vt-surface-3); color: var(--vt-text-2); }
@@ -946,9 +961,9 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-ssid-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .vt-app .vt-ssid-name { font-weight: 640; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vt-app .vt-ssid-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-.vt-app .vt-sec { font-size: 11px; font-weight: 600; color: var(--vt-text-2); }
+.vt-app .vt-sec { font-size: var(--vt-fs-micro); font-weight: 600; color: var(--vt-text-2); }
 .vt-app .vt-ssid-side { display: flex; flex-direction: column; align-items: flex-end; flex: none; }
-.vt-app .vt-ssid-n { font-size: 17px; font-weight: 700; line-height: 1.1; }
+.vt-app .vt-ssid-n { font-size: var(--vt-fs-lg); font-weight: 700; line-height: 1.1; }
 .vt-app .vt-ssid-idle .vt-ssid-n { color: var(--vt-text-3); }
 
 /* ------------------------------------------------------------ 11. drawer */
@@ -981,11 +996,11 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-drawer-ico { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--vt-surface-3); color: var(--vt-text-2); flex: none; }
 .vt-app .vt-drawer-ico .vt-ico { width: 22px; height: 22px; }
 .vt-app .vt-drawer-titles { min-width: 0; }
-.vt-app .vt-drawer-name { font-size: 17px; font-weight: 680; letter-spacing: -.01em; line-height: 1.25; overflow-wrap: anywhere; }
-.vt-app .vt-drawer-sub { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; color: var(--vt-text-3); font-size: 12px; margin-top: 3px; }
+.vt-app .vt-drawer-name { font-size: var(--vt-fs-lg); font-weight: 680; letter-spacing: -.01em; line-height: 1.25; overflow-wrap: anywhere; }
+.vt-app .vt-drawer-sub { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; color: var(--vt-text-3); font-size: var(--vt-fs-sm); margin-top: 3px; }
 .vt-app .vt-drawer-close {
 	display: inline-flex; align-items: center; justify-content: center; flex: none;
-	width: 34px; height: 34px; padding: 0; margin: 0; border: 0; border-radius: 9px;
+	width: var(--vt-ctl); height: var(--vt-ctl); padding: 0; margin: 0; border: 0; border-radius: var(--vt-r-ctl);
 	background: transparent; color: var(--vt-text-2); cursor: pointer; box-shadow: none; min-width: 0;
 }
 .vt-app .vt-drawer-close:hover { background: var(--vt-surface-3); color: var(--vt-text); }
@@ -993,7 +1008,7 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-dactions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .vt-app .vt-dactions:has(> .vt-link:only-child) { justify-content: flex-end; }
 .vt-app .vt-rename-slot:empty { display: none; }
-.vt-app .vt-banner { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--vt-r-sm); font-size: 12.5px; }
+.vt-app .vt-banner { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--vt-r-sm); font-size: var(--vt-fs-sm); }
 .vt-app .vt-banner-muted { background: var(--vt-surface-3); color: var(--vt-text-2); }
 
 .vt-app .vt-expcard {
@@ -1008,52 +1023,52 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-ring-svg { width: 58px; height: 58px; transform: rotate(-90deg); }
 .vt-app .vt-ring-track { fill: none; stroke: color-mix(in oklab, var(--vt-xc) 18%, transparent); stroke-width: 3.5; }
 .vt-app .vt-ring-arc { fill: none; stroke: var(--vt-xc); stroke-width: 3.5; stroke-linecap: round; }
-.vt-app .vt-ring-n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 720; }
-.vt-app .vt-expcard-grade { font-weight: 680; font-size: 14px; }
-.vt-app .vt-expcard-reason { font-size: 12.5px; color: var(--vt-text-2); margin-top: 1px; }
-.vt-app .vt-factors { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; color: var(--vt-text-3); }
+.vt-app .vt-ring-n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--vt-fs-lg); font-weight: 720; }
+.vt-app .vt-expcard-grade { font-weight: 680; font-size: var(--vt-fs-md); }
+.vt-app .vt-expcard-reason { font-size: var(--vt-fs-sm); color: var(--vt-text-2); margin-top: 1px; }
+.vt-app .vt-factors { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; font-size: var(--vt-fs-micro); color: var(--vt-text-3); }
 .vt-app .vt-factors li { display: flex; gap: 6px; }
 .vt-app .vt-factors li .vt-tn { width: 26px; flex: none; color: var(--vt-text-2); font-weight: 650; }
 
 .vt-app .vt-dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .vt-app .vt-dcard { display: flex; flex-direction: column; gap: 1px; padding: 12px; border-radius: var(--vt-r); background: var(--vt-surface-2); border: 1px solid var(--vt-line); min-width: 0; }
-.vt-app .vt-dcard-label { font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .05em; color: var(--vt-text-3); }
-.vt-app .vt-dcard-value { font-size: 20px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
-.vt-app .vt-dcard-sub { font-size: 11.5px; line-height: 1.35; color: var(--vt-text-3); min-height: 16px; }
+.vt-app .vt-dcard-label { font-size: var(--vt-fs-micro); font-weight: 650; text-transform: uppercase; letter-spacing: .05em; color: var(--vt-text-3); }
+.vt-app .vt-dcard-value { font-size: var(--vt-fs-xl); font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+.vt-app .vt-dcard-sub { font-size: var(--vt-fs-micro); line-height: 1.35; color: var(--vt-text-3); min-height: 16px; }
 .vt-app .vt-dcard .vt-sk { margin-top: auto; padding-top: 18px; }
 .vt-app .vt-dcard .vt-sk-max { top: 16px; }
 .vt-app .vt-dcard .vt-spark { height: 36px; }
 .vt-app .vt-dspark { padding-top: 14px; }
 .vt-app .vt-dspark .vt-spark { height: 48px; }
-.vt-app .vt-dsec-title { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--vt-text-3); margin: 0 0 6px; padding: 0; border: 0; }
+.vt-app .vt-dsec-title { font-size: var(--vt-fs-micro); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--vt-text-3); margin: 0 0 6px; padding: 0; border: 0; }
 .vt-app .vt-kvs { display: flex; flex-direction: column; }
 .vt-app .vt-kvs .vt-kv { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--vt-line); }
 .vt-app .vt-kvs .vt-kv:last-child { border-bottom: 0; }
-.vt-app .vt-kvs .vt-kv dt { font-size: 12px; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--vt-text-3); }
-.vt-app .vt-kvs .vt-kv dd { font-size: 13px; font-weight: 520; margin: 0; white-space: pre-line; overflow-wrap: anywhere; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-.vt-app .vt-kvs .vt-kv dd small { font-size: 11.5px; color: var(--vt-text-3); font-weight: 400; }
+.vt-app .vt-kvs .vt-kv dt { font-size: var(--vt-fs-sm); text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--vt-text-3); }
+.vt-app .vt-kvs .vt-kv dd { font-size: var(--vt-fs-base); font-weight: 520; margin: 0; white-space: pre-line; overflow-wrap: anywhere; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.vt-app .vt-kvs .vt-kv dd small { font-size: var(--vt-fs-micro); color: var(--vt-text-3); font-weight: 400; }
 .vt-app .vt-dlist { display: flex; flex-direction: column; }
 .vt-app .vt-dlist-name { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .vt-app .vt-rename { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: var(--vt-r); background: var(--vt-surface-2); border: 1px solid var(--vt-line); }
-.vt-app .vt-rename-label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--vt-text-2); }
+.vt-app .vt-rename-label { display: flex; flex-direction: column; gap: 5px; font-size: var(--vt-fs-sm); font-weight: 600; color: var(--vt-text-2); }
 .vt-app .vt-rename .vt-rename-input {
-	height: 36px; width: 100%; padding: 0 10px; margin: 0;
-	border: 1px solid var(--vt-line-2); border-radius: var(--vt-r-sm); background: var(--vt-surface);
-	color: var(--vt-text); font: inherit; font-size: 14px; box-shadow: none;
+	height: var(--vt-ctl); width: 100%; padding: 0 10px; margin: 0;
+	border: 1px solid var(--vt-line-2); border-radius: var(--vt-r-ctl); background: var(--vt-surface);
+	color: var(--vt-text); font: inherit; font-size: var(--vt-fs-md); box-shadow: none;
 }
 .vt-app .vt-rename .vt-rename-input:focus { outline: none; border-color: var(--vt-accent-line); box-shadow: 0 0 0 3px var(--vt-accent-soft); }
 .vt-app .vt-icon-picks { display: flex; flex-wrap: wrap; gap: 4px; }
 .vt-app .vt-icon-pick {
-	display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; margin: 0;
-	border: 1px solid var(--vt-line); border-radius: 8px; background: var(--vt-surface); color: var(--vt-text-2);
+	display: inline-flex; align-items: center; justify-content: center; width: var(--vt-ctl); height: var(--vt-ctl); padding: 0; margin: 0;
+	border: 1px solid var(--vt-line); border-radius: var(--vt-r-ctl); background: var(--vt-surface); color: var(--vt-text-2);
 	cursor: pointer; box-shadow: none; min-width: 0;
 }
 .vt-app .vt-icon-pick:hover { border-color: var(--vt-line-2); color: var(--vt-text); }
 .vt-app .vt-icon-pick[aria-pressed="true"] { background: var(--vt-accent); border-color: var(--vt-accent); color: var(--vt-accent-ink); }
 .vt-app .vt-rename-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.vt-app .vt-rename-actions .vt-hint { flex-basis: 100%; font-size: 11px; }
-.vt-app .vt-form-err { color: var(--vt-err); font-size: 12px; }
+.vt-app .vt-rename-actions .vt-hint { flex-basis: 100%; font-size: var(--vt-fs-micro); }
+.vt-app .vt-form-err { color: var(--vt-err); font-size: var(--vt-fs-sm); }
 
 /* ------------------------------------------------ 12. small screens, motion */
 
@@ -1064,7 +1079,7 @@ html[data-darkmode="true"] .vt-app {
 	.vt-app .vt-fchips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px; }
 	.vt-app .vt-fchip { flex: none; }
 	.vt-app .vt-head { gap: 10px; }
-	.vt-app .vt-headline { font-size: 18px; }
+	.vt-app .vt-headline { font-size: var(--vt-fs-lg); }
 	.vt-app .vt-orb { width: 32px; height: 32px; }
 	/* phones: a live connection is just the pulsing dot; paused or
 	   reconnecting still says so in words */
@@ -1075,10 +1090,10 @@ html[data-darkmode="true"] .vt-app {
 	.vt-app .vt-health { grid-template-columns: 1fr 1fr; gap: 8px; }
 	.vt-app .vt-chip { padding: 9px 10px; gap: 8px; }
 	.vt-app .vt-chip-ico { width: 22px; height: 22px; }
-	.vt-app .vt-chip-reason { -webkit-line-clamp: 2; font-size: 11.5px; }
+	.vt-app .vt-chip-reason { -webkit-line-clamp: 2; font-size: var(--vt-fs-micro); }
 	.vt-app .vt-sys-cpu { grid-template-columns: auto minmax(0, 1fr); }
 	.vt-app .vt-chart { --vt-mh: 108px; --vt-mg: 12px; }
-	.vt-app .vt-mult-now { font-size: 15px; }
+	.vt-app .vt-mult-now { font-size: var(--vt-fs-md); }
 	.vt-app .vt-mx-odd { display: none; }
 	.vt-app .vt-tip { min-width: 160px; }
 }
@@ -1112,11 +1127,11 @@ html[data-darkmode="true"] .vt-app {
 	.vt-app .vt-exp { gap: 8px; }
 	.vt-app .vt-exp-text { flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; }
 	.vt-app .vt-exp-text b { flex: none; }
-	.vt-app .vt-score { width: 28px; height: 22px; font-size: 12px; }
+	.vt-app .vt-score { width: 28px; height: 22px; font-size: var(--vt-fs-sm); }
 	.vt-app .vt-td-name { min-width: 0; }
 	.vt-app .vt-ctable td.vt-td-rate, .vt-app .vt-ctable td.vt-td-time { display: none; }
 	.vt-app .vt-who-label { max-width: 100%; }
-	.vt-app .vt-net-ssid { font-size: 13px; max-width: none; }
+	.vt-app .vt-net-ssid { font-size: var(--vt-fs-base); max-width: none; }
 }
 
 @media (max-width: 640px) {
@@ -1132,6 +1147,11 @@ html[data-darkmode="true"] .vt-app {
 	.vt-app .vt-drawer-head { padding: 10px 12px 12px 16px; }
 	.vt-app .vt-drawer-body { padding: 12px 16px calc(24px + env(safe-area-inset-bottom)); }
 	.vt-app .vt-kvs .vt-kv { grid-template-columns: 112px minmax(0, 1fr); }
+}
+
+/* touch: 16px text in fields (iOS zooms into anything smaller) */
+@media (pointer: coarse) {
+	.vt-app .vt-filter .vt-filter-input, .vt-app .vt-rename .vt-rename-input { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -56,7 +56,13 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   placeholder), from `system board` via rpc in the menu script.
 - **Theme toggle**: auto / light / dark, stored in `localStorage`, applied
   in `<head>` before CSS (no flash), exposed as `html[data-darkmode]`.
-- **Tabs** (depth ≥ 3) under the top bar.
+- **Tabs** (depth ≥ 3) under the top bar, underlined. Each tab level
+  inside a page has one look, and a page has one underline strip: on a
+  page without menu tabs, tabs standing at page level (Interfaces /
+  Devices / ..., Channel Analysis's radios) are its sub-pages and take
+  the underline; the first level inside a page, form or modal is a
+  segmented control; tabs inside a tab are a side list where the pane is
+  wide enough and chips where it is not, and at any deeper level.
 - **Mobile** (≤ 720 px): rail becomes a drawer/bottom bar, tables become
   cards using `td[data-title]`, forms stack.
 
@@ -67,6 +73,18 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
 - All core widgets per contract §5 (dropdown state machine, tabs, modals
   incl. apply countdown, tooltips, dynlist, progress bars, file browser,
   notifications with real fade-out transition, changes dialog).
+- **Forms**: one control height for inputs, selects, dropdowns, buttons
+  and tabs, chosen by pointer type, not screen width (36 px with a mouse,
+  44 px on touch, 16 px text in touch fields); a 180 px label column and
+  fields up to 360 px (a select grows to fit a long choice). Field help,
+  and page and section intros, show their first line and an (i) button
+  unfolds the rest, so the start of a warning is always visible; text
+  that fits one line gets no button. A page or card heading that only
+  repeats the breadcrumb, the map title or its tab is hidden visually and
+  kept for screen readers. LuCI's text and the order of LuCI's nodes are
+  never changed: the menu script adds the (i) buttons (after a field
+  row's field, or first inside an intro) and sets classes, `data-v-help`
+  and (where missing) a description `id` for `aria-controls`.
 - 404 / CSRF pages render in the theme without leaking anything.
 
 ### Visual identity
@@ -82,6 +100,12 @@ reference only.
 Either way: one accent colour only, status colours distinct from it,
 system font stacks, self-drawn SVG icons, WCAG AA contrast in both modes,
 visible focus, reduced-motion respected.
+
+One type scale for the theme and the dashboard: 10.5 / 12 / 13 / 14 /
+16 / 20 / 24 px (`--fs-*`, shared as `--v-fs-*`). Every font size comes
+from it, except the 16 px of fields on touch screens (iOS zooms into
+anything smaller); monospace text is set a few percent smaller than the
+text around it so it looks the same size.
 
 ## 4. App v1 (`luci-app-vantage`)
 
@@ -117,6 +141,16 @@ visible focus, reduced-motion respected.
   a per-tile minimum and hide them. Saved in `localStorage` per screen
   class (and separately for wired devices), validated on read; never on
   the device.
+- **Controls** (buttons, filter, chips, sort headers, icon buttons) take
+  the theme's control height through `--v-ctl-h` (36 px, 44 px on
+  touch) and the theme's control radius (`--v-r`); under another theme
+  the app falls back to the same 36/44 px by pointer type. Text sizes come
+  from the theme's type scale (`--v-fs-*`). The layout itself stays the
+  app's own: container queries on its own width, one column below
+  700 px. On a 721–803 px screen the dashboard is therefore still one
+  column while theme forms already sit beside their labels; that is
+  intended, since the dashboard only gets about 600–700 px there and its
+  two-column tiles clip below that (measured).
 - Polling via `poll.add` with sane intervals; pauses when the tab is hidden.
 - ACL: three groups. `luci-app-vantage` (read): `system info/board`,
   `network.interface dump`, `network.device status`, `iwinfo

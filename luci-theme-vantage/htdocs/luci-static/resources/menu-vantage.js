@@ -46,7 +46,8 @@ const ICONS = {
 	moon: [ [ 'path', { d: 'M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z' } ] ],
 	auto: [ [ 'circle', { cx: '12', cy: '12', r: '8' } ], [ 'path', { d: 'M12 4a8 8 0 0 1 0 16z', 'class': 'vt-fill' } ] ],
 	logout: [ [ 'path', { d: 'M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14' } ], [ 'path', { d: 'M10 8l-4 4 4 4M6 12h10' } ] ],
-	pin: [ [ 'path', { d: 'M4 5v14M9 12h11M15 7l5 5-5 5' } ] ]
+	pin: [ [ 'path', { d: 'M4 5v14M9 12h11M15 7l5 5-5 5' } ] ],
+	info: [ [ 'circle', { cx: '12', cy: '12', r: '8.5' } ], [ 'path', { d: 'M12 11v5.5' } ], [ 'circle', { cx: '12', cy: '7.75', r: '.6' } ] ]
 };
 
 function iconFor(name) {
@@ -178,6 +179,11 @@ function technical(text) {
 	if (!t || t.length > 120 || !/\d/.test(t)) return false;
 	const rest = t.replace(UNITS, '');
 	return /\d/.test(rest) && /^[\s0-9a-fA-F.:,\/%()+\-x[\]~=]*$/.test(rest);
+}
+
+/* heading text as compared for repeats: case, spacing and a trailing colon don't count */
+function headingKey(text) {
+	return String(text || '').replace(/\s+/g, ' ').replace(/[\s:]+$/, '').trim().toLowerCase();
 }
 
 /* ---------------------------------------------------------------------------
@@ -410,11 +416,18 @@ function humpPath(points) {
 	return 'M' + r(x0) + ',' + r(base) + 'C' + r(x0 + k) + ',' + r(cy) + ' ' + r(x3 - k) + ',' + r(cy) + ' ' + r(x3) + ',' + r(base) + 'Z';
 }
 
+/* "#89cdb4" -> "rgb(137, 205, 180)", the form element.style reads back */
+function hexRgb(hex) {
+	const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex));
+	return m ? 'rgb(' + [ m[1], m[2], m[3] ].map(h => parseInt(h, 16)).join(', ') + ')' : null;
+}
+
 function setupChannelAnalysis() {
 	const view = document.getElementById('view');
 	const own = new Set();
 	const slots = new Map();
 	let next = 0;
+	let colourOf = null;
 	/* slot 1 (the accent) is the AP itself; neighbours take 2..6 in the order
 	   they first appear (the view sorts by channel, so neighbours differ) */
 	const slotFor = (colour, mine) => {
@@ -455,9 +468,17 @@ function setupChannelAnalysis() {
 				const dot = tr.querySelector('span[style*="color"]');
 				const cells = tr.querySelectorAll(':scope > td, :scope > .td');
 				if (!cells.length) return;
-				const bssid = cells[cells.length - 1].textContent.trim().toUpperCase();
+				const printed = cells[cells.length - 1].textContent.trim();
+				const bssid = printed.toUpperCase();
 				const mine = own.has(bssid);
 				if (tr.classList.contains('v-ca-own') !== mine) tr.classList.toggle('v-ca-own', mine);
+				/* the view prints its own interface's row without the colour
+				   dot, so rebuild that colour the way the view made it: from
+				   the BSSID as printed (the derivation is case-sensitive) */
+				if (mine && colourOf) {
+					const derived = hexRgb(colourOf(printed));
+					if (derived) mineByColour.set(derived, true);
+				}
 				if (!dot) return;
 				const colour = dot.style.color;
 				if (mine) mineByColour.set(colour, true);
@@ -531,7 +552,15 @@ function setupChannelAnalysis() {
 		busy = false;
 	};
 
-	L.resolveDefault(callWirelessDevices(), {}).then(devs => {
+	/* tools.prng is what the view colours networks with (it is loaded
+	   already); derive_color reseeds on every call, so calling it here
+	   leaves the view's colours as they are */
+	Promise.all([
+		L.resolveDefault(callWirelessDevices(), {}),
+		L.resolveDefault(L.require('tools.prng'), null)
+	]).then(([ devs, prng ]) => {
+		if (prng && typeof prng.derive_color === 'function')
+			colourOf = b => prng.derive_color(b);
 		for (const r of Object.values(devs || {}))
 			for (const i of (r && Array.isArray(r.interfaces)) ? r.interfaces : [])
 				[ i.iwinfo && i.iwinfo.bssid, i.config && i.config.macaddr ].forEach(b => {
@@ -558,10 +587,12 @@ return baseclass.extend({
 		this.closeTimer = null;
 		this.openTimer = null;
 		this.entries = [];
+		this.trailKeys = new Set();
 
 		this.setupTheme();
 		this.setupIndicators();
 		this.setupNumerals();
+		this.setupForms();
 		setupStockEnhancers();
 		setupCharts();
 		this.setupKeys();
@@ -605,6 +636,7 @@ return baseclass.extend({
 		this.renderCrumbs();
 		this.renderTabs();
 		this.buildIndex();
+		this.queueForms();
 	},
 
 	isPinned() {
@@ -861,6 +893,7 @@ return baseclass.extend({
 		});
 
 		this.pageTitle = parts[parts.length - 1].title;
+		parts.forEach(p => this.trailKeys.add(headingKey(p.title)));
 		this.updateTitle();
 	},
 
@@ -1194,5 +1227,126 @@ return baseclass.extend({
 			window.requestAnimationFrame(scan);
 		}).observe(main, { childList: true, subtree: true, characterData: true });
 		scan();
+	},
+
+	/* ---------------------------------------------------- form chrome */
+
+	/* LuCI renders forms into #view and the modal, and renders them again
+	   after a save: watch the body and decorate what is new. This adds (i)
+	   buttons and sets classes and attributes; LuCI's text and the order of
+	   LuCI's nodes stay as they are. */
+	setupForms() {
+		this.formsQueued = false;
+		this.helpSeq = 0;
+		this.helpSizes = window.ResizeObserver ? new ResizeObserver(entries => entries.forEach(e => this.fitHelp(e.target))) : null;
+		if (window.MutationObserver)
+			new MutationObserver(() => this.queueForms()).observe(document.body, { childList: true, subtree: true });
+		this.decorateForms();
+	},
+
+	queueForms() {
+		if (this.formsQueued) return;
+		this.formsQueued = true;
+		window.requestAnimationFrame(() => {
+			this.formsQueued = false;
+			this.decorateForms();
+		});
+	},
+
+	decorateForms() {
+		document.querySelectorAll('.cbi-value > .cbi-value-title + .cbi-value-field > .cbi-value-description:not(.vt-help-text)')
+			.forEach(desc => this.addFieldHelp(desc));
+		document.querySelectorAll(':is(.cbi-map-descr, .cbi-section-descr):not(:has(> .vt-help))')
+			.forEach(desc => this.addIntroHelp(desc));
+		this.markRepeats();
+	},
+
+	/* Help text shows its first line; (i) unfolds the rest. LuCI also puts
+	   warnings here, so none is hidden whole: its start stays visible.
+	   Field help: the button sits in the label column, after the field,
+	   because LuCI's label click handler finds the widget through
+	   nextElementSibling. */
+	addFieldHelp(desc) {
+		const row = desc.parentNode.parentNode;
+		const title = row.querySelector(':scope > .cbi-value-title');
+		row.appendChild(this.helpToggle(desc, row, _('Show full help: %s').format(title.textContent.trim()), _('Show full help')));
+	},
+
+	/* Page and section intros: the button leads the first line, inside the
+	   description, since nothing may stand between LuCI's siblings (ui.tabs
+	   finds a tab menu as its pane group's previous sibling). The fold needs
+	   the button, so a view that rewrote the text would show it whole until
+	   the next pass adds the button again. The cut-off line unfolds on a
+	   click too, a bigger target on touch than the icon. */
+	addIntroHelp(desc) {
+		if (desc.closest('.vt-app') || !desc.textContent.trim()) return;
+		desc.insertBefore(this.helpToggle(desc, desc, _('Show full description'), _('Show full description')), desc.firstChild);
+		if (desc._vtIntroClick) return;
+		desc._vtIntroClick = true;
+		desc.addEventListener('click', ev => {
+			const btn = desc.querySelector(':scope > .vt-help');
+			if (!btn || btn.hidden || desc.getAttribute('data-v-help') !== 'closed') return;
+			if (ev.target.closest('a, button') || String(window.getSelection())) return;
+			btn.click();
+		});
+	},
+
+	/* The (i) button for desc. Its state lives on holder (the field row, or
+	   the intro itself) as data-v-help, which the CSS folds by. */
+	helpToggle(desc, holder, label, title) {
+		const state = holder.getAttribute('data-v-help') || 'closed';
+		holder.setAttribute('data-v-help', state);
+		desc.classList.add('vt-help-text');
+		if (!desc.id) desc.id = 'vt-help-' + (++this.helpSeq);
+		const btn = E('button', {
+			'class': 'vt-help', 'type': 'button', 'hidden': '',
+			'aria-expanded': String(state === 'open'), 'aria-controls': desc.id,
+			'aria-label': label, 'title': title,
+			'click': () => {
+				const open = holder.getAttribute('data-v-help') !== 'open';
+				holder.setAttribute('data-v-help', open ? 'open' : 'closed');
+				btn.setAttribute('aria-expanded', String(open));
+				this.fitHelp(desc);
+			}
+		}, [ svg('info', 16) ]);
+		desc._vtHelp = { btn: btn, holder: holder };
+		if (this.helpSizes) this.helpSizes.observe(desc);
+		else btn.hidden = false;
+		return btn;
+	},
+
+	/* (i) shows only while the one-line clamp cuts the text. Text that is
+	   not displayed (another tab, an unmet dependency) measures 0 and waits
+	   for the next resize notification. */
+	fitHelp(desc) {
+		if (!desc.isConnected) {
+			if (this.helpSizes) this.helpSizes.unobserve(desc);
+			return;
+		}
+		const h = desc._vtHelp;
+		if (!h || !h.btn.isConnected || !desc.clientHeight) return;
+		const cut = desc.scrollHeight > desc.clientHeight + 1;
+		h.btn.hidden = !cut && h.holder.getAttribute('data-v-help') !== 'open';
+	},
+
+	/* A page title or card heading that only repeats the breadcrumb, the
+	   map title or its own tab's name is hidden visually; screen readers
+	   still get it as a heading. Headings that hold a control (Overview's
+	   Hide/Show label) always stay. */
+	markRepeats() {
+		/* template pages (Status -> Overview) print their title before #view */
+		document.querySelectorAll('#maincontent > h2, #view h2, #view .cbi-section > h3:first-child').forEach(h => {
+			if (h.closest('.vt-app') || h.querySelector('a, button, input, select, [data-clickable], [tabindex]')) return;
+			const key = headingKey(h.textContent);
+			let repeat = this.trailKeys.has(key);
+			if (!repeat && h.tagName === 'H3') {
+				const map = h.closest('.cbi-map');
+				const mapTitle = map && map.querySelector(':scope > h2');
+				const pane = h.closest('[data-tab-title]');
+				repeat = (mapTitle && headingKey(mapTitle.textContent) === key) ||
+					(pane && headingKey(pane.getAttribute('data-tab-title')) === key);
+			}
+			h.classList.toggle('vt-repeat', !!(key && repeat));
+		});
 	}
 });

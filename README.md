@@ -34,6 +34,8 @@ without the app.
   changes count) as keyboard-accessible pills
 - Its own login page, and restyled stock pages, forms, tables, charts and
   status icons; tables become cards on small screens
+- One control size (bigger on touch screens), one look per tab level, and
+  field help folded to its first line
 - System fonts, self-drawn SVG icons, no CDNs or frameworks
 
 **`luci-app-vantage`**, the dashboard at `admin/dashboard` (the landing page):
