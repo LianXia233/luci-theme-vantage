@@ -13,7 +13,7 @@
 <br>
 
 <p align="center">
-  <img src="docs/screenshots/dashboard-dark.png" alt="The Vantage dashboard in dark mode: health strip, network path from gateway to access point, radios and SSIDs, system tile and live throughput charts" width="100%">
+  <img src="docs/screenshots/dashboard-dark.png" alt="The Vantage dashboard in dark mode: health strip, network path from gateway to access point, radios and SSIDs, live throughput with download and upload in their own colours, and radio cards" width="100%">
 </p>
 
 <p align="center"><sub>Screenshots show recorded data from a real access point, pseudonymised
