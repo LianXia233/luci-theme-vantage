@@ -83,7 +83,8 @@
  *   Object.assign sources object literals); a style sheet's
  *   replaceSync(x)/insertRule(x) needs constant CSS, or x must be the first
  *   parameter of a .then() callback on a chain that starts with
- *   fetch(L.resource('<literal>')) (a stylesheet shipped with the package).
+ *   fetch(L.resource('<literal>')) (a stylesheet shipped with the package;
+ *   an options object of literals, such as { cache: 'no-cache' }, may follow).
  *   Selectors: querySelector/querySelectorAll/closest/matches/
  *   webkitMatchesSelector(sel) need a constant selector or a concatenation
  *   of literals and CSS.escape(...) (this./self.matches, the view's own
@@ -1549,7 +1550,8 @@ function scanUnit(prog, u, report) {
 			flag(i, 'css-style', `${what} \`${text(vs, ve)}\` is not a literal or literal/number concatenation (CSS from data: url() beacons, overlays)${why()}`, [vs]);
 	};
 	/* [s, e) is the first parameter of a .then() callback on a chain that
-	   starts with fetch(L.resource('<literal>')) */
+	   starts with fetch(L.resource('<literal>')), optionally with an options
+	   object whose values are all literals ({ cache: 'no-cache' }) */
 	const fetchedResource = (i, s, e) => {
 		if (e - s !== 1 || !isId(T[s])) return false;
 		const f = innermostFn(u, i);
@@ -1558,8 +1560,17 @@ function scanUnit(prog, u, report) {
 			if (isId(T[j], T[s].v) && !isP(T[j - 1], '.') && T[j + 1] && T[j + 1].t === 'punc' && (ASSIGN_OPS.has(T[j + 1].v) || T[j + 1].v === '++' || T[j + 1].v === '--')) return false;
 		if (!(isP(T[f.start - 1], '(') && isId(T[f.start - 2], 'then') && isP(T[f.start - 3], '.'))) return false;
 		const c = chainStart(u, f.start - 3);
-		return isId(T[c], 'fetch') && isP(T[c + 1], '(') && isId(T[c + 2], 'L') && isP(T[c + 3], '.') && isId(T[c + 4], 'resource') &&
-			isP(T[c + 5], '(') && isLit(T[c + 6]) && T[c + 6].t !== 'num' && isP(T[c + 7], ')') && isP(T[c + 8], ')') && u.match[c + 1] === c + 8;
+		if (!(isId(T[c], 'fetch') && isP(T[c + 1], '(') && isId(T[c + 2], 'L') && isP(T[c + 3], '.') && isId(T[c + 4], 'resource') &&
+			isP(T[c + 5], '(') && isLit(T[c + 6]) && T[c + 6].t !== 'num' && isP(T[c + 7], ')'))) return false;
+		if (isP(T[c + 8], ')')) return u.match[c + 1] === c + 8;
+		if (!isP(T[c + 8], ',') || !isP(T[c + 9], '{')) return false;
+		const close = u.match[c + 9];
+		if (close === undefined) return false;
+		for (let j = c + 10; j < close; j += 4) {
+			if (!((isId(T[j]) || (T[j] && T[j].t === 'str')) && isP(T[j + 1], ':') && isLit(T[j + 2]))) return false;
+			if (j + 3 !== close && !isP(T[j + 3], ',')) return false;
+		}
+		return isP(T[close + 1], ')') && u.match[c + 1] === close + 1;
 	};
 	/* constant selector, or literals + CSS.escape(...) */
 	const selectorSafe = (s, e) => {

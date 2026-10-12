@@ -63,6 +63,10 @@
 	--vt-b6: var(--vt-chart-4);
 	--vt-b60: var(--vt-text-2);
 	--vt-series-up: var(--vt-chart-1);
+	/* throughput directions: download keeps the uplink colour, upload
+	   takes one that no band uses */
+	--vt-dir-dn: var(--vt-chart-1);
+	--vt-dir-up: var(--vt-chart-5);
 	--vt-mem: var(--vt-info);
 	--vt-hover: color-mix(in srgb, var(--vt-surface-2) 70%, var(--vt-surface-3));
 	--vt-av-l: 92%;
@@ -691,12 +695,14 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-chart .vt-tile-title { flex-wrap: wrap; row-gap: 0; }
 .vt-app .vt-chart-sub { font-size: 12px; font-weight: 500; color: var(--vt-text-3); }
 .vt-app .vt-chart-sub::before { content: "·"; margin: 0 6px 0 0; }
-.vt-app .vt-c-up { --vt-sc: var(--vt-series-up); }
-.vt-app .vt-c-2g { --vt-sc: var(--vt-b2); }
-.vt-app .vt-c-5g { --vt-sc: var(--vt-b5); }
-.vt-app .vt-c-6g { --vt-sc: var(--vt-b6); }
-.vt-app .vt-c-x { --vt-sc: var(--vt-text-3); }
 .vt-app .vt-lg-key { width: 12px; height: 3px; border-radius: 2px; background: var(--vt-sc); flex: none; }
+/* one colour per direction in every row (series, gradients, dots, keys) */
+.vt-app .vt-chart, .vt-app .vt-chart .vt-k-dn { --vt-sc: var(--vt-dir-dn); }
+.vt-app .vt-chart .vt-dir-up, .vt-app .vt-chart .vt-k-up { --vt-sc: var(--vt-dir-up); }
+.vt-app .vt-arr { font-weight: 700; }
+.vt-app .vt-arr-dn { color: color-mix(in oklab, var(--vt-dir-dn) 70%, var(--vt-text)); }
+.vt-app .vt-arr-up { color: color-mix(in oklab, var(--vt-dir-up) 70%, var(--vt-text)); }
+.vt-app .vt-dir-legend { font-size: 11.5px; gap: 4px 12px; }
 
 .vt-app .vt-mult-wrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 300px; border-radius: var(--vt-r-sm); outline-offset: 4px; }
 .vt-app .vt-mults { flex: 1; display: grid; grid-auto-rows: minmax(100px, 1fr); }
@@ -706,9 +712,10 @@ html[data-darkmode="true"] .vt-app {
 }
 .vt-app .vt-mult:first-child { border-top: 0; padding-top: 2px; }
 .vt-app .vt-mult-head { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
-.vt-app .vt-mult-name { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vt-app .vt-mult-now { font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; white-space: nowrap; }
-.vt-app .vt-mult-now-up { font-size: 13px; font-weight: 650; line-height: 1.3; color: var(--vt-text-2); white-space: nowrap; }
+.vt-app .vt-mult-name { font-size: 11.5px; font-weight: 600; color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vt-app .vt-mult-now { display: flex; align-items: center; gap: 6px; font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; white-space: nowrap; }
+.vt-app .vt-mult-now b { font-weight: inherit; }
+.vt-app .vt-mult-now-up { font-size: 13px; font-weight: 650; line-height: 1.3; color: var(--vt-text-2); }
 .vt-app .vt-mult-stats { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 11px; color: var(--vt-text-3); white-space: nowrap; }
 .vt-app .vt-mult-stats b { font-weight: 600; color: var(--vt-text-2); }
 .vt-app .vt-mult-plot { position: relative; min-height: 72px; margin: 12px 0; --vt-sc: inherit; }
@@ -717,10 +724,6 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-chart-vgrid { fill: none; stroke: var(--vt-chart-grid); stroke-width: 1; stroke-dasharray: 2 4; vector-effect: non-scaling-stroke; }
 .vt-app .vt-series-line { fill: none; stroke: var(--vt-sc); stroke-width: 1.75; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
 .vt-app .vt-series-area { stroke: none; }
-/* upload, below the line: the link's colour, quieter */
-.vt-app .vt-series-line.vt-dir-up { stroke-opacity: .6; }
-.vt-app .vt-series-area.vt-dir-up { opacity: .55; }
-.vt-app .vt-mult-dot.vt-dir-up, .vt-app .vt-sk-dot.vt-dir-up { opacity: .7; }
 .vt-app .vt-chart-mid { fill: none; stroke: color-mix(in oklab, var(--vt-chart-axis) 55%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .vt-app .vt-mult-max {
 	position: absolute; right: 0; top: -3px; transform: translateY(-100%);
@@ -739,18 +742,17 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-mult-wrap { cursor: crosshair; touch-action: pan-y; }
 .vt-app .vt-cursor { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid color-mix(in oklab, var(--vt-text) 45%, transparent); pointer-events: none; }
 .vt-app .vt-tip {
-	position: absolute; top: 4px; z-index: 4; transform: translateX(12px);
+	position: absolute; top: 4px; z-index: 4;
 	width: max-content; min-width: 180px; padding: 8px 10px 7px; border-radius: var(--vt-r);
 	background: var(--vt-surface); border: 1px solid var(--vt-line-2);
 	box-shadow: 0 10px 28px rgba(12, 14, 17, .16), 0 2px 6px rgba(12, 14, 17, .06);
 	font-size: 12px; pointer-events: none;
 }
-.vt-app .vt-tip-left { transform: translateX(calc(-100% - 12px)); }
 .vt-app .vt-tip-time { display: flex; justify-content: space-between; gap: 12px; color: var(--vt-text-3); font-size: 11px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid var(--vt-line); }
-.vt-app .vt-tip-row { display: grid; grid-template-columns: 12px auto auto minmax(0, 1fr); align-items: center; column-gap: 8px; line-height: 1.6; }
-.vt-app .vt-tip-row b { font-weight: 700; color: var(--vt-text); white-space: nowrap; }
-.vt-app .vt-tip-row .vt-tip-up { font-weight: 600; color: var(--vt-text-2); }
-.vt-app .vt-tip-label { color: var(--vt-text-3); white-space: nowrap; text-align: right; }
+.vt-app .vt-tip-link + .vt-tip-link { margin-top: 5px; }
+.vt-app .vt-tip-label { color: var(--vt-text-3); font-size: 11px; white-space: nowrap; }
+.vt-app .vt-tip-row { display: grid; grid-template-columns: 12px auto minmax(0, 1fr); align-items: center; column-gap: 8px; line-height: 1.6; color: var(--vt-text-2); }
+.vt-app .vt-tip-row b { font-weight: 700; color: var(--vt-text); white-space: nowrap; text-align: right; }
 
 /* ------------------------------------------------------------ 8. radios */
 

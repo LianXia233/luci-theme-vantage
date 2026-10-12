@@ -165,6 +165,11 @@ Upgrades then come with the rest of your packages:
 apk update && apk upgrade luci-theme-vantage luci-app-vantage
 ```
 
+After an upgrade, reload the dashboard once with Ctrl+Shift+R (Cmd+Shift+R
+on a Mac). LuCI tags its scripts with LuCI's own version, not the app's, so
+a browser can keep running the previous dashboard from its cache until the
+page is reloaded without it.
+
 **Switching from a file install:** when a package was installed from a
 `.apk` file, apk pins that exact file in `/etc/apk/world`
 (`luci-theme-vantage><Q1…`), so `apk upgrade` keeps it. After adding the

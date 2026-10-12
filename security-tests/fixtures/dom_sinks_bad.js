@@ -240,6 +240,9 @@ function badCss(el, x, sheet, doc) {
 	sheet.insertRule(x); // expect-violation
 	fetch(x).then(function(t) { sheet.replaceSync(t); }); // expect-violation
 	fetch(L.resource('a.css')).then(function(t) { t = x; sheet.replaceSync(t); }); // expect-violation
+	fetch(L.resource('a.css'), { cache: x }).then(function(t) { sheet.replaceSync(t); }); // expect-violation
+	fetch(L.resource('a.css'), opts).then(function(t) { sheet.replaceSync(t); }); // expect-violation
+	fetch(L.resource('a.css'), { cache: 'no-cache' }, x).then(function(t) { sheet.replaceSync(t); }); // expect-violation
 	doc.querySelector('[data-mac="' + x + '"]'); // expect-violation
 	el.closest(x); // expect-violation
 	el.matches(x.sel); // expect-violation

@@ -50,10 +50,13 @@ function hostapd(ifname, method) {
 	return L.resolveDefault(hostapdCalls[key](), null);
 }
 
+/* revalidated on every load (a 304 when unchanged): LuCI versions its own
+   scripts, not this sheet, so after an upgrade a browser could pair the
+   new view with a cached app.css */
 var cssPromise = null;
 function loadCss() {
 	if (cssPromise) return cssPromise;
-	cssPromise = fetch(L.resource('vantage/app.css')).then(function(r) { return r.ok ? r.text() : ''; }).then(function(text) {
+	cssPromise = fetch(L.resource('vantage/app.css'), { cache: 'no-cache' }).then(function(r) { return r.ok ? r.text() : ''; }).then(function(text) {
 		if (!text || !('adoptedStyleSheets' in document) || typeof CSSStyleSheet !== 'function') return;
 		var sheet = new CSSStyleSheet();
 		sheet.replaceSync(text);
@@ -158,14 +161,16 @@ function signalGlyph(sig) {
 
 /* vertical fade for area fills: the series colour (--vt-sc) at the
    chart fill opacity at the top, transparent at the baseline (flip: an
-   area hanging down from its baseline). Returns the paint reference for
-   the fill attribute. */
+   area hanging down from its baseline). cls goes on the gradient, which
+   takes --vt-sc from where it sits, not from the area using it. Returns
+   the paint reference for the fill attribute. */
 var gradSeq = 0;
-function fadeFill(svg, flip) {
+function fadeFill(svg, flip, cls) {
 	var id = 'vt-fade-' + (++gradSeq);
 	var defs = document.createElementNS(SVGNS, 'defs');
 	var lg = document.createElementNS(SVGNS, 'linearGradient');
 	lg.setAttribute('id', id);
+	if (cls) lg.setAttribute('class', cls);
 	lg.setAttribute('x1', '0'); lg.setAttribute('y1', flip ? '1' : '0');
 	lg.setAttribute('x2', '0'); lg.setAttribute('y2', flip ? '0' : '1');
 	[ [ '0', 'vt-fade-top' ], [ '1', 'vt-fade-end' ] ].forEach(function(st) {
@@ -178,6 +183,11 @@ function fadeFill(svg, flip) {
 	svg.appendChild(defs);
 	return 'url(#' + id + ')';
 }
+
+/* throughput direction: the same colour in every row, the legend, the
+   readouts and the tooltip ('dn' download, 'up' upload) */
+function dirKey(dir) { return E('span', { 'class': 'vt-lg-key vt-k-' + dir }); }
+function dirArrow(dir) { return E('span', { 'class': 'vt-arr vt-arr-' + dir }, [ dir === 'up' ? '↑' : '↓' ]); }
 
 function pos(el, xPct, yPct) {
 	el.style.left = Math.max(0, Math.min(100, xPct)).toFixed(2) + '%';
@@ -1493,7 +1503,13 @@ return view.extend({
 		return this.foldable('chart', E('section', { 'class': 'vt-tile vt-chart', 'aria-label': _('Throughput') }, [
 			E('header', { 'class': 'vt-tile-head' }, [
 				E('h3', { 'class': 'vt-tile-title' }, [ icon('pulse'), E('span', {}, [ _('Throughput') ]), el.chartSub ]),
-				E('div', { 'class': 'vt-tile-extra' }, [ this.foldButton('chart', _('Show or hide the throughput chart')) ])
+				E('div', { 'class': 'vt-tile-extra' }, [
+					E('span', { 'class': 'vt-legend vt-dir-legend' }, [
+						E('span', { 'class': 'vt-legend-item' }, [ dirKey('dn'), E('span', {}, [ _('Download') ]) ]),
+						E('span', { 'class': 'vt-legend-item' }, [ dirKey('up'), E('span', {}, [ _('Upload') ]) ])
+					]),
+					this.foldButton('chart', _('Show or hide the throughput chart'))
+				])
 			]),
 			plot,
 			el.chartLive
@@ -1502,15 +1518,16 @@ return view.extend({
 
 	/* one small multiple per link: the uplink, then each radio. Download
 	   (towards the clients) rises above the middle line, upload hangs
-	   below it; each half has its own y scale (upload is often a hundredth
-	   of download, and a busy uplink would flatten an idle radio), labelled
-	   with its unit, on a shared time axis and crosshair. Columns of a
+	   below it, each in its direction's colour; each half has its own y
+	   scale (upload is often a hundredth of download, and a busy uplink
+	   would flatten an idle radio), labelled with its unit, on a shared
+	   time axis and crosshair. Columns of a
 	   history point [ t, rx, tx ]: the uplink receives what clients
 	   download, a radio sends it. */
 	chartSeries: function() {
 		var m = this.m;
-		var list = [ { key: 'uplink', label: m.uplink ? _('Uplink %s').format(m.uplink.dev) : _('Uplink'), cls: 'vt-c-up', dn: 1, up: 2 } ];
-		m.radios.forEach(function(r) { list.push({ key: r.id, label: _('%s radio').format(r.bandLabel), cls: 'vt-c-' + (r.band || 'x'), dn: 2, up: 1 }); });
+		var list = [ { key: 'uplink', label: m.uplink ? _('Uplink %s').format(m.uplink.dev) : _('Uplink'), dn: 1, up: 2 } ];
+		m.radios.forEach(function(r) { list.push({ key: r.id, label: _('%s radio').format(r.bandLabel), dn: 2, up: 1 }); });
 		return list;
 	},
 
@@ -1548,7 +1565,7 @@ return view.extend({
 			});
 			[ [ segD, false, '' ], [ segU, true, ' vt-dir-up' ] ].forEach(function(h) {
 				var area = svgPath(series.areaPath(h[0], M), 'vt-series-area' + h[2]);
-				area.setAttribute('fill', fadeFill(svg, h[1]));
+				area.setAttribute('fill', fadeFill(svg, h[1], h[2].trim()));
 				svg.appendChild(area);
 				svg.appendChild(svgPath(series.linePath(h[0]), 'vt-series-line' + h[2]));
 			});
@@ -1560,19 +1577,21 @@ return view.extend({
 			}
 			var dotD = E('span', { 'class': 'vt-mult-dot', 'hidden': 'hidden' }), dotU = E('span', { 'class': 'vt-mult-dot vt-dir-up', 'hidden': 'hidden' });
 			rows.push({ s: s, d: d, vd: vd, vu: vu, dotD: dotD, dotU: dotU });
-			return E('div', { 'class': 'vt-mult ' + s.cls }, [
+			return E('div', { 'class': 'vt-mult' }, [
 				E('div', { 'class': 'vt-mult-head' }, [
-					E('span', { 'class': 'vt-mult-name' }, [ E('span', { 'class': 'vt-lg-key' }), E('span', {}, [ s.label ]) ]),
-					E('b', { 'class': 'vt-mult-now vt-tn', 'title': _('Download') }, [ '↓ ', fresh && sd.now != null ? fmt.bits(last[s.dn]) : fmt.DASH ]),
-					E('b', { 'class': 'vt-mult-now-up vt-tn', 'title': _('Upload') }, [ '↑ ', fresh && su.now != null ? fmt.bits(last[s.up]) : fmt.DASH ]),
+					E('span', { 'class': 'vt-mult-name' }, [ s.label ]),
+					E('span', { 'class': 'vt-mult-now', 'title': _('Download') }, [ dirKey('dn'),
+						E('b', { 'class': 'vt-tn' }, [ dirArrow('dn'), ' ', fresh && sd.now != null ? fmt.bits(last[s.dn]) : fmt.DASH ]) ]),
+					E('span', { 'class': 'vt-mult-now vt-mult-now-up', 'title': _('Upload') }, [ dirKey('up'),
+						E('b', { 'class': 'vt-tn' }, [ dirArrow('up'), ' ', fresh && su.now != null ? fmt.bits(last[s.up]) : fmt.DASH ]) ]),
 					E('span', { 'class': 'vt-mult-stats vt-tn' }, sd.n > 1 ? [
-						E('span', {}, [ _('peak'), ' ', E('b', {}, [ '↓ ' + fmt.bitsShort(sd.peak) ]), ' ', E('b', {}, [ '↑ ' + fmt.bitsShort(su.peak) ]) ])
+						E('span', {}, [ _('peak'), ' ', E('b', {}, [ dirArrow('dn'), ' ' + fmt.bitsShort(sd.peak) ]), ' ', E('b', {}, [ dirArrow('up'), ' ' + fmt.bitsShort(su.peak) ]) ])
 					] : [ E('span', {}, [ _('measuring…') ]) ])
 				]),
 				E('div', { 'class': 'vt-mult-plot' }, [
 					svg,
-					sd.n ? E('span', { 'class': 'vt-mult-max vt-tn' }, [ '↓ ' + bitsLabel(vd) ]) : '',
-					sd.n ? E('span', { 'class': 'vt-mult-max vt-mult-max-up vt-tn' }, [ '↑ ' + bitsLabel(vu) ]) : '',
+					sd.n ? E('span', { 'class': 'vt-mult-max vt-tn' }, [ dirArrow('dn'), ' ' + bitsLabel(vd) ]) : '',
+					sd.n ? E('span', { 'class': 'vt-mult-max vt-mult-max-up vt-tn' }, [ dirArrow('up'), ' ' + bitsLabel(vu) ]) : '',
 					sd.n < 2 ? E('span', { 'class': 'vt-sk-note' }, [ _('collecting…') ]) : '',
 					tailDot(segD, ''),
 					tailDot(segU, ' vt-dir-up'),
@@ -1623,6 +1642,7 @@ return view.extend({
 		this.ui.hover = at.t != null ? { t: tp } : at;
 		el.chartCursor.hidden = false;
 		el.chartCursor.style.left = x.toFixed(2) + '%';
+		var said = [];
 		var tipRows = meta.rows.map(function(r) {
 			var j = series.nearest(r.d, tp), p = (j >= 0 && Math.abs(r.d[j][0] - tp) < POLL_S * 1000) ? r.d[j] : null;
 			var vd = p ? p[r.s.dn] : null, vu = p ? p[r.s.up] : null;
@@ -1630,16 +1650,23 @@ return view.extend({
 			r.dotU.hidden = vu == null;
 			if (vd != null) pos(r.dotD, x, (1 - Math.min(1, vd / r.vd)) * 50);
 			if (vu != null) pos(r.dotU, x, 50 + Math.min(1, vu / r.vu) * 50);
-			return E('div', { 'class': 'vt-tip-row ' + r.s.cls }, [ E('span', { 'class': 'vt-lg-key' }),
-				E('b', { 'class': 'vt-tn' }, [ '↓ ' + (vd == null ? fmt.DASH : fmt.bits(vd)) ]),
-				E('b', { 'class': 'vt-tn vt-tip-up' }, [ '↑ ' + (vu == null ? fmt.DASH : fmt.bits(vu)) ]),
-				E('span', { 'class': 'vt-tip-label' }, [ r.s.label ]) ]);
+			var bd = vd == null ? fmt.DASH : fmt.bits(vd), bu = vu == null ? fmt.DASH : fmt.bits(vu);
+			said.push(r.s.label + ': ↓ ' + bd + ' ↑ ' + bu);
+			return E('div', { 'class': 'vt-tip-link' }, [
+				E('div', { 'class': 'vt-tip-label' }, [ r.s.label ]),
+				E('div', { 'class': 'vt-tip-row' }, [ dirKey('dn'), E('span', {}, [ _('Download') ]), E('b', { 'class': 'vt-tn' }, [ bd ]) ]),
+				E('div', { 'class': 'vt-tip-row' }, [ dirKey('up'), E('span', {}, [ _('Upload') ]), E('b', { 'class': 'vt-tn' }, [ bu ]) ])
+			]);
 		});
 		dom.content(el.chartTip, [ E('div', { 'class': 'vt-tip-time vt-tn' }, [ new Date(tp).toLocaleTimeString(), E('span', {}, [ fmt.ago(Date.now() - tp) ]) ]) ].concat(tipRows));
 		el.chartTip.hidden = false;
-		el.chartTip.style.left = x.toFixed(2) + '%';
-		el.chartTip.classList.toggle('vt-tip-left', x > 55);
-		if (at.t != null) txt(el.chartLive, [ new Date(tp).toLocaleTimeString() ].concat(tipRows.map(function(r) { return r.textContent; })).join('; '));
+		/* beside the crosshair, on the side it fits; on a narrow chart it
+		   may cover the readouts on the left but never leaves the tile */
+		var ow = el.chartOver.clientWidth, tw = el.chartTip.offsetWidth, px = x / 100 * ow, gap = 12;
+		var lx = px + gap + tw <= ow ? px + gap : px - gap - tw;
+		lx = Math.max(-el.chartOver.offsetLeft, Math.min(ow - tw, lx));
+		el.chartTip.style.left = lx.toFixed(0) + 'px';
+		if (at.t != null) txt(el.chartLive, [ new Date(tp).toLocaleTimeString() ].concat(said).join('; '));
 	},
 
 	chartHide: function() {
