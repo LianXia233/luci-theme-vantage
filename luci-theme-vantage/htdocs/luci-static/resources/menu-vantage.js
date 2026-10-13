@@ -186,6 +186,14 @@ function headingKey(text) {
 	return String(text || '').replace(/\s+/g, ' ').replace(/[\s:]+$/, '').trim().toLowerCase();
 }
 
+/* Does a heading only repeat the breadcrumb? A page title (h2) may repeat
+   any crumb; a card heading (h3) only the page's or the tab's, never the
+   category's: on Services > Dynamic DNS the "Services" table is content. */
+function repeatsTrail(key, tag, trail) {
+	if (!key) return false;
+	return (tag === 'H2' ? trail.all : trail.page).has(key);
+}
+
 /* ---------------------------------------------------------------------------
  * Stock-page enhancers, only where CSS cannot restructure LuCI's markup
  * (Status -> Overview: fused memory bar, per-mount storage bars, radio band
@@ -587,7 +595,7 @@ return baseclass.extend({
 		this.closeTimer = null;
 		this.openTimer = null;
 		this.entries = [];
-		this.trailKeys = new Set();
+		this.trail = { all: new Set(), page: new Set() };
 
 		this.setupTheme();
 		this.setupIndicators();
@@ -670,8 +678,11 @@ return baseclass.extend({
 				link.lastChild.setAttribute('class', 'vt-rail-caret');
 
 				link.addEventListener('click', ev => this.handleRailClick(ev, cat, li, link));
+				/* hover opens a category; an open page switcher was opened on
+				   purpose, so passing over the rail leaves it be (a click on a
+				   category still swaps it) */
 				li.addEventListener('pointerenter', ev => {
-					if (ev.pointerType !== 'mouse' || this.isPinned() || this.mqMobile.matches) return;
+					if (ev.pointerType !== 'mouse' || this.isPinned() || this.mqMobile.matches || this.switchOpen()) return;
 					this.cancelClose();
 					window.clearTimeout(this.openTimer);
 					this.openTimer = window.setTimeout(() => this.openFlyout(cat, li, link, false), this.fly.hidden ? 90 : 0);
@@ -679,6 +690,7 @@ return baseclass.extend({
 				li.addEventListener('pointerleave', ev => {
 					if (ev.pointerType !== 'mouse') return;
 					window.clearTimeout(this.openTimer);
+					if (this.isPinned() || this.switchOpen()) return;
 					this.scheduleClose();
 				});
 
@@ -703,6 +715,9 @@ return baseclass.extend({
 		fly.addEventListener('pointerenter', () => this.cancelClose());
 		fly.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse' && !fly.classList.contains('is-switch')) this.scheduleClose(); });
 		fly.addEventListener('keydown', ev => this.handleFlyKeys(ev));
+		/* the switcher closes once focus moves on past it (a null target is
+		   a click on nothing focusable, which the document click handles) */
+		fly.addEventListener('focusout', ev => this.leaveSwitch(ev.relatedTarget));
 		if (this.scrim) this.scrim.addEventListener('click', () => this.closeFlyout(false));
 
 		document.addEventListener('click', ev => {
@@ -777,7 +792,8 @@ return baseclass.extend({
 	handleFlyKeys(ev) {
 		const links = Array.prototype.slice.call(this.fly.querySelectorAll('a'));
 		const i = links.indexOf(document.activeElement);
-		if (ev.key === 'Escape' || (ev.key === 'ArrowLeft' && !this.mqMobile.matches)) {
+		const isSwitch = this.switchOpen();
+		if (ev.key === 'Escape' || (ev.key === 'ArrowLeft' && !isSwitch && !this.mqMobile.matches)) {
 			ev.preventDefault();
 			this.closeFlyout(true);
 		}
@@ -787,10 +803,51 @@ return baseclass.extend({
 			links[(i + d + links.length) % links.length].focus();
 		}
 		else if (ev.key === 'Tab' && links.length) {
-			/* leaving the panel returns to the rail */
 			const edge = ev.shiftKey ? 0 : links.length - 1;
-			if (i === edge) { ev.preventDefault(); this.closeFlyout(true); }
+			if (i !== edge) return;
+			ev.preventDefault();
+			/* the switcher reads as part of the top bar, after its crumb:
+			   Tab goes on to the next control there, Shift+Tab back to the
+			   crumb. The rail's flyout returns to its rail button. */
+			if (isSwitch && !ev.shiftKey) {
+				const btn = this.switchBtn;
+				this.closeFlyout(false);
+				this.focusAfter(btn);
+			}
+			else this.closeFlyout(true);
 		}
+	},
+
+	/* keys on the crumb switch: arrows open it (or enter it) at the current
+	   page; Tab from the open switch goes into its list */
+	handleSwitchKeys(ev, cat, page, btn) {
+		const down = ev.key === 'ArrowDown', up = ev.key === 'ArrowUp';
+		if (!down && !up && !(ev.key === 'Tab' && !ev.shiftKey && this.switchOpen())) return;
+		ev.preventDefault();
+		if (!this.switchOpen()) { this.openSwitch(cat, page, btn, true); return; }
+		const links = this.fly.querySelectorAll('a');
+		const target = (ev.key === 'Tab' ? null : this.fly.querySelector('a[aria-current]')) ||
+			(up ? links[links.length - 1] : links[0]);
+		if (target) target.focus();
+	},
+
+	switchOpen() {
+		return !!(this.fly && !this.fly.hidden && this.fly.classList.contains('is-switch'));
+	},
+
+	/* focus moved from the switch or its list to `to` */
+	leaveSwitch(to) {
+		if (!to || !this.switchOpen()) return;
+		if (this.fly.contains(to) || to === this.switchBtn) return;
+		this.closeFlyout(false);
+	},
+
+	/* the control after `el` in tab order, outside the flyout */
+	focusAfter(el) {
+		const all = Array.prototype.filter.call(document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]'), n =>
+			n.tabIndex >= 0 && !n.disabled && n.type !== 'hidden' && !this.fly.contains(n) && n.getClientRects().length > 0);
+		const next = all[all.indexOf(el) + 1];
+		(next || el).focus();
 	},
 
 	openFlyout(cat, li, link, focusFirst) {
@@ -866,6 +923,11 @@ return baseclass.extend({
 	openSwitch(cat, page, btn, focusFirst) {
 		const fly = this.fly;
 		if (!fly) return;
+		/* a rail hover may have left a timer behind; closeFlyout() skips
+		   cancelling it when the panel is hidden, so cancel both here */
+		this.cancelClose();
+		window.clearTimeout(this.openTimer);
+		this.openTimer = null;
 		this.closeFlyout(false);
 		fly.textContent = '';
 		const total = page.subs.length;
@@ -939,15 +1001,19 @@ return baseclass.extend({
 			const last = i === parts.length - 1;
 			if (i) nav.appendChild(E('span', { 'class': 'vt-crumb-sep', 'aria-hidden': 'true' }, [ '›' ]));
 			if (last && siblings && parts.length === 3) {
+				/* a disclosure (aria-expanded + aria-controls): the panel is a
+				   region of links, not a menu, so no aria-haspopup */
 				const btn = E('button', {
 					'type': 'button', 'class': 'vt-crumb vt-crumb-current vt-crumb-switch', 'aria-current': 'page',
-					'aria-haspopup': 'true', 'aria-expanded': 'false', 'aria-controls': 'vt-flyout',
+					'aria-expanded': 'false', 'aria-controls': 'vt-flyout',
 					'title': _('Other pages in %s').format(siblings.title)
 				}, [ E('span', {}, [ p.title ]), svg('caret', 14) ]);
 				btn.addEventListener('click', ev => {
-					if (this.fly && !this.fly.hidden && this.fly.classList.contains('is-switch')) this.closeFlyout(true);
+					if (this.switchOpen()) this.closeFlyout(true);
 					else this.openSwitch(cat, siblings, btn, ev.detail === 0);
 				});
+				btn.addEventListener('keydown', ev => this.handleSwitchKeys(ev, cat, siblings, btn));
+				btn.addEventListener('focusout', ev => this.leaveSwitch(ev.relatedTarget));
 				nav.appendChild(btn);
 			}
 			else nav.appendChild(last
@@ -956,7 +1022,11 @@ return baseclass.extend({
 		});
 
 		this.pageTitle = parts[parts.length - 1].title;
-		parts.forEach(p => this.trailKeys.add(headingKey(p.title)));
+		parts.forEach((p, i) => {
+			this.trail.all.add(headingKey(p.title));
+			/* the category, unless it is the page itself */
+			if (i || parts.length === 1) this.trail.page.add(headingKey(p.title));
+		});
 		this.updateTitle();
 	},
 
@@ -969,7 +1039,7 @@ return baseclass.extend({
 		const tabs = ui.menu.getChildren(page);
 		if (tabs.length < 2) return;
 
-		const seg = E('div', { 'class': 'vt-seg' });
+		const seg = E('div', { 'class': 'vt-pagetabs' });
 		for (const t of tabs) {
 			const cur = this.dp[3] === t.name;
 			seg.appendChild(E('a', {
@@ -1016,8 +1086,11 @@ return baseclass.extend({
 
 	openPalette() {
 		if (this.pal) return;
+		/* focus inside the flyout goes back to what opened the flyout, since
+		   closing it hides the element that had focus */
+		const from = document.activeElement;
+		this.palReturn = (this.fly && this.fly.contains(from)) ? this.openLink : from;
 		this.closeFlyout(false);
-		this.palReturn = document.activeElement;
 
 		const input = E('input', {
 			'class': 'vt-pal-input', 'type': 'text', 'role': 'combobox', 'aria-expanded': 'true',
@@ -1412,7 +1485,7 @@ return baseclass.extend({
 		document.querySelectorAll('#maincontent > h2, #view h2, #view .cbi-section > h3:first-child').forEach(h => {
 			if (h.closest('.vt-app') || h.querySelector('a, button, input, select, [data-clickable], [tabindex]')) return;
 			const key = headingKey(h.textContent);
-			let repeat = this.trailKeys.has(key);
+			let repeat = repeatsTrail(key, h.tagName, this.trail);
 			if (!repeat && h.tagName === 'H3') {
 				const map = h.closest('.cbi-map');
 				const mapTitle = map && map.querySelector(':scope > h2');

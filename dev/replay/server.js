@@ -10,7 +10,7 @@
    usage: node server.js --mirror <dir> [--port 8025] [--theme-dir <htdocs/luci-static/name>]
                          [--theme <name>] [--templates <ucode/template dir>] [--rootfs <dir>]
                          [--app-dir <package dir>]... [--keep-uniwrt] [--[no-]synthetic] [--demo]
-                         [--lang <LuCI language, e.g. de or zh_Hans>]
+                         [--lang <LuCI language, e.g. de or zh_Hans>] [--fixtures <dir>]...
 
    Pages are rendered like the device does: the dispatcher logic below
    resolves the request against the recorded menu, then the core
@@ -23,16 +23,23 @@
    --wired serves the device as a router without Wi-Fi (wired.js): no
    radios, the uplink renamed wan, synthetic lan/vpn/guest interfaces.
 
+   --fixtures <dir> (repeatable) adds hand-written data for pages the
+   recording lacks (fixtures.js): rpcd plugin stand-ins, uci configs, a small
+   file system for file.read/stat/list and cgi-download, exec outputs. The
+   recording always answers first.
+
    --lang previews a translation: the UI runs in that language with the
    theme's and apps' po/<lang>/*.po (compiled the way po2lmo does, read on
    every request) over the recorded catalogue of that language.
 
    Trust model: the templates (--templates, --theme-dir, the theme and app
-   packages) and the --rootfs dump are executed as JavaScript with your
-   privileges (ut.js compiles .ut files to functions). This is not a
-   sandbox: use only themes and dumps you trust, or run the replay in a
-   disposable container or as an unprivileged user. Recorded data and HTTP
-   requests only ever reach templates as values.
+   packages), the --rootfs dump and the *-plugin.js files of --fixtures
+   directories are executed as JavaScript with your privileges (ut.js
+   compiles .ut files to functions; plugins are require()d). This is not a
+   sandbox: use only themes, dumps and fixtures you trust, or run the
+   replay in a disposable container or as an unprivileged user. Recorded
+   data, the rest of a fixture directory and HTTP requests only ever reach
+   templates as values.
 
    HTTP: only requests addressed to 127.0.0.1/localhost/[::1] on --port are
    answered (DNS rebinding), cross-site POSTs are refused (CSRF), ubus
@@ -46,6 +53,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { Engine } = require('./ut');
 const { Store, safe } = require('./store');
+const { Fixtures } = require('./fixtures');
 const i18n = require('../i18n/catalog');
 const policy = require('../mirror/policy');
 const wired = require('./wired');
@@ -55,16 +63,17 @@ const wired = require('./wired');
 function parseArgs(argv) {
 	const o = { port: 8025, synthetic: true };
 	for (let i = 0; i < argv.length; i++) {
-		const m = /^--(mirror|port|theme-dir|theme|templates|rootfs|app-dir|lang)(?:=(.*))?$/.exec(argv[i]);
+		const m = /^--(mirror|port|theme-dir|theme|templates|rootfs|app-dir|lang|fixtures)(?:=(.*))?$/.exec(argv[i]);
 		if (!m) { if (argv[i] === '--keep-uniwrt') o.keepUniwrt = true; else if (argv[i] === '--synthetic') o.synthetic = true; else if (argv[i] === '--no-synthetic') o.synthetic = false; else if (argv[i] === '--demo') o.demo = true; else if (argv[i] === '--wired') o.wired = true; else if (argv[i] === '-h' || argv[i] === '--help') o.help = true; else o.bad = argv[i]; continue; }
 		const v = (m[2] !== undefined) ? m[2] : argv[++i];
 		if (m[1] === 'app-dir') (o.appDirs = o.appDirs || []).push(v);
+		else if (m[1] === 'fixtures') (o.fixtures = o.fixtures || []).push(v);
 		else o[m[1].replace(/-(\w)/g, (_, c) => c.toUpperCase())] = v;
 	}
 	return o;
 }
 
-const USAGE = 'usage: server.js --mirror <dir> [--port 8025] [--theme-dir <htdocs/luci-static/name>] [--theme <name>] [--templates <dir>] [--rootfs <dir>] [--app-dir <pkg>]... [--keep-uniwrt] [--no-synthetic] [--demo] [--wired] [--lang <lang>]';
+const USAGE = 'usage: server.js --mirror <dir> [--port 8025] [--theme-dir <htdocs/luci-static/name>] [--theme <name>] [--templates <dir>] [--rootfs <dir>] [--app-dir <pkg>]... [--keep-uniwrt] [--no-synthetic] [--demo] [--wired] [--lang <lang>] [--fixtures <dir>]...';
 const opts = parseArgs(process.argv.slice(2));
 if (opts.help || opts.bad || !opts.mirror) {
 	console.error(opts.bad ? `unknown argument ${opts.bad}\n${USAGE}` : USAGE);
@@ -119,7 +128,13 @@ if (opts.lang != null) {
 	preview = { code: hit[0], lc: hit[1].lc, dirs: pkgs.map(d => path.join(d, 'po', hit[0])) };
 }
 
-const store = new Store(path.resolve(opts.mirror), { synthetic: opts.synthetic, demo: !!opts.demo });
+for (const d of opts.fixtures || []) {
+	let st = null;
+	try { st = fs.statSync(d); } catch (e) {}
+	if (!st || !st.isDirectory()) { console.error(`--fixtures ${d}: not a directory`); process.exit(2); }
+}
+const fixtures = new Fixtures(opts.fixtures);
+const store = new Store(path.resolve(opts.mirror), { synthetic: opts.synthetic, demo: !!opts.demo, fixtures });
 
 /* --------------------------------------------------------------- device */
 
@@ -197,6 +212,13 @@ Object.assign(menuSpecs, appMenu);
 const recordedMenu = repairMenu(store.menu() || { action: { type: 'firstchild' }, children: {} }, '');
 const menu = mergeMenu(opts.keepUniwrt ? recordedMenu : dropUniwrt(recordedMenu), appMenu);
 
+/* fixture configs, before the packages' defaults: new configs are seeded,
+   recorded ones only gain the sections they lack (e.g. a WireGuard
+   interface in network) */
+for (const [ name, file ] of fixtures.configs()) {
+	const values = parseUci(readText(file));
+	if (!store.uciSeed(name, values)) store.uciAddSections(name, values);
+}
 /* uci configs shipped by the app packages, unless the mirror has them */
 for (const d of appDirs) {
 	const cdir = path.join(d, 'root/etc/config');
@@ -691,6 +713,19 @@ async function handle(req, res) {
 		}
 		return send(res, 200, 'text/plain; charset=UTF-8', out);
 	}
+	if (p === '/cgi-bin/cgi-download' && fixtures.dirs.length) {
+		/* fs.read_direct() (cgi-io): the login session, then fixture files
+		   only, never the host's or the recording's */
+		if (req.method !== 'POST') return send(res, 405, 'text/plain', 'Method Not Allowed');
+		const q = new URLSearchParams(await readBody(req));
+		if (q.get('sessionid') !== SID) return send(res, 403, 'text/plain', 'Download permission denied');
+		const body = fixtures.read(q.get('path'));
+		if (body == null) {
+			store.warn('no fixture for cgi-download (answered 404)', String(q.get('path')));
+			return send(res, 404, 'text/plain', 'No such file');
+		}
+		return send(res, 200, 'application/octet-stream', body, { 'Content-Disposition': 'attachment' });
+	}
 	if (p.startsWith('/cgi-bin/') && !p.startsWith(SCRIPT + '/')) {
 		console.error(`[replay] refused ${safe(req.method)} ${safe(p)}`);
 		return send(res, 403, 'text/plain', 'Not available in the replay');
@@ -736,5 +771,6 @@ server.listen(port, '127.0.0.1', () => {
 	if (store.demo) console.error(`[replay] DEMO mode: recording pseudonymised (${store.demo.macs.size} MACs, ${store.demo.v4nets.size + store.demo.v4other.size} IPv4 networks/addresses, ${store.demo.v6nets.size} IPv6 prefixes, ${store.demo.names.size} names)`);
 	console.error(`[replay] synthetic data ${store.synthetic ? 'ON (realtime stats, conntrack list, wifi scan; --no-synthetic to disable)' : 'OFF'}`);
 	if (store.plugins.size) console.error(`[replay] plugins: ${[ ...store.plugins.keys() ].join(', ')}`);
+	if (fixtures.dirs.length) console.error(`[replay] fixtures: ${fixtures.dirs.join(', ')} (${fixtures.pluginFiles().length} plugin files, ${fixtures.configs().length} uci configs, ${fixtures.exec.size} exec outputs)`);
 	if (preview) console.error(`[replay] language ${preview.code} (${preview.lc}): catalogues from ${preview.dirs.join(', ')} over the recorded one`);
 });

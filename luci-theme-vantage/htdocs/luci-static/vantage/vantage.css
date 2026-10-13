@@ -69,14 +69,17 @@
 	--warn-soft: rgba(214, 138, 0, .15);
 	--err: #c42b2b;
 	--err-soft: rgba(196, 43, 43, .1);
+	--err-ink: #ffffff;         /* text on an --err / --info fill, >= 4.5:1 */
 	--info: #1c64c4;
+	--info-ink: #ffffff;
+	--ok-text: #0a7262;         /* --ok as text on control fills (s3, s4) */
 	--info-soft: rgba(28, 100, 196, .1);
 	--scrim: rgba(20, 23, 26, .38);
 	--shadow-pop: 0 12px 32px rgba(20, 23, 26, .16), 0 2px 6px rgba(20, 23, 26, .08);
 	--zone-mix: .22;
 	--seg-bg: var(--s3);        /* segmented control: track, selected segment */
 	--seg-on: var(--s2);
-	--seg-on-ring: 0 0 0 1px var(--line), var(--v-shadow);
+	--seg-on-ring: inset 0 0 0 1px var(--line);   /* inset: drawn at the segment's padding edge */
 }
 
 html[data-darkmode="true"] {
@@ -107,14 +110,17 @@ html[data-darkmode="true"] {
 	--warn-soft: rgba(245, 184, 74, .13);
 	--err: #ff6b6b;
 	--err-soft: rgba(255, 107, 107, .12);
+	--err-ink: #1a0505;         /* white on the light dark-mode red was 2.8:1 */
 	--info: #6cb4ff;
+	--info-ink: #0d0e10;
+	--ok-text: var(--ok);
 	--info-soft: rgba(108, 180, 255, .12);
 	--scrim: rgba(0, 0, 0, .58);
 	--shadow-pop: 0 16px 40px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .02);
 	--zone-mix: .2;
 	--seg-bg: var(--bg);
 	--seg-on: var(--s3);
-	--seg-on-ring: 0 0 0 1px var(--line-2);
+	--seg-on-ring: inset 0 0 0 1px var(--line-2);
 }
 
 /* touch: controls are sized by the pointer, not the screen width */
@@ -161,7 +167,7 @@ html[data-darkmode="true"] {
 	--v-r-lg: var(--r-lg);
 	--v-ctl-h: var(--ctl-h);             /* every control: 36px, 44px on touch */
 	--v-shadow: 0 1px 2px rgba(20, 23, 26, .06), 0 1px 0 rgba(20, 23, 26, .03);
-	/* where sticky content may start: below the top bar and page tabs */
+	/* where sticky content may start: below the top bar (page tabs scroll) */
 	--v-stick-top: var(--stick-top);
 
 	/* charts (stock realtime graphs, channel analysis, the dashboard app).
@@ -429,7 +435,7 @@ html[data-rail="pinned"] .vt-frame { margin-left: var(--rail-w-pinned); }
 .vt-fly-list > li + li { margin-top: 1px; }
 .vt-fly-link {
 	display: flex; align-items: center; gap: var(--sp-2);
-	min-height: 34px; padding: 6px 10px;
+	min-height: var(--ctl-h); padding: 6px 10px;
 	border-radius: var(--r);
 	color: var(--text);
 	text-decoration: none !important;
@@ -475,18 +481,23 @@ html[data-rail="pinned"] .vt-frame { margin-left: var(--rail-w-pinned); }
 
 .vt-crumbs {
 	display: flex; align-items: center; gap: 6px;
-	min-width: 0; flex: 1 1 auto;
+	min-width: 0; flex: 1 .001 auto;     /* gives way last: see .vt-top-actions */
+	align-self: stretch;                 /* the bar's height: room for focus rings */
+	margin-inline: -8px; padding-inline: 8px;   /* room for the switch's ring (it sits 6px out) */
 	font-size: var(--fs-base);
 	white-space: nowrap; overflow: hidden;
 }
 .vt-crumb { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; text-decoration: none !important; }
+/* a link crumb is a control high to click; the padding adds no height to the bar */
+a.vt-crumb { padding-block: calc((var(--ctl-h) - 1.5em) / 2); }
 a.vt-crumb:hover { color: var(--text); }
 .vt-crumb-current { color: var(--text); font-weight: 600; }
 .vt-crumb-sep { color: var(--text-3); flex: none; font-family: var(--mono); font-size: var(--fs-sm); }
-/* the current crumb of a page with page tabs: opens its sibling pages */
+/* the current crumb of a page with page tabs: opens its sibling pages.
+   A control high; the ring sits on its edge, inside the crumbs' clip. */
 .vt-crumb-switch {
 	display: inline-flex; align-items: center; gap: 4px;
-	min-width: 0; margin: -4px -6px; padding: 4px 6px;
+	min-width: 0; min-height: var(--ctl-h); margin: 0 -6px; padding: 0 6px;
 	border: 0; border-radius: var(--r);
 	background: none;
 	font: inherit; font-weight: 600; color: var(--text);
@@ -495,8 +506,9 @@ a.vt-crumb:hover { color: var(--text); }
 .vt-crumb-switch > span { overflow: hidden; text-overflow: ellipsis; }
 .vt-crumb-switch > svg { flex: none; width: 14px; height: 14px; color: var(--text-3); transition: transform .15s; }
 .vt-crumb-switch:hover, .vt-crumb-switch[aria-expanded="true"] { background: var(--s3); }
+.vt-crumb-switch:focus-visible { outline-offset: 0; }
 .vt-crumb-switch[aria-expanded="true"] > svg { transform: rotate(90deg); }
-@media (min-width: 721px) {
+@media (width > 720px) {
 	/* the flyout as a dropdown under the crumb (left: set from the crumb) */
 	.vt-flyout.is-switch {
 		top: calc(var(--top-h) - 4px); bottom: auto; left: var(--x, var(--rail-w));
@@ -508,7 +520,10 @@ a.vt-crumb:hover { color: var(--text); }
 }
 @keyframes vt-drop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
-.vt-top-actions { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
+/* when the bar is short of room, the host chip gives way first, then the
+   search field's label, and only then the crumbs */
+.vt-top-actions { display: flex; align-items: center; gap: var(--sp-2); flex: 0 1 auto; min-width: 0; }
+.vt-top-actions > :not(.vt-host, .vt-search) { flex: none; }
 
 .vt-search {
 	display: inline-flex; align-items: center; gap: var(--sp-2);
@@ -546,6 +561,7 @@ a.vt-crumb:hover { color: var(--text); }
 .vt-host {
 	display: inline-flex; align-items: center; gap: 6px;
 	height: 28px; max-width: 300px;
+	flex: 0 1000 auto; min-width: 0; overflow: hidden;
 	padding: 0 10px;
 	border: 1px solid var(--line); border-radius: 999px;
 	background: var(--s1);
@@ -571,17 +587,21 @@ a.vt-crumb:hover { color: var(--text); }
 }
 #indicators > span[data-clickable] { cursor: pointer; }
 #indicators > span[data-clickable]:hover { border-color: var(--text-3); color: var(--text); }
-#indicators > span[data-indicator="poll-status"][data-style="active"] { position: relative; }
+#indicators > span[data-indicator="poll-status"][data-style="active"] { position: relative; isolation: isolate; }
 #indicators > span[data-indicator="poll-status"][data-style="active"]::before {
 	content: ""; width: 7px; height: 7px; border-radius: 50%;
 	background: var(--accent-text);
 }
 /* the pulse is a ring of its own that scales and fades: the compositor
-   runs it, where an animated box-shadow repainted the page every frame */
+   runs it, where an animated box-shadow repainted the page every frame.
+   It sits behind the dot (z-index -1 in the pill's isolated stack), so
+   the dot never lightens, and is invisible unless animated: with reduced
+   motion the one near-instant run ends on opacity 0. */
 #indicators > span[data-indicator="poll-status"][data-style="active"]::after {
-	content: ""; position: absolute; left: 10px; top: calc(50% - 3.5px);
+	content: ""; position: absolute; z-index: -1; left: 10px; top: calc(50% - 3.5px);
 	width: 7px; height: 7px; border-radius: 50%;
 	background: var(--accent-line);
+	opacity: 0;
 	pointer-events: none;
 	animation: vt-live 2s ease-out infinite;
 }
@@ -613,7 +633,7 @@ a.vt-crumb:hover { color: var(--text); }
 #indicators > span[data-indicator="media_error"] { color: var(--err); border-color: var(--err); background: var(--err-soft); }
 
 /* level-3 page tabs: on the content column, drawn as every other tab
-   level (.vt-seg shares the .cbi-tabmenu rules below). They scroll with
+   level (.vt-pagetabs shares the .cbi-tabmenu rules below). They scroll with
    the page; the current crumb in the top bar switches between them. */
 .vt-tabs {
 	width: 100%; max-width: calc(var(--content-max) + 2 * var(--sp-6));
@@ -888,6 +908,8 @@ legend { font-size: var(--fs-md); font-weight: 600; padding: 0; margin-bottom: v
 .cbi-section-create > * { margin: 0; }
 .cbi-section-create > .cbi-section-create-name { max-width: 240px; }
 .cbi-section-remove { text-align: right; padding: var(--sp-2) 0; }
+/* several nodes of one typed section in a card: a rule between them */
+.cbi-section-node + :is(.cbi-section-node, .cbi-section-remove) { margin-top: var(--sp-5); padding-top: var(--sp-5); border-top: 1px solid var(--line); }
 
 /* page actions: a floating command bar docked to the bottom right */
 .cbi-page-actions {
@@ -909,6 +931,13 @@ legend { font-size: var(--fs-md); font-weight: 600; padding: 0; margin-bottom: v
 .cbi-page-actions .cbi-button-save { order: 2; }
 .cbi-page-actions .cbi-button-apply, .cbi-page-actions .cbi-dropdown { order: 3; }
 .cbi-page-actions:empty { display: none; }
+/* the bar sits at the bottom of the view (docked, or the page's end), so
+   its Save & Apply menu opens upwards; LuCI's touch branch would open it
+   down, under the phone's bottom bar and past the screen */
+.cbi-page-actions .cbi-dropdown[open] > ul.dropdown {
+	top: auto !important; bottom: 100% !important;
+	max-height: 50vh !important;
+}
 
 /* ------------------------------------------------------------ 6. widgets */
 
@@ -933,6 +962,8 @@ input, select, textarea, button { font: inherit; color: inherit; }
 	transition: border-color .12s, box-shadow .12s;
 }
 .vt-main textarea, .cbi-input-textarea, .modal textarea { max-width: calc(2 * var(--field-max)); min-height: 88px; font-family: var(--mono); font-size: var(--fs-sm); resize: vertical; }
+/* read-only text (System and Kernel log) is a viewer, not a field: full width */
+.vt-main textarea[readonly] { max-width: none; }
 .vt-main select, .cbi-input-select, .modal select {
 	appearance: none; -webkit-appearance: none;
 	padding-right: 30px;
@@ -957,6 +988,15 @@ input:focus, select:focus, textarea:focus {
 	box-shadow: 0 0 0 3px var(--accent-soft);
 }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+/* fields in pages, modals and the login: the rules above lose to the field
+   rules' (0,2,1), so hover and focus are restated at their weight. Focus:
+   a --focus border plus a 1px ring of it (>= 3:1 against the field and
+   the card in both modes) and the soft halo. The dashboard styles its own. */
+:is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"], .vt-pal-input, .vt-app *):hover { border-color: var(--text-3); }
+:is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"], .vt-pal-input, .vt-app *):focus {
+	border-color: var(--focus);
+	box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--accent-soft);
+}
 input[disabled], select[disabled], textarea[disabled], input[readonly] { opacity: .6; cursor: not-allowed; }
 input[readonly] { cursor: default; }
 
@@ -979,6 +1019,9 @@ input[readonly] { cursor: default; }
 .control-group > :not(:last-child) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
 .control-group > :not(:first-child) { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
 .control-group > .btn, .control-group > .cbi-button { flex: none; }
+/* in LuCI's unclassed field wrapper (a flex row) the group sized to its
+   content, 254px for a password with its reveal button: as wide as a field */
+.cbi-value-field > div:not([class]) > .control-group { flex: 1 1 auto; }
 
 /* checkbox */
 .cbi-checkbox { display: inline-flex; align-items: center; min-height: var(--ctl-h); gap: var(--sp-2); }
@@ -1058,7 +1101,7 @@ input[type="button"], input[type="reset"], input[type="submit"]) {
 	vertical-align: middle;
 }
 .cbi-dropdown:hover { border-color: var(--text-3); }
-.cbi-dropdown:focus, .cbi-dropdown[open] { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cbi-dropdown:focus, .cbi-dropdown[open] { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--accent-soft); }
 .cbi-dropdown:focus-visible { outline: none; }
 .cbi-dropdown[disabled] { opacity: .55; pointer-events: none; }
 
@@ -1233,15 +1276,15 @@ input[type="button"], input[type="reset"], input[type="submit"]) {
 }
 .cbi-value-field :is(.btn, .cbi-button).cbi-button-apply:hover,
 .td :is(.btn, .cbi-button).cbi-button-apply:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent-text); }
-:is(.btn, .cbi-button).cbi-button-positive:not(.important) { color: var(--ok); }
+:is(.btn, .cbi-button).cbi-button-positive:not(.important) { color: var(--ok-text); }
 :is(.btn, .cbi-button, .cbi-dropdown):is(.cbi-button-negative, .cbi-button-remove) {
 	background: transparent;
 	color: var(--err);
 	border-color: color-mix(in srgb, var(--err) 40%, var(--line-2));
 }
 :is(.btn, .cbi-button, .cbi-dropdown):is(.cbi-button-negative, .cbi-button-remove):hover { background: var(--err-soft); border-color: var(--err); }
-:is(.btn, .cbi-button, .cbi-dropdown).cbi-button-negative.important { background: var(--err); border-color: var(--err); color: #fff; }
-:is(.btn, .cbi-button, .cbi-dropdown).cbi-button-negative.important:hover { background: color-mix(in srgb, var(--err) 85%, #000); color: #fff; }
+:is(.btn, .cbi-button, .cbi-dropdown).cbi-button-negative.important { background: var(--err); border-color: var(--err); color: var(--err-ink); }
+:is(.btn, .cbi-button, .cbi-dropdown).cbi-button-negative.important:hover { background: color-mix(in srgb, var(--err) 88%, var(--err-ink)); color: var(--err-ink); }
 :is(.btn, .cbi-button).cbi-button-reset { background: transparent; color: var(--text-2); }
 :is(.btn, .cbi-button).cbi-button-reset:hover { color: var(--text); }
 
@@ -1402,40 +1445,44 @@ div.right { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(
 div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; }
 
 /* Tabs: one segmented control for every level, the menu's page tabs
-   (.vt-seg), ui.tabs at page level, in a form or modal, and tabs inside
-   a tab. Nesting shows by where a control sits, not by another look. It
-   wraps its segments instead of hiding them. */
-.cbi-tabmenu, .vt-seg {
-	display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+   (.vt-pagetabs in #vt-tabs), ui.tabs at page level, in a form or modal,
+   and tabs inside a tab. Nesting shows by where a control sits, not by
+   another look. It wraps its segments instead of hiding them. Every
+   segment is a whole control high (--ctl-h, 36px / 44px on touch) to
+   click or tap: the 3px between the track's edge and the drawn segment
+   is the segment's own transparent border, so the track is one control
+   high as well. */
+.cbi-tabmenu, .vt-tabs > .vt-pagetabs {
+	display: flex; flex-wrap: wrap; align-items: stretch;
 	width: fit-content; max-width: 100%; min-height: var(--ctl-h);
-	margin: 0 0 var(--sp-5); padding: 2px;
+	margin: 0 0 var(--sp-5); padding: 0;
 	list-style: none;
 	background: var(--seg-bg);
-	border: 1px solid var(--line);
 	border-radius: var(--r-lg);
-	overflow-x: auto;
-	scrollbar-width: none;
+	box-shadow: inset 0 0 0 1px var(--line);
 }
-.vt-seg { margin: 0; }
-:is(.cbi-tabmenu, .vt-seg)::-webkit-scrollbar { display: none; }
-.cbi-tabmenu > li { position: relative; flex: none; }
-.cbi-tabmenu > li > a, .vt-tab {
+.vt-tabs > .vt-pagetabs { margin: 0; }
+.cbi-tabmenu > li { position: relative; flex: none; display: flex; max-width: 100%; }
+.cbi-tabmenu > li > a, .vt-pagetabs > .vt-tab {
+	flex: 1 1 auto;
 	display: flex; align-items: center; gap: 6px;
-	height: calc(var(--ctl-h) - 6px); padding: 0 var(--sp-3);
-	border-radius: var(--r);
+	min-height: var(--ctl-h); padding: 0 10px;
+	border: 3px solid transparent; background-clip: padding-box;
+	border-radius: calc(var(--r) + 3px);
 	color: var(--text-2);
 	font-weight: 500;
 	white-space: nowrap;
 	text-decoration: none !important;
 }
-:is(.cbi-tabmenu > li > a, .vt-tab):hover { color: var(--text); }
-.cbi-tabmenu > li.cbi-tab > a, .vt-tab[aria-current] { background: var(--seg-on); color: var(--text); font-weight: 600; box-shadow: var(--seg-on-ring); }
+:is(.cbi-tabmenu > li > a, .vt-pagetabs > .vt-tab):hover { color: var(--text); }
+:is(.cbi-tabmenu > li > a, .vt-pagetabs > .vt-tab):focus-visible { outline-offset: -1px; border-radius: calc(var(--r) + 3px); }
+.cbi-tabmenu > li.cbi-tab > a, .vt-pagetabs > .vt-tab[aria-current] { background-color: var(--seg-on); color: var(--text); font-weight: 600; box-shadow: var(--seg-on-ring); }
 .cbi-tabmenu > li[data-errors] > a::after {
 	content: attr(data-errors);
 	display: inline-flex; align-items: center; justify-content: center;
 	min-width: 18px; height: 18px; padding: 0 5px;
 	border-radius: 999px;
-	background: var(--err); color: #fff;
+	background: var(--err); color: var(--err-ink);
 	font: 700 var(--fs-micro)/1 var(--mono);
 }
 .cbi-tabmenu > li.cbi-tab-disabled[data-errors] > a { color: var(--err); }
@@ -1480,21 +1527,27 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 /* "<strong>Label:</strong> value<br>" dumps (LuCI itemlist) -> aligned
    label/value grid. Each span.nowrap becomes a subgrid row: the <strong>
    is the label cell, the contiguous value run the anonymous value cell. */
+/* LuCI's " | " separators between the items are bare text, so each would
+   be a grid row of its own: no text size, line or row gap for them; the
+   items keep their own size and space */
 :is(.ifacebox-body, .ifacebadge) > span:has(> .nowrap) {
 	display: grid;
 	grid-template-columns: max-content minmax(0, 1fr);
-	column-gap: 14px; row-gap: 3px;
+	column-gap: 14px; row-gap: 0;
 	align-items: baseline;
 	min-width: 0;
 	white-space: normal;
 	text-align: left;
+	font-size: 0; line-height: 0;
 }
 :is(.ifacebox-body, .ifacebadge) > span:has(> .nowrap) > br { display: none; }
+:is(.ifacebox-body, .ifacebadge) > span:has(> .nowrap) > :not(.nowrap) { font-size: var(--fs-sm); line-height: 1.55; }
 :is(.ifacebox-body, .ifacebadge) > span:has(> .nowrap) > .nowrap {
 	grid-column: 1 / -1;
 	display: grid; grid-template-columns: subgrid;
 	align-items: baseline;
 	min-width: 0;
+	margin-block: 1.5px;
 	white-space: normal; overflow-wrap: anywhere;
 	color: var(--text);
 	font: 400 var(--fs-sm)/1.55 var(--mono);
@@ -1606,7 +1659,8 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 .zonebadge[style*="--zone-color-rgb"] { box-shadow: inset 3px 0 0 rgb(var(--zone-color-rgb)); padding-left: 10px; }
 .ifacebox-head[style*="--zone-color-rgb"] { box-shadow: inset 0 3px 0 rgb(var(--zone-color-rgb)); border-bottom-color: rgba(var(--zone-color-rgb), .4) !important; }
 .ifacebox-head[style*="background-color:#"], .ifacebox-head[style*="background-color: #"] { color: #111 !important; }
-.zonebadge > em { font-style: normal; color: var(--text-3); }
+/* muted, but on the zone tint: --text-3 fell to 3.1:1 there in dark mode */
+.zonebadge > em { font-style: normal; color: color-mix(in srgb, var(--text) 78%, transparent); }
 .zonebadge .ifacebadge { padding: 0 4px; border: 0; background: transparent; }
 .zone-forwards { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .zone-forwards > span { color: var(--text-3); }
@@ -1700,9 +1754,9 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 	transition: opacity .15s;
 	pointer-events: none;
 }
-.cbi-tooltip.error { background: var(--err); border-color: var(--err); color: #fff; }
+.cbi-tooltip.error { background: var(--err); border-color: var(--err); color: var(--err-ink); }
 .cbi-tooltip.warning { background: var(--warn); border-color: var(--warn); color: #1a1200; }
-.cbi-tooltip.info { background: var(--info); border-color: var(--info); color: #fff; }
+.cbi-tooltip.info { background: var(--info); border-color: var(--info); color: var(--info-ink); }
 .cbi-tooltip-container { position: relative; cursor: help; }
 .cbi-tooltip-container > .cbi-tooltip { left: -10000px; top: auto; margin-top: 6px; white-space: normal; }
 .cbi-tooltip-container:hover > .cbi-tooltip { left: 0; top: 100%; opacity: 1; }
@@ -1739,6 +1793,10 @@ body.modal-overlay-active #modal_overlay { display: block; }
 }
 #modal_overlay > .modal.cbi-modal { width: min(960px, 100%); }
 #modal_overlay > .modal .cbi-section { background: none; border: 0; padding: 0; margin: 0; box-shadow: none; }
+/* a modal's sections have no card padding, so nothing in them bleeds out
+   by it: tables keep the modal's width (a bleed scrolled the section
+   sideways) and their first and last cells line up with the fields */
+#modal_overlay > .modal .cbi-section { --card-px: 0px; --card-py: 0px; }
 #modal_overlay > .modal .cbi-section > h3:first-child { margin: 0 0 var(--sp-3); padding: 0; min-height: 0; border: 0; }
 .uci-dialog > .cbi-section > br, .uci-change-list > br:last-child { display: none; }
 .uci-dialog > .cbi-section > strong { display: block; margin-bottom: var(--sp-2); color: var(--text-3); font-size: var(--fs-micro); letter-spacing: .08em; text-transform: uppercase; }
@@ -2120,8 +2178,12 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	color: var(--text-3);
 	font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
 }
-.vt-live-dot { position: relative; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-text); }
-.vt-live-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--accent-line); animation: vt-live 2s ease-out infinite; }
+.vt-login-sub { isolation: isolate; }
+/* the ring as on the poll pill: behind the dot (the dot itself makes no
+   stacking context, so z-index -1 lands under its background), opacity 0
+   unless animated */
+.vt-login-dot { position: relative; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-text); }
+.vt-login-dot::after { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: 50%; background: var(--accent-line); opacity: 0; animation: vt-live 2s ease-out infinite; }
 .vt-login-error {
 	margin: 0 0 var(--sp-4);
 	padding: var(--sp-2) var(--sp-3);
@@ -2135,7 +2197,7 @@ html:not([data-darkmode="true"]) .vt-login-page {
 .vt-field { display: flex; flex-direction: column; gap: 6px; }
 .vt-field-label { color: var(--text-3); font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .vt-field input {
-	width: 100%; height: 38px;
+	width: 100%; height: var(--ctl-h);
 	padding: 0 12px;
 	background: var(--s2);
 	color: var(--text);
@@ -2144,7 +2206,7 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	font-size: var(--fs-md);
 }
 .vt-field input[name="luci_username"] { font-family: var(--mono); }
-.vt-login-submit { height: 38px; margin-top: var(--sp-2); font-size: var(--fs-md) !important; width: 100%; }
+.vt-login-submit { height: var(--ctl-h); margin-top: var(--sp-2); font-size: var(--fs-md) !important; width: 100%; }
 .vt-login-foot { margin: var(--sp-4) 0 0; text-align: center; color: var(--text-3); font: var(--fs-micro)/1.4 var(--mono); letter-spacing: .03em; }
 
 /* ------------------------------------------------ 9. stock page layouts */
@@ -2265,9 +2327,19 @@ html:not([data-darkmode="true"]) .vt-login-page {
    a non-scrolling ancestor, so status tables only scroll when narrow. */
 .cbi-tblsection, .cbi-section:has(> .cbi-tblsection) { overflow-x: auto; }
 .cbi-section:has(.cbi-dropdown[open]), .cbi-tblsection:has(.cbi-dropdown[open]) { overflow: visible; }
-@media (max-width: 1180px) and (min-width: 721px) {
+@media (720px < width <= 1180px) {
 	.cbi-section { overflow-x: auto; }
 	.cbi-section:has(.cbi-dropdown[open]) { overflow: visible; }
+	/* a free-standing table card (Processes, Wireless's stations) has no
+	   section to scroll in: the card itself scrolls, its rows held in one
+	   table box (LuCI puts every row, titles too, in the tbody, so the
+	   columns stay aligned), its header static as in sections */
+	:is(#view, #view > div, .cbi-map, #view > div > div > [data-tab-title]:not(.cbi-section)) > .table:not(:has(> thead)) {
+		display: block; overflow-x: auto;
+	}
+	:is(#view, #view > div, .cbi-map, #view > div > div > [data-tab-title]:not(.cbi-section)) > .table:not(:has(> thead)) > tbody { display: table; width: 100%; }
+	:is(#view, #view > div, .cbi-map, #view > div > div > [data-tab-title]:not(.cbi-section)) > .table:has(.cbi-dropdown[open]) { overflow: visible; }
+	:is(#view, #view > div, .cbi-map, #view > div > div > [data-tab-title]:not(.cbi-section)) > .table .tr > .th.th { position: static; }
 }
 
 
@@ -2275,6 +2347,18 @@ html:not([data-darkmode="true"]) .vt-login-page {
    scroller (pushed down by --stick-top over the rows): keep those static */
 .cbi-tblsection .table .tr > .th.th, .cbi-section:has(> .cbi-tblsection) .table .tr > .th.th { position: static; }
 @media (max-width: 1180px) { .cbi-section .table .tr > .th.th { position: static; } }
+
+/* add-ons: adblock and banIP inject status palettes keyed on the OS
+   colour scheme (@media prefers-color-scheme), so with the theme toggle
+   set the other way their text fell to 1.7-3:1. Their own two palettes,
+   picked by the toggle instead (html[data-darkmode] outweighs their #id
+   rules); nothing else of theirs is touched. */
+html[data-darkmode="false"] #adb-status { --adb-ok: #1f8a5f; --adb-warn: #a8760a; --adb-err: #c0392b; --adb-info: #2f6fb0; }
+html[data-darkmode="true"] #adb-status { --adb-ok: #63c79b; --adb-warn: #d9ab4e; --adb-err: #e8897e; --adb-info: #7fb3e8; }
+html[data-darkmode="false"] #adb-dash { --adb-blocked: #c0392b; --adb-allowed: #1f8a5f; --adb-neutral: #2f6fb0; --adb-warn: #a8760a; }
+html[data-darkmode="true"] #adb-dash { --adb-blocked: #e8897e; --adb-allowed: #63c79b; --adb-neutral: #7fb3e8; --adb-warn: #d9ab4e; }
+html[data-darkmode="false"] :is(#ban-status, #ban-report) { --ban-ok: #1f8a5f; --ban-err: #c0392b; --ban-info: #2f6fb0; }
+html[data-darkmode="true"] :is(#ban-status, #ban-report) { --ban-ok: #63c79b; --ban-err: #e8897e; --ban-info: #7fb3e8; }
 
 /* ----------------------------------------------------- responsive */
 
@@ -2286,6 +2370,13 @@ html:not([data-darkmode="true"]) .vt-login-page {
 
 @media (max-width: 900px) {
 	.vt-host { display: none !important; }
+	/* indicators go compact (dot, count) before the crumbs get cut; the
+	   label stays as text for screen readers and as the title */
+	#indicators > span[data-indicator] { height: 28px; padding: 0 8px; }
+	#indicators > span[data-indicator="poll-status"] { font-size: 0; gap: 0; width: 28px; justify-content: center; padding: 0; }
+	#indicators > span[data-indicator="poll-status"][data-style="active"]::after { left: calc(50% - 3.5px); }
+	#indicators > span[data-indicator][data-count] { padding: 0 3px; gap: 0; }
+	#indicators > span[data-indicator][data-count]::before { content: none; }
 	html[data-rail="pinned"] .vt-rail { width: var(--rail-w); }
 	html[data-rail="pinned"] .vt-frame { margin-left: var(--rail-w); }
 	html[data-rail="pinned"] body.vt-auth .vt-shell::before { width: var(--rail-w); }
@@ -2311,12 +2402,17 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	.vt-rail > .vt-brand, .vt-rail-foot { display: none; }
 	body.vt-auth .vt-shell::before { display: none; }
 	.vt-rail-list {
-		flex-direction: row; justify-content: center;
+		flex-direction: row; justify-content: flex-start;
 		gap: 0; padding: 0 var(--sp-1);
 		overflow-x: auto; overflow-y: hidden;
 	}
-	/* the buttons stay a centred group on wider screens */
+	/* the buttons stay a centred group on wider screens. Centred with auto
+	   margins, not justify-content: center, which would push an overflowing
+	   list's first items past the scroll start where nothing reaches them;
+	   auto margins drop to 0 when the list overflows. */
 	.vt-rail-item { flex: 1 0 60px; max-width: 104px; padding: 6px 2px; }
+	.vt-rail-item:first-child { margin-inline-start: auto; }
+	.vt-rail-item:last-child { margin-inline-end: auto; }
 	.vt-rail-link, html[data-rail="pinned"] .vt-rail-link {
 		flex-direction: column; justify-content: center; gap: 3px;
 		height: 48px; padding: 0 4px;
@@ -2355,11 +2451,6 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	.vt-crumbs .vt-crumb-current { font-size: var(--fs-md); }
 	.vt-top-actions { gap: 2px; }
 	.vt-search { border-color: transparent; background: none; color: var(--text-2); width: 32px; height: 32px; }
-	#indicators > span[data-indicator] { height: 28px; padding: 0 8px; }
-	#indicators > span[data-indicator="poll-status"] { font-size: 0; gap: 0; width: 28px; justify-content: center; padding: 0; }
-	#indicators > span[data-indicator="poll-status"][data-style="active"]::after { left: calc(50% - 3.5px); }
-	#indicators > span[data-indicator][data-count] { padding: 0 3px; gap: 0; }
-	#indicators > span[data-indicator][data-count]::before { content: none; }
 	.vt-tabs { padding: var(--sp-4) var(--sp-4) 0; }
 	.vt-tabs:not([hidden]) + .vt-main { padding-top: var(--sp-4); }
 
@@ -2372,7 +2463,14 @@ html:not([data-darkmode="true"]) .vt-login-page {
 		width: auto;
 		margin: var(--sp-4) 0 0;
 	}
-	.cbi-page-actions > * { flex: 1 1 auto; }
+	/* one row: the buttons share the bar from a zero basis, so the row only
+	   breaks when their longest words no longer fit, and a long label
+	   wraps inside its button instead of taking the bar to a second row */
+	.cbi-page-actions > *, .cbi-page-actions > form > * { flex: 1 1 0; }
+	.cbi-page-actions :is(.btn, .cbi-button, button, input[type="button"], input[type="submit"]):not(.cbi-dropdown) {
+		padding: 4px 8px;
+		white-space: normal; text-align: center; line-height: 1.15;
+	}
 	.cbi-section { overflow-x: visible; }
 	.cbi-tblsection, .cbi-section:has(> .cbi-tblsection) { overflow-x: visible; }
 	.network-status-table .ifacebox-head, .network-status-table .ifacebox-body { padding-left: 12px; padding-right: 12px; }
@@ -2401,33 +2499,35 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	.cbi-value:has(> .cbi-value-field > .cbi-checkbox) > .vt-help { grid-row: 1; grid-column: 3; }
 	.cbi-value:has(> .cbi-value-field > .cbi-checkbox) > .cbi-value-field > :not(.cbi-checkbox) { grid-column: 1 / -1; }
 	/* a segmented control spans the width and its segments share each row */
-	.cbi-tabmenu, .vt-seg { width: auto; }
-	.cbi-tabmenu > li, .vt-tab { flex: 1 1 auto; }
-	.cbi-tabmenu > li > a, .vt-tab { justify-content: center; }
+	.cbi-tabmenu, .vt-tabs > .vt-pagetabs { width: auto; }
+	.cbi-tabmenu > li, .vt-pagetabs > .vt-tab { flex: 1 1 auto; }
+	.cbi-tabmenu > li > a, .vt-pagetabs > .vt-tab { justify-content: center; }
 	.cbi-dropdown, .vt-main input, .vt-main select, .control-group, .cbi-dynlist { max-width: none; }
 
-	/* tables become cards */
+	/* tables become cards, in pages and in modals alike. Header rows go
+	   (LuCI also puts .cbi-section-table-titles on each row's name cell,
+	   which stays); every cell drops the fixed row height. */
 	.hide-xs { display: none !important; }
-	.vt-main .table, .vt-main .table > tbody, .vt-main .table > thead, .modal .table, .modal .table > tbody { display: block; width: 100%; }
-	.vt-main .table > .tr.table-titles, .vt-main .table > thead > .tr.table-titles, .vt-main .table > tbody > .tr.table-titles,
-	.vt-main .cbi-section-table-titles, .vt-main .cbi-section-table-descr, .modal .table-titles { display: none !important; }
-	.vt-main .table .tr, .modal .table .tr {
+	:is(.vt-main, .modal) .table, :is(.vt-main, .modal) .table > :is(tbody, thead) { display: block; width: 100%; }
+	:is(.vt-main, .modal) .table :is(tr, .tr):is(.table-titles, .cbi-section-table-titles, .cbi-section-table-descr) { display: none !important; }
+	:is(.vt-main, .modal) .table .tr {
 		display: flex; flex-wrap: wrap;
 		padding: 6px 0;
 		border-bottom: 1px solid var(--line);
 	}
-	.vt-main .table .tr:last-child { border-bottom: 0; }
-	.vt-main .table .tr > .td, .modal .table .tr > .td {
+	:is(.vt-main, .modal) .table .tr:last-child { border-bottom: 0; }
+	:is(.vt-main, .modal) .table .tr > .td {
 		display: block;
 		flex: 1 1 100%;
 		min-width: 0;
 		width: auto !important;
+		height: auto;
 		padding: 4px 10px;
 		border: 0;
 		text-align: left !important;
 	}
-	.vt-main :is(.cbi-section, .cbi-value) .table .tr > .td:nth-child(n) { padding: 4px var(--card-px); height: auto; }
-	.vt-main .table .tr > .td[data-title]::before, .modal .table .tr > .td[data-title]::before {
+	:is(.vt-main, .modal) :is(.cbi-section, .cbi-value) .table .tr > .td:nth-child(n) { padding: 4px var(--card-px); }
+	:is(.vt-main, .modal) .table .tr > .td[data-title]::before {
 		content: attr(data-title);
 		display: block;
 		margin-bottom: 2px;
@@ -2435,18 +2535,20 @@ html:not([data-darkmode="true"]) .vt-login-page {
 		color: var(--text-3);
 		font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
 	}
-	.vt-main .table:not(:has(.table-titles)) .tr > .td:first-child:nth-last-child(2) {
+	:is(.vt-main, .modal) .table:not(:has(.table-titles)) .tr > .td:first-child:nth-last-child(2) {
 		width: auto !important; padding-bottom: 0;
 		color: var(--text-3); font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
 	}
-	.vt-main .table .tr > .td[data-title]:not(:only-child) { flex-basis: 50%; }
-	.vt-main .table .tr > .td[data-title]:last-child:nth-child(odd) { flex-basis: 100%; }
-	.vt-main .table .tr > .td.cbi-section-actions { flex-basis: 100%; text-align: left !important; }
-	.vt-main .table .tr > .td[data-name="_ifacebox"], .vt-main .table .tr > .td[data-name="_ifacestat"] { flex-basis: 100%; }
+	:is(.vt-main, .modal) .table .tr > .td[data-title]:not(:only-child) { flex-basis: 50%; }
+	:is(.vt-main, .modal) .table .tr > .td[data-title]:last-child:nth-child(odd) { flex-basis: 100%; }
+	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions { flex-basis: 100%; text-align: left !important; }
+	/* a named grid section's name cell heads its card */
+	:is(.vt-main, .modal) .table .tr > .td.cbi-section-table-titles { flex-basis: 100%; color: var(--text); font-weight: 600; }
+	:is(.vt-main, .modal) .table .tr > .td:is([data-name="_ifacebox"], [data-name="_ifacestat"]) { flex-basis: 100%; }
 	.cbi-section-table .td[data-name="_ifacebox"] .ifacebox { width: 100%; }
-	.vt-main .table .tr > .td.cbi-section-actions > div { flex-wrap: wrap; }
-	.vt-main .table .tr > .td.cbi-section-actions::before { display: none !important; }
-	.vt-main .table .tr:hover > .td { background: none; }
+	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions > div { flex-wrap: wrap; }
+	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions::before { display: none !important; }
+	:is(.vt-main, .modal) .table .tr:hover > .td { background: none; }
 	.cbi-section .table, .cbi-section .cbi-section-table { border: 0; }
 	.cbi-progressbar { max-width: none; }
 	.network-status-table > .ifacebox { max-width: none; }
@@ -2469,6 +2571,10 @@ html:not([data-darkmode="true"]) .vt-login-page {
 }
 @media (pointer: coarse) {
 	input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+	/* top-bar buttons: a touch control high, at every width */
+	.vt-icon-btn, .vt-search { min-width: var(--ctl-h); height: var(--ctl-h); }
+	/* dropdown choices (Save & Apply's too) are touch targets */
+	.cbi-dropdown[open] > ul.dropdown > li { min-height: var(--ctl-h); }
 	.cbi-value { padding: 8px 0; }
 }
 
@@ -2498,6 +2604,7 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	/* ui.Dropdown moves focus on transitionend: keep a (near-instant) transition */
 	.cbi-dropdown[open] > ul.dropdown { transition-duration: .01s; }
 	.cbi-progressbar > div { transition: none; }
+	.vt-crumb-switch > svg, .vt-rail-caret, .vt-rail-pin svg { transition: none; }
 }
 
 @media print {

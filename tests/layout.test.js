@@ -162,3 +162,10 @@ test('settle: tiles grow at once and shrink only after holding for a while', () 
 	s = layout.settle(s, 300, 10000 + layout.HOLD_MS);
 	assert.deepEqual(s, { h: 300, since: null }, 'shrinks once held long enough');
 });
+
+test('nextRelease: ms to the earliest held height, null without one', () => {
+	assert.equal(layout.nextRelease({}, 0), null);
+	assert.equal(layout.nextRelease({ a: { h: 300, since: null } }, 0), null);
+	assert.equal(layout.nextRelease({ a: { h: 300, since: 1000 }, b: { h: 200, since: 5000 } }, 2000), layout.HOLD_MS - 1000);
+	assert.equal(layout.nextRelease({ a: { h: 300, since: 0 } }, layout.HOLD_MS + 5), 0, 'overdue: now');
+});

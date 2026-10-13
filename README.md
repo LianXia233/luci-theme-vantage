@@ -27,15 +27,17 @@ without the app.
 **`luci-theme-vantage`**, the shell:
 
 - Icon rail with a flyout per category; a bottom bar and sheet on phones
-- Breadcrumb, page tabs, and a <kbd>Ctrl</kbd>+<kbd>K</kbd> / <kbd>/</kbd>
-  command palette with fuzzy search over every page you can open
+- Breadcrumb, page tabs (the current crumb also switches between them),
+  and a <kbd>Ctrl</kbd>+<kbd>K</kbd> / <kbd>/</kbd> command palette with
+  fuzzy search over every page you can open
 - Light, dark and auto modes, applied before first paint (no flash)
 - Host chip (hostname and model), LuCI's indicators (including the unsaved
   changes count) as keyboard-accessible pills
 - Its own login page, and restyled stock pages, forms, tables, charts and
   status icons; tables become cards on small screens
-- One control size (bigger on touch screens), one look per tab level, and
-  field help folded to its first line
+- One control size (bigger on touch screens) for fields, buttons and
+  every tab, one tab style at every level, and field help folded to its
+  first line
 - System fonts, self-drawn SVG icons, no CDNs or frameworks
 
 **`luci-app-vantage`**, the dashboard at `admin/dashboard` (the landing page):

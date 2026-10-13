@@ -1,7 +1,8 @@
 # Vantage — v1 specification
 
-Status: **draft for approval**. Nothing here is built yet except the dev
-tooling in `dev/`.
+Status: **implemented** (v1, released as 1.0.x). This is the contract
+both packages are built and reviewed against; section 5 lists what is
+not built yet.
 
 Vantage is a LuCI theme plus a companion dashboard app for OpenWrt. It
 takes its cues from the *functionality* of managed-network consoles —
@@ -51,7 +52,9 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   (Ctrl+K or `/`): fuzzy search over every menu page, recent pages first;
   later the app registers entities (clients, interfaces, radios) into it.
 - **Indicators** as pills; the unsaved-changes count is prominent and
-  opens the changes dialog.
+  opens the changes dialog. When the bar runs short of room the host
+  chip gives way first, and at 900 px and below the pills shrink to a
+  dot and a count, so the breadcrumb is cut last.
 - **Host chip**: hostname · model (board name when the model string is a
   placeholder), from `system board` via rpc in the menu script.
 - **Theme toggle**: auto / light / dark, stored in `localStorage`, applied
@@ -60,11 +63,36 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   (depth ≥ 3, at the top of the content column), tabs at page level, in a
   form or modal, and tabs inside a tab. Nesting shows by where a control
   sits, not by a different look. A control wraps its segments instead of
-  hiding them; on phones the segments share each row's width. Page tabs
-  scroll with the page; on such a page the current crumb in the top bar
-  is a switcher that lists them (a dropdown, a bottom sheet on phones).
-- **Mobile** (≤ 720 px): rail becomes a drawer/bottom bar, tables become
-  cards using `td[data-title]`, forms stack.
+  hiding them; on phones the segments share each row's width. Each
+  segment is a whole control high to click or tap (the gap between the
+  track's edge and the drawn segment is part of the segment), so a
+  one-row track is one control high too. The page tabs carry their own
+  class (`vt-pagetabs`): the theme styles no class the app uses.
+- **Page switcher**: page tabs scroll with the page; on such a page the
+  current crumb in the top bar is a switcher that lists them (a dropdown
+  under the crumb, a bottom sheet on phones). It is a disclosure
+  (`aria-expanded` + `aria-controls`, a region of links, no
+  `aria-haspopup`). ArrowDown or ArrowUp on the crumb opens it at the
+  current page; Tab from the open crumb enters the list, Tab from its
+  last link closes it and goes on to the next top-bar control, Shift+Tab
+  from its first link returns to the crumb, Escape closes it, and focus
+  moving anywhere else closes it. It shares the panel with the rail's
+  flyouts: hovering the rail while it is open leaves it open (a click on
+  a category replaces it), and rail hover timers never close it.
+- **Hit targets**: everything clickable in the shell is at least the
+  control height (36 px with a mouse, 44 px on touch): tab segments, the
+  crumb switch and its links, crumb links, and on touch the top bar's
+  search, theme and log-out buttons.
+- **Mobile** (≤ 720 px; the desktop side is written `width > 720px` so
+  fractional widths fall on one side): the rail becomes a bottom bar
+  (centred, scrolling from its first item when the categories do not
+  fit) with a bottom sheet for flyouts; forms stack; the page's action
+  bar keeps one row (labels wrap inside their buttons) and its Save &
+  Apply menu opens upwards. Tables become cards using `td[data-title]`,
+  in pages and in modals alike: header rows are hidden (not a named grid
+  section's per-row name cell, which heads its card) and cells lose the
+  fixed row height. Between 721 and 1180 px wide tables scroll inside
+  their card, never the page.
 
 ### Pages
 
@@ -86,6 +114,13 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   row's field, or first inside an intro) and sets classes, `data-v-help`
   and (where missing) a description `id` for `aria-controls`.
 - 404 / CSRF pages render in the theme without leaking anything.
+- Focused fields show a 2 px `--focus` outline (border plus ring, at
+  least 3:1 against field and card in both modes); text on coloured
+  fills (danger buttons, error and info tooltips) uses an ink colour that
+  keeps 4.5:1 in both modes.
+- Add-ons: adblock and banIP pick their status palettes from the OS
+  colour scheme; the theme sets their own light or dark palette from
+  `html[data-darkmode]` instead, so they follow the theme toggle.
 
 ### Visual identity
 
@@ -140,7 +175,9 @@ text around it so it looks the same size.
   tiles, move them with buttons or arrow keys, change their width within
   a per-tile minimum and hide them. Saved in `localStorage` per screen
   class (and separately for wired devices), validated on read; never on
-  the device.
+  the device. A tile whose content shrinks keeps its height for 30 s,
+  then the layout settles on its own; while arranging, each tile's
+  content starts below its handle bar.
 - **Controls** (buttons, filter, chips, sort headers, icon buttons) take
   the theme's control height through `--v-ctl-h` (36 px, 44 px on
   touch) and the theme's control radius (`--v-r`); under another theme
@@ -152,6 +189,10 @@ text around it so it looks the same size.
   intended, since the dashboard only gets about 600–700 px there and its
   two-column tiles clip below that (measured).
 - Polling via `poll.add` with sane intervals; pauses when the tab is hidden.
+  A poll updates only what changed and lays nothing out unless a tile
+  changes size. Idle animations (the Live beat, the flow on busy wires)
+  use transform and opacity only, so the compositor runs them; with
+  reduced motion they stop and busy wires show a static dotted line.
 - ACL: three groups. `luci-app-vantage` (read): `system info/board`,
   `network.interface dump`, `network.device status`, `iwinfo
   info/assoclist`, `hostapd.* get_status/get_clients`, `luci-rpc
@@ -195,7 +236,8 @@ text around it so it looks the same size.
   and text nodes only; style, selectors, dynamic regular expressions and
   history URLs from data are rejected too (checked by
   `security-tests/check_dom_sinks.js`, on the theme and the app, with no
-  `dom-safe` suppressions).
+  `dom-safe` suppressions). Web Animations keyframes count as CSS from
+  data.
 - ACL test: the app's ACL grants only the listed read methods and every
   `rpc.declare` in the app is covered, nothing unused is granted
   (`security-tests/test_acl_policy.js`, also run by `node --test tests/`).

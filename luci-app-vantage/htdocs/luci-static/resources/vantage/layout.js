@@ -187,6 +187,19 @@ return baseclass.extend({
 		return { h: prev.h, since: since };
 	},
 
+	/* ms until the earliest held height may be released (0 when one is
+	   already due), or null when nothing is held */
+	nextRelease: function(held, now) {
+		var next = null, self = this;
+		Object.keys(held || {}).forEach(function(id) {
+			var s = held[id];
+			if (!s || s.since == null) return;
+			var left = Math.max(0, s.since + self.HOLD_MS - now);
+			if (next == null || left < next) next = left;
+		});
+		return next;
+	},
+
 	/* where shown tiles go. items: [{ id, c, w, h }] in order, h measured;
 	   returns { rects: { id: { c, w, top, h } }, height }. A tile that
 	   ends a little above the next one in its columns stretches to meet

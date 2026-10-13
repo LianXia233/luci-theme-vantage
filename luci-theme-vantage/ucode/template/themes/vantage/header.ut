@@ -69,7 +69,7 @@
 			<nav class="vt-crumbs" id="vt-crumbs" aria-label="{{ entityencode(_('Breadcrumb'), true) }}"><span class="vt-crumb vt-crumb-current">{{ entityencode(page_title, true) }}</span></nav>
 			<div class="vt-top-actions">
 {% if (authed): %}
-				<button type="button" class="vt-search" id="vt-search-btn" aria-haspopup="dialog" aria-keyshortcuts="Control+K /">
+				<button type="button" class="vt-search" id="vt-search-btn" aria-haspopup="dialog" aria-keyshortcuts="Control+K /" aria-label="{{ entityencode(_('Search pages'), true) }}">
 					<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
 					<span class="vt-search-label">{{ entityencode(_('Search pages'), true) }}</span>
 					<kbd class="vt-kbd">Ctrl K</kbd>

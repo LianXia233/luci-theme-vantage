@@ -21,11 +21,18 @@
      7. anything else  [ 4 ] (UBUS_STATUS_NOT_FOUND), logged once
    Nothing is ever forwarded: there is no upstream.
 
-   Plugins: every dev/replay/<name>-plugin.js is loaded at start. It exports
+   Plugins: every dev/replay/<name>-plugin.js is loaded at start, then the
+   --fixtures ones (fixtures.js; they cannot replace a built-in plugin, uci
+   or session). A plugin exports
      OBJECT (or OBJECTS: [ ... ])  the ubus object name(s) it answers
-     call(store, method, args)     -> { result: [ status, data? ] } | { error }
+     call(store, method, args, next)
+                                   -> { result: [ status, data? ] } | { error };
+                                   next() is the reply without the plugin
      POLICY (optional)             { method: { arg: type } }, for `list`
-   and may use the store API (data, call, uci, uciGet, uciSeed).
+   and may use the store API (data, call, uci, uciGet, uciSeed, fixtures).
+
+   Fixtures (opts.fixtures, a fixtures.js Fixtures) answer file.read/stat/
+   list and file.exec only where the recording has no answer.
 
    The uci overlay keeps configs and sections in prototype-less objects and
    refuses names libuci would refuse (uci_validate_name), so a request can
@@ -60,8 +67,11 @@ function nclone(v) {
 	return v;
 }
 
-/* optional stand-ins for rpcd plugins: dev/replay/<name>-plugin.js */
-function loadPlugins() {
+/* optional stand-ins for rpcd plugins: dev/replay/<name>-plugin.js, then
+   those of --fixtures directories, which may not replace a built-in one or
+   the replay's own uci overlay and session */
+const RESERVED = new Set([ 'uci', 'session' ]);
+function loadPlugins(extra) {
 	const plugins = new Map();
 	let files = [];
 	try { files = fs.readdirSync(__dirname).filter(f => /^[a-z0-9_-]+-plugin\.js$/.test(f)).sort(); } catch (e) {}
@@ -70,6 +80,17 @@ function loadPlugins() {
 		const objects = Array.isArray(mod.OBJECTS) ? mod.OBJECTS : [ mod.OBJECT ];
 		if (typeof mod.call !== 'function') continue;
 		for (const o of objects) if (typeof o === 'string' && o) plugins.set(o, mod);
+	}
+	const builtin = new Set(plugins.keys());
+	for (const f of extra || []) {
+		const mod = require(f);
+		const objects = Array.isArray(mod.OBJECTS) ? mod.OBJECTS : [ mod.OBJECT ];
+		if (typeof mod.call !== 'function') continue;
+		for (const o of objects) {
+			if (typeof o !== 'string' || !o) continue;
+			if (builtin.has(o) || RESERVED.has(o) || plugins.has(o)) { console.error(`[replay] ${safe(f)}: ${safe(o)} is already answered, ignored`); continue; }
+			plugins.set(o, mod);
+		}
 	}
 	return plugins;
 }
@@ -126,7 +147,8 @@ class Store {
 		this.warned = new Set();
 		this.interval = 5000;
 		this.t0 = Date.now();
-		this.plugins = (this.opts.plugins === false) ? new Map() : loadPlugins();
+		this.fixtures = this.opts.fixtures || null;
+		this.plugins = (this.opts.plugins === false) ? new Map() : loadPlugins(this.fixtures && this.fixtures.pluginFiles());
 		this.load(mirror);
 		/* --demo: rewrite every recorded reply before anything reads it */
 		if (this.opts.demo) this.demo = require('./demo').pseudonymiseStore(this, mirror, argsKey);
@@ -212,8 +234,14 @@ class Store {
 	/* JSON-RPC reply body for one ubus call: { result } or { error } */
 	call(object, method, args) {
 		args = (args && typeof args === 'object') ? args : {};
+		if (typeof object === 'string' && this.plugins.has(object))
+			return this.plugins.get(object).call(this, method, args, () => this.answer(object, method, args));
+		return this.answer(object, method, args);
+	}
+
+	/* the reply without plugins: what a plugin's next() returns */
+	answer(object, method, args) {
 		const sig = `${object}.${method} ${argsKey(args)}`;
-		if (typeof object === 'string' && this.plugins.has(object)) return this.plugins.get(object).call(this, method, args);
 		if (object === 'uci') return this.uci(method, args);
 		if (object === 'session' && method === 'access') return { result: [ 0, { access: true } ] };
 		if (this.synthetic) {
@@ -229,8 +257,15 @@ class Store {
 			const argv = [ args.command ].concat(Array.isArray(args.params) ? args.params : []);
 			const out = this.exec.get(JSON.stringify(argv));
 			if (out != null) return { result: [ 0, { code: 0, stdout: out } ] };
+			const fx = this.fixtures && this.fixtures.execText(argv);
+			if (fx != null) return { result: [ 0, { code: 0, stdout: fx } ] };
 			this.warn('unrecorded exec (answered NOT_FOUND)', JSON.stringify(argv));
 			return { result: [ NOT_FOUND ] };
+		}
+
+		if (object === 'file' && this.fixtures) {
+			const fx = this.fixtures.file(method, args);
+			if (fx) return fx;
 		}
 
 		if (WRITES[object] && WRITES[object].includes(method)) {
@@ -282,6 +317,7 @@ class Store {
 
 	execText(argv) {
 		const out = this.exec.get(JSON.stringify(argv));
+		if (out == null && this.fixtures) return this.fixtures.execText(argv);
 		return (out == null) ? null : out;
 	}
 
@@ -308,6 +344,23 @@ class Store {
 		this.uciCommitted[config] = nclone(values);
 		this.uciStaged[config] = nclone(values);
 		return true;
+	}
+
+	/* fixture sections for a recorded config: only names it lacks are
+	   added, so recorded sections are never replaced */
+	uciAddSections(config, values) {
+		if (!uciName(config, UCI_CONFIG) || !hasOwn(this.uciCommitted, config) || !values || typeof values !== 'object') return 0;
+		const conf = this.uciCommitted[config];
+		let n = 0, idx = Object.keys(conf).length;
+		for (const [ sid, s ] of Object.entries(values)) {
+			if (!uciName(sid, UCI_NAME) || hasOwn(conf, sid) || !s || typeof s !== 'object' || !uciName(s['.type'], UCI_NAME)) continue;
+			const sec = { '.anonymous': !!s['.anonymous'], '.type': s['.type'], '.name': sid, '.index': idx++ };
+			for (const [ k, v ] of Object.entries(s)) if (uciName(k, UCI_NAME)) sec[k] = Array.isArray(v) ? v.map(String) : String(v);
+			conf[sid] = nclone(sec);
+			n++;
+		}
+		if (n) this.uciStaged[config] = nclone(conf);
+		return n;
 	}
 
 	uciPending() {

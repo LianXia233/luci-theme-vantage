@@ -57,6 +57,24 @@ test('repeated headings: case, spacing and a trailing colon do not count', () =>
 	assert.equal(headingKey(null), '');
 });
 
+test('repeated headings: a card heading never counts as a repeat of the category', () => {
+	const start = src.indexOf('function repeatsTrail(');
+	assert.ok(start > 0, 'found repeatsTrail');
+	const end = src.indexOf('\n}\n', start) + 3;
+	const repeatsTrail = new Function(src.slice(start, end) + '\nreturn repeatsTrail;')();
+	/* Services > Dynamic DNS: the page title repeats the page crumb, the
+	   "Services" table heading only matches the category and is content */
+	const ddns = { all: new Set([ 'services', 'dynamic dns' ]), page: new Set([ 'dynamic dns' ]) };
+	assert.equal(repeatsTrail('dynamic dns', 'H2', ddns), true);
+	assert.equal(repeatsTrail('services', 'H3', ddns), false);
+	/* a page title may repeat the category (Status > Overview prints "Status") */
+	assert.equal(repeatsTrail('services', 'H2', ddns), true);
+	assert.equal(repeatsTrail('', 'H2', ddns), false);
+	/* the trail: the category goes only to `all`, unless it is the page */
+	assert.match(src, /this\.trail\.all\.add\(headingKey\(p\.title\)\);\n\t\t\t\/\*[^*]*\*\/\n\t\t\tif \(i \|\| parts\.length === 1\) this\.trail\.page\.add\(headingKey\(p\.title\)\);/);
+	assert.match(src, /let repeat = repeatsTrail\(key, h\.tagName, this\.trail\);/);
+});
+
 test('form chrome: never stands between LuCI nodes, never changes their text', () => {
 	const part = (from, to) => {
 		const start = src.indexOf(from), end = src.indexOf(to, start);

@@ -248,6 +248,19 @@ function badCss(el, x, sheet, doc) {
 	el.matches(x.sel); // expect-violation
 	document.querySelectorAll(`[id=${x}]`); // expect-violation
 	new RegExp(x); // expect-violation
+	/* Web Animations keyframes are CSS too */
+	el.animate([ { backgroundImage: 'url(' + x + ')' } ], 300); // expect-violation
+	el.animate(x, 300); // expect-violation
+	el.animate({ color: [ 'red', x ] }, 300); // expect-violation
+	el.animate([ { opacity: 0 }, x ], 300); // expect-violation
+	el.animate([ { opacity: 0 } ], { duration: 300, easing: x }); // expect-violation
+	el.animate([ { opacity: 0 } ], x); // expect-violation
+	el.animate([ { backgroundImage: (x * 0, x) } ], 300); // expect-violation
+	el.animate([ { opacity: 0 } ], (x * 0, x)); // expect-violation
+	el.style.color = (x - 1, x); // expect-violation
+	var kf = [];
+	kf.push({ transform: x });
+	el.animate(kf, 300); // expect-violation
 	RegExp('^' + x + '$'); // expect-violation
 	history.pushState(null, '', x); // expect-violation
 	history.replaceState(null, '', 'javascript:' + x); // expect-violation

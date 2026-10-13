@@ -80,7 +80,10 @@
  *   X.style[k] = v, X.style.setProperty(name, v) and Object.assign(X.style,
  *   {...}) follow the style-attribute rule (v a literal or a concatenation
  *   of literals and numeric expressions; setProperty's name a literal;
- *   Object.assign sources object literals); a style sheet's
+ *   Object.assign sources object literals); el.animate(keyframes, options)
+ *   (Web Animations) needs keyframes traced to keyframe objects (or one
+ *   property-indexed object) whose values follow the same rule, and options
+ *   that are a number or an object literal of such values; a style sheet's
  *   replaceSync(x)/insertRule(x) needs constant CSS, or x must be the first
  *   parameter of a .then() callback on a chain that starts with
  *   fetch(L.resource('<literal>')) (a stylesheet shipped with the package;
@@ -669,6 +672,9 @@ class Program {
 			if (t.t === 'punc' || isId(t, 'instanceof') || isId(t, 'in')) ops.push(j);
 		}
 		const opAt = (v) => ops.filter((j) => T[j].v === v);
+		/* a sequence yields its last operand: (x * 0, x) is x, not a number */
+		const comma = opAt(',');
+		if (comma.length) return this.classify(u, comma[comma.length - 1] + 1, b, kind);
 		const assign = ops.find((j) => ASSIGN_OPS.has(T[j].v));
 		if (assign !== undefined)
 			return T[assign].v === '=' ? this.classify(u, assign + 1, b, kind) : (NUMERIC.has(K.base) && NUM_ASSIGN_OPS.has(T[assign].v));
@@ -1760,6 +1766,23 @@ function scanUnit(prog, u, report) {
 					prog.objEntries(u, r[0], r[1]).every((en) => en.kind === 'value' && en.key !== undefined && check(en.vs, en.ve, 'style')));
 				if (!ok) flag(i, 'css-style', `Object.assign() on a style object needs object literals with literal/number values${why()}`, [args[0][0]]);
 			}
+		}
+
+		/* Web Animations: el.animate(keyframes, options) applies the
+		   keyframes' values as CSS, so they follow the style rule: an array
+		   of keyframe objects (or one property-indexed object of arrays)
+		   whose values are literals or literal/number concatenations;
+		   options are a number or an object literal of such values
+		   (Infinity counts as a number) */
+		if (t.v === 'animate' && member && isP(next, '(')) {
+			const [k, o] = callArgs(u, i + 1);
+			if (!k || !check(k[0], k[1], 'elems:elems:style'))
+				flag(i, 'css-style', `animate() keyframes \`${k ? text(k[0], k[1]) : ''}\` are not literal or literal/number CSS values${why()}`, k ? [k[0]] : []);
+			const optVal = (vs, ve) => (ve - vs === 1 && isId(T[vs], 'Infinity') && !u.decls.some((d) => d.name === 'Infinity')) || check(vs, ve, 'style');
+			if (o && !((isP(T[o[0]], '{') && u.match[o[0]] === o[1] - 1)
+				? prog.objEntries(u, o[0], o[1]).every((en) => en.kind === 'value' && en.key !== undefined && optVal(en.vs, en.ve))
+				: check(o[0], o[1], 'num')))
+				flag(i, 'css-style', `animate() options \`${text(o[0], o[1])}\` are not a number or an object literal of literal/number values${why()}`, [o[0]]);
 		}
 
 		/* style sheets from data */
