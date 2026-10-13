@@ -477,10 +477,18 @@ html[data-darkmode="true"] .vt-app {
 	border: 1px solid var(--vt-line); background: var(--vt-surface);
 	font-size: var(--vt-fs-sm); font-weight: 560; color: var(--vt-text-2); white-space: nowrap;
 }
-.vt-app .vt-live-beat { width: 8px; height: 8px; border-radius: 50%; background: var(--vt-ok); box-shadow: 0 0 0 0 color-mix(in oklab, var(--vt-ok) 50%, transparent); animation: vt-beat 2s infinite; }
-.vt-app .vt-live-paused .vt-live-beat { background: var(--vt-text-3); animation: none; }
-.vt-app .vt-live-err .vt-live-beat { background: var(--vt-warn); }
-@keyframes vt-beat { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--vt-ok) 45%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.vt-app .vt-live-beat { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--vt-beat-c, var(--vt-ok)); }
+/* the beat is a ring that scales and fades (compositor only; an animated
+   box-shadow repainted every frame) */
+.vt-app .vt-live-beat::after {
+	content: ""; position: absolute; inset: 0; border-radius: 50%;
+	background: color-mix(in oklab, var(--vt-beat-c, var(--vt-ok)) 45%, transparent);
+	animation: vt-beat 2s ease-out infinite;
+}
+.vt-app .vt-live-paused .vt-live-beat { --vt-beat-c: var(--vt-text-3); }
+.vt-app .vt-live-paused .vt-live-beat::after { animation: none; opacity: 0; }
+.vt-app .vt-live-err .vt-live-beat { --vt-beat-c: var(--vt-warn); }
+@keyframes vt-beat { 0% { transform: scale(1); opacity: 1; } 70%, 100% { transform: scale(2.75); opacity: 0; } }
 
 .vt-app .vt-health {
 	display: grid; gap: 10px; margin-bottom: 14px;

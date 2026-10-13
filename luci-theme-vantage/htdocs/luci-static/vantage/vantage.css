@@ -483,6 +483,30 @@ html[data-rail="pinned"] .vt-frame { margin-left: var(--rail-w-pinned); }
 a.vt-crumb:hover { color: var(--text); }
 .vt-crumb-current { color: var(--text); font-weight: 600; }
 .vt-crumb-sep { color: var(--text-3); flex: none; font-family: var(--mono); font-size: var(--fs-sm); }
+/* the current crumb of a page with page tabs: opens its sibling pages */
+.vt-crumb-switch {
+	display: inline-flex; align-items: center; gap: 4px;
+	min-width: 0; margin: -4px -6px; padding: 4px 6px;
+	border: 0; border-radius: var(--r);
+	background: none;
+	font: inherit; font-weight: 600; color: var(--text);
+	cursor: pointer;
+}
+.vt-crumb-switch > span { overflow: hidden; text-overflow: ellipsis; }
+.vt-crumb-switch > svg { flex: none; width: 14px; height: 14px; color: var(--text-3); transition: transform .15s; }
+.vt-crumb-switch:hover, .vt-crumb-switch[aria-expanded="true"] { background: var(--s3); }
+.vt-crumb-switch[aria-expanded="true"] > svg { transform: rotate(90deg); }
+@media (min-width: 721px) {
+	/* the flyout as a dropdown under the crumb (left: set from the crumb) */
+	.vt-flyout.is-switch {
+		top: calc(var(--top-h) - 4px); bottom: auto; left: var(--x, var(--rail-w));
+		width: auto; min-width: 240px; max-width: 320px;
+		max-height: calc(100vh - var(--top-h) - var(--sp-4));
+		border: 1px solid var(--line-2); border-radius: var(--r-lg);
+		animation: vt-drop-in .12s ease-out;
+	}
+}
+@keyframes vt-drop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 .vt-top-actions { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
 
@@ -547,18 +571,26 @@ a.vt-crumb:hover { color: var(--text); }
 }
 #indicators > span[data-clickable] { cursor: pointer; }
 #indicators > span[data-clickable]:hover { border-color: var(--text-3); color: var(--text); }
+#indicators > span[data-indicator="poll-status"][data-style="active"] { position: relative; }
 #indicators > span[data-indicator="poll-status"][data-style="active"]::before {
 	content: ""; width: 7px; height: 7px; border-radius: 50%;
 	background: var(--accent-text);
-	box-shadow: 0 0 0 0 var(--accent-line);
+}
+/* the pulse is a ring of its own that scales and fades: the compositor
+   runs it, where an animated box-shadow repainted the page every frame */
+#indicators > span[data-indicator="poll-status"][data-style="active"]::after {
+	content: ""; position: absolute; left: 10px; top: calc(50% - 3.5px);
+	width: 7px; height: 7px; border-radius: 50%;
+	background: var(--accent-line);
+	pointer-events: none;
 	animation: vt-live 2s ease-out infinite;
 }
 #indicators > span[data-indicator="poll-status"][data-style="inactive"]::before {
 	content: ""; width: 7px; height: 7px; border-radius: 1px; background: var(--text-3);
 }
 @keyframes vt-live {
-	0% { box-shadow: 0 0 0 0 var(--accent-line); }
-	70%, 100% { box-shadow: 0 0 0 6px transparent; }
+	0% { transform: scale(1); opacity: 1; }
+	70%, 100% { transform: scale(2.7); opacity: 0; }
 }
 /* "Unsaved Changes: N" -> label + prominent count (text node stays for LuCI) */
 #indicators > span[data-indicator][data-count] {
@@ -580,35 +612,14 @@ a.vt-crumb:hover { color: var(--text); }
 }
 #indicators > span[data-indicator="media_error"] { color: var(--err); border-color: var(--err); background: var(--err-soft); }
 
-/* level-3 page tabs */
+/* level-3 page tabs: on the content column, drawn as every other tab
+   level (.vt-seg shares the .cbi-tabmenu rules below). They scroll with
+   the page; the current crumb in the top bar switches between them. */
 .vt-tabs {
-	position: sticky; top: var(--top-h); z-index: 190;
-	display: flex; gap: var(--sp-1);
-	padding: 0 var(--sp-5);
-	background: color-mix(in srgb, var(--bg) 92%, transparent);
-	backdrop-filter: blur(10px);
-	-webkit-backdrop-filter: blur(10px);
-	border-bottom: 1px solid var(--line);
-	overflow-x: auto;
-	scrollbar-width: none;
+	width: 100%; max-width: calc(var(--content-max) + 2 * var(--sp-6));
+	margin: 0 auto; padding: var(--sp-6) var(--sp-6) 0;
 }
-.vt-tabs::-webkit-scrollbar { display: none; }
-.vt-tab {
-	position: relative;
-	display: inline-flex; align-items: center;
-	height: var(--ctl-h); padding: 0 var(--sp-3);
-	color: var(--text-2);
-	font-weight: 500;
-	white-space: nowrap;
-	text-decoration: none !important;
-}
-.vt-tab:hover { color: var(--text); }
-.vt-tab[aria-current] { color: var(--text); font-weight: 600; }
-.vt-tab[aria-current]::after {
-	content: ""; position: absolute; left: var(--sp-3); right: var(--sp-3); bottom: -1px;
-	height: 2px; border-radius: 2px 2px 0 0;
-	background: var(--accent-text);
-}
+.vt-tabs:not([hidden]) + .vt-main { padding-top: var(--sp-5); }
 
 /* content column */
 .vt-main {
@@ -712,7 +723,6 @@ a.vt-crumb:hover { color: var(--text); }
 /* page = title block + a stack of cards. Cards carry a full-bleed header
    row (h3) and full-bleed tables; nested sections lose their chrome. */
 :root { --card-px: 20px; --card-py: 16px; --stick-top: var(--top-h); }
-html:has(.vt-tabs:not([hidden])) { --stick-top: calc(var(--top-h) + var(--ctl-h) + 1px); }
 
 .cbi-map { margin-bottom: var(--sp-6); }
 .cbi-map > h2, .vt-main > h2, #view > h2, #view > div > h2:first-child, .cbi-map > h2:first-child {
@@ -1391,20 +1401,12 @@ div.right, div.left { display: block; }
 div.right { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-4); }
 div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; }
 
-/* Tabs inside a page (ui.tabs), one look per level:
-   - tabs standing at page level (not inside a form section or another
-     tab) are the page's sub-pages when the menu shows no page tabs: they
-     take the page-tab underline, like .vt-tabs (Interfaces / Devices /
-     ..., DHCP's Leases / dnsmasq, Channel Analysis's radios). Under
-     .vt-tabs they are the first level inside the page instead;
-   - the first level inside a page, form or modal: a segmented control;
-   - tabs inside a tab: a side list where the pane is wide enough
-     (container query on the pane, so modals and pages alike), chips
-     where it is not and at every deeper level.
-   A level is a pane of a section's option tabs (.cbi-section-node-tabbed);
-   map-level panes are not counted, so a page's sub-pages add no level. */
-.cbi-tabmenu {
-	display: flex; flex-wrap: nowrap; align-items: center; gap: 2px;
+/* Tabs: one segmented control for every level, the menu's page tabs
+   (.vt-seg), ui.tabs at page level, in a form or modal, and tabs inside
+   a tab. Nesting shows by where a control sits, not by another look. It
+   wraps its segments instead of hiding them. */
+.cbi-tabmenu, .vt-seg {
+	display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
 	width: fit-content; max-width: 100%; min-height: var(--ctl-h);
 	margin: 0 0 var(--sp-5); padding: 2px;
 	list-style: none;
@@ -1414,9 +1416,10 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 	overflow-x: auto;
 	scrollbar-width: none;
 }
-.cbi-tabmenu::-webkit-scrollbar { display: none; }
+.vt-seg { margin: 0; }
+:is(.cbi-tabmenu, .vt-seg)::-webkit-scrollbar { display: none; }
 .cbi-tabmenu > li { position: relative; flex: none; }
-.cbi-tabmenu > li > a {
+.cbi-tabmenu > li > a, .vt-tab {
 	display: flex; align-items: center; gap: 6px;
 	height: calc(var(--ctl-h) - 6px); padding: 0 var(--sp-3);
 	border-radius: var(--r);
@@ -1425,79 +1428,8 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 	white-space: nowrap;
 	text-decoration: none !important;
 }
-.cbi-tabmenu > li > a:hover { color: var(--text); }
-.cbi-tabmenu > li.cbi-tab > a { background: var(--seg-on); color: var(--text); font-weight: 600; box-shadow: var(--seg-on-ring); }
-
-html:not(:has(.vt-tabs:not([hidden]))) #view .cbi-tabmenu:not(.cbi-section *, [data-tab-title] *) {
-	gap: var(--sp-1);
-	width: auto; padding: 0;
-	background: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
-}
-html:not(:has(.vt-tabs:not([hidden]))) #view .cbi-tabmenu:not(.cbi-section *, [data-tab-title] *) > li > a { height: var(--ctl-h); border-radius: 0; }
-html:not(:has(.vt-tabs:not([hidden]))) #view .cbi-tabmenu:not(.cbi-section *, [data-tab-title] *) > li.cbi-tab > a { background: none; box-shadow: none; }
-html:not(:has(.vt-tabs:not([hidden]))) #view .cbi-tabmenu:not(.cbi-section *, [data-tab-title] *) > li.cbi-tab::after {
-	content: ""; position: absolute; left: var(--sp-3); right: var(--sp-3); bottom: 0;
-	height: 2px; background: var(--accent-text); border-radius: 2px 2px 0 0;
-}
-
-.cbi-section-node-tabbed > [data-tab-title] { container-type: inline-size; }
-.cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu {
-	flex-wrap: wrap; gap: var(--sp-2);
-	width: auto; margin-bottom: var(--sp-4); padding: 0;
-	background: none; border: 0; border-radius: 0;
-	overflow: visible;
-}
-.cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu > li > a {
-	height: var(--ctl-h); padding: 0 14px;
-	border: 1px solid var(--line-2); border-radius: 999px;
-}
-.cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu > li.cbi-tab > a {
-	background: var(--accent-soft); border-color: var(--accent-line);
-	color: var(--accent-text); box-shadow: none;
-}
-@container (min-width: 640px) {
-	.cbi-section-node-tabbed > [data-tab-title] :has(> .cbi-tabmenu) {
-		display: grid;
-		grid-template-columns: 168px minmax(0, 1fr);
-		column-gap: var(--sp-6);
-		align-items: start;
-	}
-	.cbi-section-node-tabbed > [data-tab-title] :has(> .cbi-tabmenu) > * { grid-column: 1 / -1; }
-	.cbi-section-node-tabbed > [data-tab-title] :has(> .cbi-tabmenu) > .cbi-tabmenu + * { grid-column: 2; }
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu {
-		grid-column: 1;
-		flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 2px;
-		margin: 0;
-	}
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu > li > a {
-		justify-content: space-between;
-		padding: 0 var(--sp-3);
-		border: 0; border-radius: var(--r);
-		white-space: normal; line-height: 1.25;
-	}
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu > li > a:hover { background: var(--s3); }
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu > li.cbi-tab > a { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent-line); }
-	/* beside the list there is no card edge to bleed to: table sections and
-	   tables fit the column */
-	.cbi-section-node-tabbed > [data-tab-title] :has(> .cbi-tabmenu) > .cbi-tabmenu + * .cbi-tblsection { margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
-	.cbi-section-node-tabbed > [data-tab-title] :has(> .cbi-tabmenu) > .cbi-tabmenu + * .table { width: 100% !important; margin-left: 0; margin-right: 0; }
-	.cbi-section-node-tabbed > [data-tab-title] :has(> .cbi-tabmenu) > .cbi-tabmenu + * .table .tr > :is(.th, .td):first-child { padding-left: 0; }
-	.cbi-section-node-tabbed > [data-tab-title] :has(> .cbi-tabmenu) > .cbi-tabmenu + * .table .tr > :is(.th, .td):last-child { padding-right: 0; }
-	/* deeper levels: back to the chips above */
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-section-node-tabbed > [data-tab-title] :has(> .cbi-tabmenu) { display: block; }
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu {
-		flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
-		margin: 0 0 var(--sp-4);
-	}
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu > li > a {
-		justify-content: normal;
-		padding: 0 14px;
-		border: 1px solid var(--line-2); border-radius: 999px;
-		white-space: nowrap; line-height: inherit;
-	}
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu > li > a:hover { background: none; }
-	.cbi-section-node-tabbed > [data-tab-title] .cbi-section-node-tabbed > [data-tab-title] .cbi-tabmenu > li.cbi-tab > a { border-color: var(--accent-line); box-shadow: none; }
-}
+:is(.cbi-tabmenu > li > a, .vt-tab):hover { color: var(--text); }
+.cbi-tabmenu > li.cbi-tab > a, .vt-tab[aria-current] { background: var(--seg-on); color: var(--text); font-weight: 600; box-shadow: var(--seg-on-ring); }
 .cbi-tabmenu > li[data-errors] > a::after {
 	content: attr(data-errors);
 	display: inline-flex; align-items: center; justify-content: center;
@@ -2188,7 +2120,8 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	color: var(--text-3);
 	font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
 }
-.vt-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-text); animation: vt-live 2s ease-out infinite; }
+.vt-live-dot { position: relative; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-text); }
+.vt-live-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--accent-line); animation: vt-live 2s ease-out infinite; }
 .vt-login-error {
 	margin: 0 0 var(--sp-4);
 	padding: var(--sp-2) var(--sp-3);
@@ -2378,22 +2311,24 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	.vt-rail > .vt-brand, .vt-rail-foot { display: none; }
 	body.vt-auth .vt-shell::before { display: none; }
 	.vt-rail-list {
-		flex-direction: row; justify-content: space-around;
+		flex-direction: row; justify-content: center;
 		gap: 0; padding: 0 var(--sp-1);
 		overflow-x: auto; overflow-y: hidden;
 	}
-	.vt-rail-item { flex: 1 0 60px; padding: 6px 2px; }
+	/* the buttons stay a centred group on wider screens */
+	.vt-rail-item { flex: 1 0 60px; max-width: 104px; padding: 6px 2px; }
 	.vt-rail-link, html[data-rail="pinned"] .vt-rail-link {
 		flex-direction: column; justify-content: center; gap: 3px;
 		height: 48px; padding: 0 4px;
 	}
 	.vt-rail-link .vt-rail-label, html[data-rail="pinned"] .vt-rail-link .vt-rail-label {
 		display: block !important;
+		flex: none; /* the rail's label grows; here it would push the icon up */
 		max-width: 100%;
 		font-size: var(--fs-micro); font-weight: 500;
 		text-align: center;
 	}
-	.vt-rail-item.is-active > .vt-rail-link::before { left: 14px; right: 14px; top: -6px; bottom: auto; width: auto; height: 2px; border-radius: 0 0 2px 2px; }
+	.vt-rail-item.is-active > .vt-rail-link::before { left: calc(50% - 10px); top: -6px; bottom: auto; width: 20px; height: 3px; border-radius: 0 0 3px 3px; }
 	.vt-frame, html[data-rail="pinned"] .vt-frame { margin-left: 0; padding-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom)); }
 
 	.vt-flyout {
@@ -2422,9 +2357,11 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	.vt-search { border-color: transparent; background: none; color: var(--text-2); width: 32px; height: 32px; }
 	#indicators > span[data-indicator] { height: 28px; padding: 0 8px; }
 	#indicators > span[data-indicator="poll-status"] { font-size: 0; gap: 0; width: 28px; justify-content: center; padding: 0; }
+	#indicators > span[data-indicator="poll-status"][data-style="active"]::after { left: calc(50% - 3.5px); }
 	#indicators > span[data-indicator][data-count] { padding: 0 3px; gap: 0; }
 	#indicators > span[data-indicator][data-count]::before { content: none; }
-	.vt-tabs { padding: 0 var(--sp-2); }
+	.vt-tabs { padding: var(--sp-4) var(--sp-4) 0; }
+	.vt-tabs:not([hidden]) + .vt-main { padding-top: var(--sp-4); }
 
 	.vt-main { padding: var(--sp-4); }
 	.vt-foot { padding-bottom: var(--sp-4); }
@@ -2463,14 +2400,10 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	.cbi-value:has(> .cbi-value-field > .cbi-checkbox) > .cbi-value-title { grid-row: 1; grid-column: 2; padding: 0; }
 	.cbi-value:has(> .cbi-value-field > .cbi-checkbox) > .vt-help { grid-row: 1; grid-column: 3; }
 	.cbi-value:has(> .cbi-value-field > .cbi-checkbox) > .cbi-value-field > :not(.cbi-checkbox) { grid-column: 1 / -1; }
-	/* a segmented control wraps its segments instead of hiding them */
-	.cbi-tabmenu:not(.cbi-section-node-tabbed > [data-tab-title] *) { flex-wrap: wrap; width: auto; }
-	.cbi-tabmenu:not(.cbi-section-node-tabbed > [data-tab-title] *) > li { flex: 1 1 auto; }
-	.cbi-tabmenu:not(.cbi-section-node-tabbed > [data-tab-title] *) > li > a { justify-content: center; }
-	/* ... while an underline strip scrolls, like the page tabs */
-	html:not(:has(.vt-tabs:not([hidden]))) #view .cbi-tabmenu:not(.cbi-section *, [data-tab-title] *) { flex-wrap: nowrap; }
-	html:not(:has(.vt-tabs:not([hidden]))) #view .cbi-tabmenu:not(.cbi-section *, [data-tab-title] *) > li { flex: none; }
-	html:not(:has(.vt-tabs:not([hidden]))) #view .cbi-tabmenu:not(.cbi-section *, [data-tab-title] *) > li > a { justify-content: normal; }
+	/* a segmented control spans the width and its segments share each row */
+	.cbi-tabmenu, .vt-seg { width: auto; }
+	.cbi-tabmenu > li, .vt-tab { flex: 1 1 auto; }
+	.cbi-tabmenu > li > a, .vt-tab { justify-content: center; }
 	.cbi-dropdown, .vt-main input, .vt-main select, .control-group, .cbi-dynlist { max-width: none; }
 
 	/* tables become cards */

@@ -56,13 +56,13 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   placeholder), from `system board` via rpc in the menu script.
 - **Theme toggle**: auto / light / dark, stored in `localStorage`, applied
   in `<head>` before CSS (no flash), exposed as `html[data-darkmode]`.
-- **Tabs** (depth ≥ 3) under the top bar, underlined. Each tab level
-  inside a page has one look, and a page has one underline strip: on a
-  page without menu tabs, tabs standing at page level (Interfaces /
-  Devices / ..., Channel Analysis's radios) are its sub-pages and take
-  the underline; the first level inside a page, form or modal is a
-  segmented control; tabs inside a tab are a side list where the pane is
-  wide enough and chips where it is not, and at any deeper level.
+- **Tabs**: one segmented control for every level: the menu's page tabs
+  (depth ≥ 3, at the top of the content column), tabs at page level, in a
+  form or modal, and tabs inside a tab. Nesting shows by where a control
+  sits, not by a different look. A control wraps its segments instead of
+  hiding them; on phones the segments share each row's width. Page tabs
+  scroll with the page; on such a page the current crumb in the top bar
+  is a switcher that lists them (a dropdown, a bottom sheet on phones).
 - **Mobile** (≤ 720 px): rail becomes a drawer/bottom bar, tables become
   cards using `td[data-title]`, forms stack.
 

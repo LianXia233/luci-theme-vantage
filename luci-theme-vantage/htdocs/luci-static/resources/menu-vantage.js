@@ -701,13 +701,13 @@ return baseclass.extend({
 		list.addEventListener('keydown', ev => this.handleRailKeys(ev, list));
 
 		fly.addEventListener('pointerenter', () => this.cancelClose());
-		fly.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') this.scheduleClose(); });
+		fly.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse' && !fly.classList.contains('is-switch')) this.scheduleClose(); });
 		fly.addEventListener('keydown', ev => this.handleFlyKeys(ev));
 		if (this.scrim) this.scrim.addEventListener('click', () => this.closeFlyout(false));
 
 		document.addEventListener('click', ev => {
 			if (fly.hidden) return;
-			if (ev.target.closest('#vt-flyout') || ev.target.closest('#vt-rail')) return;
+			if (ev.target.closest('#vt-flyout') || ev.target.closest('#vt-rail') || ev.target.closest('.vt-crumb-switch')) return;
 			this.closeFlyout(false);
 		});
 
@@ -796,6 +796,7 @@ return baseclass.extend({
 	openFlyout(cat, li, link, focusFirst) {
 		const fly = this.fly;
 		this.cancelClose();
+		this.endSwitch();
 		if (fly.getAttribute('data-cat') !== cat.name || fly.hidden) {
 			fly.textContent = '';
 			const total = cat.pages.length;
@@ -851,12 +852,56 @@ return baseclass.extend({
 		this.cancelClose();
 		this.fly.hidden = true;
 		if (this.scrim) this.scrim.hidden = true;
+		this.endSwitch();
 		document.querySelectorAll('.vt-rail-item.is-open').forEach(n => {
 			n.classList.remove('is-open');
 			const b = n.querySelector('.vt-rail-link[aria-expanded]');
 			if (b) b.setAttribute('aria-expanded', 'false');
 		});
 		if (refocus && this.openLink) this.openLink.focus();
+	},
+
+	/* the flyout, filled with a page's tabs: a dropdown under the crumb, the
+	   same bottom sheet as the rail's on phones */
+	openSwitch(cat, page, btn, focusFirst) {
+		const fly = this.fly;
+		if (!fly) return;
+		this.closeFlyout(false);
+		fly.textContent = '';
+		const total = page.subs.length;
+		fly.appendChild(E('div', { 'class': 'vt-fly-head' }, [
+			svg(cat.icon, 18),
+			E('span', { 'class': 'vt-fly-title', 'id': 'vt-fly-title' }, [ page.title ]),
+			E('span', { 'class': 'vt-fly-count' }, [ '%d %s'.format(total, total === 1 ? _('page') : _('pages')) ])
+		]));
+		const ul = E('ul', { 'class': 'vt-fly-list', 'role': 'list' });
+		for (const s of page.subs)
+			ul.appendChild(E('li', {}, E('a', {
+				'class': 'vt-fly-link', 'href': L.url('admin', cat.name, page.name, s.name), 'aria-current': this.dp[3] === s.name ? 'page' : null
+			}, [ E('span', {}, [ s.title ]) ])));
+		fly.appendChild(ul);
+		fly.setAttribute('data-cat', '');
+		fly.setAttribute('role', 'region');
+		fly.setAttribute('aria-labelledby', 'vt-fly-title');
+
+		const x = Math.max(8, Math.min(btn.getBoundingClientRect().left - 8, window.innerWidth - 328));
+		fly.style.setProperty('--x', x.toFixed(0) + 'px');
+		fly.classList.add('is-switch');
+		btn.setAttribute('aria-expanded', 'true');
+		this.switchBtn = btn;
+		this.openLink = btn;
+		fly.hidden = false;
+		if (this.scrim) this.scrim.hidden = !this.mqMobile.matches;
+
+		if (focusFirst) {
+			const first = fly.querySelector('a[aria-current]') || fly.querySelector('a');
+			if (first) first.focus();
+		}
+	},
+
+	endSwitch() {
+		if (this.fly) this.fly.classList.remove('is-switch');
+		if (this.switchBtn) this.switchBtn.setAttribute('aria-expanded', 'false');
 	},
 
 	scheduleClose() {
@@ -883,11 +928,29 @@ return baseclass.extend({
 		}
 		if (!parts.length) return;
 
+		/* a page with page tabs: its current crumb switches between them,
+		   from the top bar, which stays in view while the tabs scroll away */
+		const cat = this.cats.find(c => c.name === this.dp[1]);
+		const page = cat && this.dp.length > 3 ? cat.pages.find(p => p.name === this.dp[2]) : null;
+		const siblings = page && page.subs.length > 1 ? page : null;
+
 		nav.textContent = '';
 		parts.forEach((p, i) => {
 			const last = i === parts.length - 1;
 			if (i) nav.appendChild(E('span', { 'class': 'vt-crumb-sep', 'aria-hidden': 'true' }, [ '›' ]));
-			nav.appendChild(last
+			if (last && siblings && parts.length === 3) {
+				const btn = E('button', {
+					'type': 'button', 'class': 'vt-crumb vt-crumb-current vt-crumb-switch', 'aria-current': 'page',
+					'aria-haspopup': 'true', 'aria-expanded': 'false', 'aria-controls': 'vt-flyout',
+					'title': _('Other pages in %s').format(siblings.title)
+				}, [ E('span', {}, [ p.title ]), svg('caret', 14) ]);
+				btn.addEventListener('click', ev => {
+					if (this.fly && !this.fly.hidden && this.fly.classList.contains('is-switch')) this.closeFlyout(true);
+					else this.openSwitch(cat, siblings, btn, ev.detail === 0);
+				});
+				nav.appendChild(btn);
+			}
+			else nav.appendChild(last
 				? E('span', { 'class': 'vt-crumb vt-crumb-current', 'aria-current': 'page' }, [ p.title ])
 				: E('a', { 'class': 'vt-crumb', 'href': L.url.apply(L, p.segs) }, [ p.title ]));
 		});
@@ -906,17 +969,16 @@ return baseclass.extend({
 		const tabs = ui.menu.getChildren(page);
 		if (tabs.length < 2) return;
 
-		bar.textContent = '';
+		const seg = E('div', { 'class': 'vt-seg' });
 		for (const t of tabs) {
 			const cur = this.dp[3] === t.name;
-			bar.appendChild(E('a', {
+			seg.appendChild(E('a', {
 				'class': 'vt-tab', 'href': L.url('admin', this.dp[1], this.dp[2], t.name), 'aria-current': cur ? 'page' : null
 			}, [ _(t.title) ]));
 		}
+		bar.textContent = '';
+		bar.appendChild(seg);
 		bar.hidden = false;
-		const active = bar.querySelector('[aria-current]');
-		if (active && active.scrollIntoView && bar.scrollWidth > bar.clientWidth)
-			bar.scrollLeft = active.offsetLeft - 16;
 	},
 
 	/* ------------------------------------------------------ palette */
@@ -1238,7 +1300,7 @@ return baseclass.extend({
 	setupForms() {
 		this.formsQueued = false;
 		this.helpSeq = 0;
-		this.helpSizes = window.ResizeObserver ? new ResizeObserver(entries => entries.forEach(e => this.fitHelp(e.target))) : null;
+		this.helpSizes = window.ResizeObserver ? new ResizeObserver(entries => this.fitHelps(entries.map(e => e.target))) : null;
 		if (window.MutationObserver)
 			new MutationObserver(() => this.queueForms()).observe(document.body, { childList: true, subtree: true });
 		this.decorateForms();
@@ -1319,14 +1381,26 @@ return baseclass.extend({
 	   not displayed (another tab, an unmet dependency) measures 0 and waits
 	   for the next resize notification. */
 	fitHelp(desc) {
-		if (!desc.isConnected) {
-			if (this.helpSizes) this.helpSizes.unobserve(desc);
-			return;
+		this.fitHelps([ desc ]);
+	},
+
+	/* all sizes are read before any button changes: a write between two
+	   reads forced a layout per field (66 when the Wireless modal opened) */
+	fitHelps(descs) {
+		const fits = [];
+		for (const desc of descs) {
+			if (!desc.isConnected) {
+				if (this.helpSizes) this.helpSizes.unobserve(desc);
+				continue;
+			}
+			const h = desc._vtHelp;
+			if (!h || !h.btn.isConnected || !desc.clientHeight) continue;
+			fits.push([ h, desc.scrollHeight > desc.clientHeight + 1 ]);
 		}
-		const h = desc._vtHelp;
-		if (!h || !h.btn.isConnected || !desc.clientHeight) return;
-		const cut = desc.scrollHeight > desc.clientHeight + 1;
-		h.btn.hidden = !cut && h.holder.getAttribute('data-v-help') !== 'open';
+		for (const [ h, cut ] of fits) {
+			const hide = !cut && h.holder.getAttribute('data-v-help') !== 'open';
+			if (h.btn.hidden !== hide) h.btn.hidden = hide;
+		}
 	},
 
 	/* A page title or card heading that only repeats the breadcrumb, the

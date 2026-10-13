@@ -738,7 +738,10 @@ return view.extend({
 		this.paintDrawer();
 		this.paintLive();
 		this.scheduleWires();
-		this.scheduleLayout();
+		/* the tiles' ResizeObserver lays out again when a tile changes
+		   size, so a poll lays out only when the tile set may change (the
+		   first one, wired or not); one that changes nothing measures nothing */
+		if (this.laidWired !== !!this.m.wired) { this.laidWired = !!this.m.wired; this.scheduleLayout(); }
 	},
 
 	/* ------------------------------------------------------------ folds */
