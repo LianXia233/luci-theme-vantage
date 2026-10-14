@@ -1424,6 +1424,33 @@ table { border-collapse: separate; border-spacing: 0; width: 100%; }
 .td.cbi-section-actions, .th.cbi-section-actions { text-align: right; white-space: nowrap; width: 1%; }
 .td.cbi-section-actions > div { display: inline-flex; gap: 4px; flex-wrap: nowrap; align-items: center; }
 .td.cbi-section-actions .btn, .td.cbi-section-actions .cbi-button { padding: 0 10px; }
+/* three or more row actions: the main one plus ⋯ (menu-vantage.js
+   decorateRowActions); LuCI's other buttons stay in place, hidden, and
+   the menu clicks them */
+.vt-acts > .vt-acts-hidden { display: none !important; }
+.td.cbi-section-actions .vt-acts-more { width: var(--ctl-h); padding: 0; justify-content: center; }
+/* one width for the main action, so rows line up (Edit under Scan) */
+.td.cbi-section-actions .vt-acts > :not(.vt-acts-hidden, .vt-acts-more, .drag-handle) { min-width: 76px; justify-content: center; }
+.vt-acts-more svg { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+.vt-actmenu {
+	position: fixed; z-index: 1100;
+	display: flex; flex-direction: column; gap: 2px;
+	min-width: 168px; max-width: calc(100vw - 16px); padding: 6px;
+	border: 1px solid var(--line-2); border-radius: var(--r);
+	background: var(--s2); box-shadow: var(--shadow-pop);
+}
+.vt-actmenu[hidden] { display: none; }
+.vt-actmenu-item {
+	display: flex; align-items: center;
+	min-height: var(--ctl-h); padding: 0 12px;
+	border: 0; border-radius: var(--r-sm);
+	background: transparent; color: var(--text);
+	font: inherit; font-size: var(--fs-base); text-align: left; white-space: nowrap; cursor: pointer;
+}
+.vt-actmenu-item:hover { background: var(--s3); }
+.vt-actmenu-item:focus-visible { background: var(--s3); outline: 2px solid var(--focus); outline-offset: -2px; }
+.vt-actmenu-item.is-danger { color: var(--err); }
+.vt-actmenu-item[disabled] { opacity: .5; cursor: default; }
 .drag-handle { cursor: grab; color: var(--text-3); padding: 0 6px; font-family: var(--mono); }
 .drag-over-above > .td, .drag-over-above > td { box-shadow: inset 0 2px 0 var(--accent-text); }
 .drag-over-below > .td, .drag-over-below > td { box-shadow: inset 0 -2px 0 var(--accent-text); }
@@ -2360,6 +2387,57 @@ html[data-darkmode="true"] #adb-dash { --adb-blocked: #e8897e; --adb-allowed: #6
 html[data-darkmode="false"] :is(#ban-status, #ban-report) { --ban-ok: #1f8a5f; --ban-err: #c0392b; --ban-info: #2f6fb0; }
 html[data-darkmode="true"] :is(#ban-status, #ban-report) { --ban-ok: #63c79b; --ban-err: #e8897e; --ban-info: #7fb3e8; }
 
+/* Network -> Firewall: what a rule does reads at a glance. LuCI marks a
+   rule's raw target on its action (var[data-tooltip], never translated)
+   and each policy on its select's option values, so none of this depends
+   on the language. */
+.cbi-section-table .td var { font-style: normal; }
+.cbi-section-table .td var:is([data-tooltip="ACCEPT"], [data-tooltip="REJECT"], [data-tooltip="DROP"],
+	[data-tooltip="DNAT"], [data-tooltip="SNAT"], [data-tooltip="MASQUERADE"], [data-tooltip="NOTRACK"], [data-tooltip="HELPER"]) {
+	display: inline-block; padding: 0 7px; margin-right: 2px;
+	border-radius: var(--r-sm);
+	background: var(--s3); color: var(--text);
+	font: 600 var(--fs-sm)/1.65 var(--font);
+}
+.cbi-section-table .td var[data-tooltip="ACCEPT"] { background: var(--ok-soft); color: var(--ok-text); }
+.cbi-section-table .td var:is([data-tooltip="REJECT"], [data-tooltip="DROP"]) { background: var(--err-soft); color: var(--err); }
+.cbi-section-table .td var:is([data-tooltip="DNAT"], [data-tooltip="SNAT"], [data-tooltip="MASQUERADE"]) { background: var(--info-soft); color: var(--info); }
+/* the match: values upright, the family/protocol line quieter than
+   where the traffic comes from and goes to */
+[id^="cbi-firewall-"] .cbi-section-table .td > small:has(> br) { display: block; font-size: var(--fs-base); line-height: 1.8; }
+[id^="cbi-firewall-"] .cbi-section-table .td > small:has(> br) > span:first-child { color: var(--text-3); font-size: var(--fs-sm); }
+[id^="cbi-firewall-"] .cbi-section-table .td > small:has(> br) > span:first-child var { color: inherit; }
+[id^="cbi-firewall-"] .cbi-section-table .td small var:not([data-tooltip]) { font-size: .92em; }
+/* names: tabular figures would widen their hyphens ("Allow - Ping") */
+.cbi-section-table .td.cbi-section-table-titles { font-variant-numeric: normal; }
+/* a zone badge coloured with a plain hex (Port Forwards' target zone)
+   gets the same tint and edge as the rgb ones above */
+.zonebadge[style*="background-color:#"] {
+	padding-left: 10px;
+	border-color: var(--line-2) !important; color: var(--text) !important;
+	background-image: linear-gradient(to right, transparent 3px, color-mix(in srgb, var(--s2) calc(100% - var(--zone-mix) * 100%), transparent) 3px);
+}
+.zone-forwards :is(.zone-src, .zone-dest) { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.zonebadge.zonebadge-empty { background: transparent !important; border-style: dashed; color: var(--text-2) !important; box-shadow: none; }
+/* zone and default policies: reject and drop in red, accept in green */
+select[id^="widget.cbid.firewall."]:has(> option:checked:is([value="REJECT"], [value="DROP"])) { color: var(--err); font-weight: 600; }
+select[id^="widget.cbid.firewall."]:has(> option:checked[value="ACCEPT"]) { color: var(--ok-text); font-weight: 600; }
+select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 400; }
+/* except where accept is the risk: the masquerading (internet-facing)
+   zone accepting input, or forwarding into another zone. Green says
+   "passes", not "safe"; these two get the warning colour instead. */
+#cbi-firewall-zone .tr:has(input[data-widget-id$=".masq"]:checked) > .td[data-name="input"] select:has(> option:checked[value="ACCEPT"]) {
+	color: var(--warn); border-color: var(--warn); background-color: var(--warn-soft);
+}
+#cbi-firewall-zone .tr:has(input[data-widget-id$=".masq"]:checked) .zone-dest > .zonebadge:not(.zonebadge-empty) {
+	outline: 2px solid var(--warn); outline-offset: 1px;
+}
+/* the zones table squeezed its policy selects to 42 px at 721-900 px; a
+   wider table scrolls inside its card instead */
+#cbi-firewall-zone .td select { min-width: 7.5em; }
+/* a rule that is switched off looks off, from the moment it is unticked */
+[id^="cbi-firewall-"] .tr:has(input[data-widget-id$=".enabled"]:not(:checked)) > .td:not(.cbi-section-actions):not(:has(input[data-widget-id$=".enabled"])) { opacity: .45; }
+
 /* ----------------------------------------------------- responsive */
 
 @media (max-width: 1100px) {
@@ -2549,6 +2627,19 @@ html[data-darkmode="true"] :is(#ban-status, #ban-report) { --ban-ok: #63c79b; --
 	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions > div { flex-wrap: wrap; }
 	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions::before { display: none !important; }
 	:is(.vt-main, .modal) .table .tr:hover > .td { background: none; }
+	/* firewall rules: the on/off switch sits in the card's corner, the
+	   match runs full width */
+	[id^="cbi-firewall-"] .table .tr:has(> .td input[data-widget-id$=".enabled"]) { position: relative; }
+	[id^="cbi-firewall-"] .table .tr > .td:has(input[data-widget-id$=".enabled"]) {
+		position: absolute; top: 10px; right: var(--card-px);
+		flex: none; width: auto !important; padding: 0 !important;
+	}
+	[id^="cbi-firewall-"] .table .tr > .td:has(input[data-widget-id$=".enabled"])::before { display: none; }
+	[id^="cbi-firewall-"] .table .tr:has(> .td input[data-widget-id$=".enabled"]) > .td.cbi-section-table-titles { padding-right: calc(var(--card-px) + 40px) !important; }
+	[id^="cbi-firewall-"] .table .tr > .td:has(> small > br) { flex-basis: 100% !important; }
+	/* "From … To …" and a coloured verdict say what they are: no column labels */
+	[id^="cbi-firewall-"] .table .tr:has(> .td input[data-widget-id$=".enabled"]) > .td:has(small, var[data-tooltip])::before { display: none; }
+	[id^="cbi-firewall-"] .table .td > small:has(> br) { line-height: 1.6; }
 	.cbi-section .table, .cbi-section .cbi-section-table { border: 0; }
 	.cbi-progressbar { max-width: none; }
 	.network-status-table > .ifacebox { max-width: none; }

@@ -46,8 +46,10 @@ without the app.
   and storage, each with a one-line reason
 - Network path from gateway to access point, radios and SSIDs; click any
   node for details
-- Live throughput for the uplink and every radio (last 5 minutes), radio
-  cards with channel, width, TX power and noise
+- Live throughput for the uplink and every radio (last 5 minutes), in the
+  chart style you pick under Customize (overlaid, log scale, mirrored or
+  separate lanes),
+  radio cards with channel, width, TX power and noise
 - Clients with human names (your alias, reverse DNS, mDNS, DHCP hints, WPS
   device name, vendor, or "Private device" for randomised MACs), signal,
   link rate, Wi-Fi generation, live traffic and an experience score with
@@ -56,6 +58,9 @@ without the app.
   retries; rename a device in place
 - Top talkers, wireless networks, system tile (CPU per core, memory,
   storage, firmware)
+- Firewall overview (Network → Firewall → Overview): what is open from the
+  internet, which zone reaches which, what is switched off, and warnings
+  for the risky cases; every item links to the LuCI page that changes it
 - Your own layout: drag tiles, change their width or hide them; saved in
   the browser for each screen size, with a reset to the default
 
@@ -193,7 +198,11 @@ node security-tests/test_acl_policy.js
   names, goes through the plugin's `set_alias`, which validates the name
   and MAC on the device and writes only `/etc/config/vantage` (at most 512
   names); it is in its own group, `luci-app-vantage-names`. No group grants
-  uci writes.
+  uci writes. The firewall overview reads the `firewall` config (and the
+  interface status, to find the uplink) and is
+  shown only to sessions that hold LuCI's own `luci-app-firewall` group,
+  which already reads and changes that config; the app grants nothing for
+  it.
 - **No markup from data.** Every DOM node is built with `E()` and text
   nodes; `check_dom_sinks.js` rejects `innerHTML` and other HTML sinks.
 - **Templates.** `test_templates.js` renders the theme's templates with

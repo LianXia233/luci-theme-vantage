@@ -47,7 +47,8 @@ const ICONS = {
 	auto: [ [ 'circle', { cx: '12', cy: '12', r: '8' } ], [ 'path', { d: 'M12 4a8 8 0 0 1 0 16z', 'class': 'vt-fill' } ] ],
 	logout: [ [ 'path', { d: 'M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14' } ], [ 'path', { d: 'M10 8l-4 4 4 4M6 12h10' } ] ],
 	pin: [ [ 'path', { d: 'M4 5v14M9 12h11M15 7l5 5-5 5' } ] ],
-	info: [ [ 'circle', { cx: '12', cy: '12', r: '8.5' } ], [ 'path', { d: 'M12 11v5.5' } ], [ 'circle', { cx: '12', cy: '7.75', r: '.6' } ] ]
+	info: [ [ 'circle', { cx: '12', cy: '12', r: '8.5' } ], [ 'path', { d: 'M12 11v5.5' } ], [ 'circle', { cx: '12', cy: '7.75', r: '.6' } ] ],
+	more: [ [ 'circle', { cx: '5.5', cy: '12', r: '.9' } ], [ 'circle', { cx: '12', cy: '12', r: '.9' } ], [ 'circle', { cx: '18.5', cy: '12', r: '.9' } ] ]
 };
 
 function iconFor(name) {
@@ -1394,6 +1395,121 @@ return baseclass.extend({
 		document.querySelectorAll(':is(.cbi-map-descr, .cbi-section-descr):not(:has(> .vt-help))')
 			.forEach(desc => this.addIntroHelp(desc));
 		this.markRepeats();
+		this.decorateRowActions();
+	},
+
+	/* ---------------------------------------------- row action menus */
+
+	/* A table row with three or more actions keeps its main one (Edit, else
+	   LuCI's "important" button) and gets a ⋯ button listing the rest.
+	   LuCI's buttons stay where LuCI put them, only hidden: a menu item
+	   clicks the original, so the handler, any confirmation and the current
+	   label (Enable or Disable) are LuCI's own. The drag handle stays. */
+	decorateRowActions() {
+		document.querySelectorAll('.cbi-section-actions > div').forEach(box => {
+			if (box.closest('.vt-app')) return;
+			const btns = Array.prototype.filter.call(box.children, n =>
+				n.matches('button, .btn, .cbi-button, input[type="button"], input[type="submit"]') &&
+				!n.matches('.drag-handle, .vt-acts-more') && !n.hidden && n.style.display !== 'none');
+			const more = box.querySelector(':scope > .vt-acts-more');
+			if (btns.length < 3) {
+				if (more) more.remove();
+				box.classList.remove('vt-acts');
+				btns.forEach(b => b.classList.remove('vt-acts-hidden'));
+				return;
+			}
+			const main = btns.find(b => b.matches('.cbi-button-edit')) || btns.find(b => b.matches('.important')) || btns[0];
+			btns.forEach(b => b.classList.toggle('vt-acts-hidden', b !== main));
+			box.classList.add('vt-acts');
+			if (!more) box.appendChild(this.moreButton(box));
+		});
+	},
+
+	moreButton(box) {
+		const btn = E('button', {
+			'type': 'button', 'class': 'cbi-button cbi-button-neutral vt-acts-more',
+			'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': _('More actions'), 'title': _('More actions')
+		}, [ svg('more', 18) ]);
+		btn.addEventListener('click', ev => {
+			ev.preventDefault();
+			if (this.actBtn === btn) this.closeActMenu(false);
+			else this.openActMenu(btn, box, ev.detail === 0, false);
+		});
+		btn.addEventListener('keydown', ev => {
+			if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+			ev.preventDefault();
+			this.openActMenu(btn, box, true, ev.key === 'ArrowUp');
+		});
+		return btn;
+	},
+
+	actMenuEl() {
+		if (this.actMenu) return this.actMenu;
+		const menu = E('div', { 'id': 'vt-actmenu', 'class': 'vt-actmenu', 'role': 'menu', 'aria-label': _('More actions'), 'hidden': 'hidden' });
+		menu.addEventListener('keydown', ev => {
+			const items = Array.prototype.filter.call(menu.querySelectorAll('[role="menuitem"]'), n => !n.disabled);
+			const i = items.indexOf(document.activeElement);
+			if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); this.closeActMenu(true); }
+			else if (ev.key === 'Tab') this.closeActMenu(false);
+			else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Home' || ev.key === 'End') {
+				ev.preventDefault();
+				const n = items.length;
+				const to = ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : ev.key === 'ArrowDown' ? (i + 1) % n : (i - 1 + n) % n;
+				if (items[to]) items[to].focus();
+			}
+		});
+		document.addEventListener('pointerdown', ev => {
+			if (this.actBtn && !menu.contains(ev.target) && !this.actBtn.contains(ev.target)) this.closeActMenu(false);
+		}, true);
+		window.addEventListener('resize', () => this.closeActMenu(false));
+		window.addEventListener('scroll', () => this.closeActMenu(false), true);
+		document.body.appendChild(menu);
+		return (this.actMenu = menu);
+	},
+
+	openActMenu(btn, box, focusFirst, focusLast) {
+		this.closeActMenu(false);
+		const menu = this.actMenuEl();
+		menu.textContent = '';
+		box.querySelectorAll(':scope > .vt-acts-hidden').forEach(orig => {
+			const label = orig.tagName === 'INPUT' ? orig.value : orig.textContent.trim();
+			const item = E('button', {
+				'type': 'button', 'role': 'menuitem', 'tabindex': '-1',
+				'class': 'vt-actmenu-item' + (orig.matches('.cbi-button-remove, .cbi-button-negative, .remove') ? ' is-danger' : ''),
+				'disabled': orig.disabled ? 'disabled' : null
+			}, [ label ]);
+			item.addEventListener('click', () => {
+				this.closeActMenu(true);
+				orig.click();
+			});
+			menu.appendChild(item);
+		});
+		menu.hidden = false;
+		/* below the button, or above it when the screen (or the phone's
+		   bottom bar) leaves no room; right edges aligned */
+		const r = btn.getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
+		const rail = this.mqMobile && this.mqMobile.matches ? document.querySelector('.vt-rail') : null;
+		const floor = rail ? rail.getBoundingClientRect().top : window.innerHeight;
+		const top = r.bottom + 6 + h <= floor - 8 ? r.bottom + 6 : Math.max(8, r.top - 6 - h);
+		const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+		menu.style.top = top.toFixed(0) + 'px';
+		menu.style.left = left.toFixed(0) + 'px';
+		btn.setAttribute('aria-expanded', 'true');
+		this.actBtn = btn;
+		if (focusFirst) {
+			const items = Array.prototype.filter.call(menu.querySelectorAll('[role="menuitem"]'), n => !n.disabled);
+			const target = focusLast ? items[items.length - 1] : items[0];
+			if (target) target.focus();
+		}
+	},
+
+	closeActMenu(refocus) {
+		const btn = this.actBtn;
+		if (!btn) return;
+		this.actBtn = null;
+		if (this.actMenu) this.actMenu.hidden = true;
+		btn.setAttribute('aria-expanded', 'false');
+		if (refocus && btn.isConnected) btn.focus();
 	},
 
 	/* Help text shows its first line; (i) unfolds the rest. LuCI also puts

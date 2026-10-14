@@ -30,11 +30,17 @@
  *   granted, and every grant is used by a declare (no stale privilege);
  *   `session access` is the only call left to the platform (rpcd grants it
  *   to every session through its `unauthenticated` group);
- * - calls on uci objects name the `vantage` config literally; file.read
+ * - calls on uci objects name the `vantage` config literally, except the
+ *   firewall overview (view/vantage/firewall.js), which reads `firewall`
+ *   with uci get, finds the uplink with network.interface dump and
+ *   declares nothing else; file.read
  *   calls name a granted path literally; no `fs` module, no fs.exec;
  * - the view probes exactly the names group (write) and the rdns group
  *   (read);
- * - the menu entry is gated by the read group.
+ * - the dashboard's menu entry is gated by the read group; the firewall
+ *   overview's (Network -> Firewall -> Overview) by luci-app-firewall,
+ *   LuCI's own group for the firewall pages, which already lets its holder
+ *   read and change `firewall`: the app grants nothing for it.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -52,6 +58,7 @@ const READ_GROUP = 'luci-app-vantage';
 const RDNS_GROUP = 'luci-app-vantage-rdns';
 const WRITE_GROUP = 'luci-app-vantage-names';
 const PLUGIN_OBJECT = 'luci.vantage';
+const FIREWALL_VIEW = 'view/vantage/firewall.js';
 
 /* the complete read allowlist: object -> methods */
 const READ_UBUS = {
@@ -270,7 +277,7 @@ test('uci calls name the vantage config; file.read names a granted path', () => 
 		for (const [ v, d ] of vars) {
 			for (const m of text.matchAll(new RegExp('\\b' + v + '\\(([^,)]*)', 'g'))) {
 				const arg = m[1].trim();
-				if (d.obj === 'uci') assert.equal(arg, "'vantage'", `${file}: ${v}(${arg}) (uci ${d.method})`);
+				if (d.obj === 'uci') assert.equal(arg, file.endsWith(FIREWALL_VIEW) ? "'firewall'" : "'vantage'", `${file}: ${v}(${arg}) (uci ${d.method})`);
 				if (d.obj === 'file') {
 					assert.match(arg, /^'[^']+'$/, `${file}: ${v}(${arg}) with a non-literal path`);
 					assert.ok(Object.prototype.hasOwnProperty.call(READ_FILES, arg.slice(1, -1)), `${file}: ${v}(${arg}) not granted`);
@@ -286,6 +293,20 @@ test('the view probes the names and rdns groups; the menu is gated by the read g
 	const view = sources.find(s => s.file.endsWith('view/vantage/overview.js')).text;
 	const probes = [ ...view.matchAll(/callAccess\('access-group', '([^']+)', '(\w+)'\)/g) ].map(m => m[1] + ' ' + m[2]);
 	assert.deepEqual(probes, [ WRITE_GROUP + ' write', RDNS_GROUP + ' read' ]);
-	assert.deepEqual(Object.keys(menu), [ 'admin/dashboard' ]);
+	assert.deepEqual(Object.keys(menu), [ 'admin/dashboard', 'admin/network/firewall/overview' ]);
 	assert.deepEqual(menu['admin/dashboard'].depends.acl, [ READ_GROUP ]);
+});
+
+test('the firewall overview: behind LuCI\'s firewall group, uci get on firewall and the interface dump, nothing else declared', () => {
+	const entry = menu['admin/network/firewall/overview'];
+	assert.deepEqual(entry.action, { type: 'view', path: 'vantage/firewall' });
+	assert.deepEqual(entry.depends, { acl: [ 'luci-app-firewall' ], uci: { firewall: true } });
+	/* no Vantage group mentions the firewall config */
+	for (const [ name, g ] of Object.entries(acl))
+		for (const kind of [ 'read', 'write' ])
+			assert.ok(!((g[kind] || {}).uci || []).includes('firewall'), `${name}.${kind}: uci firewall`);
+	const src = sources.find(s => s.file.endsWith(FIREWALL_VIEW));
+	assert.ok(src, 'found the view');
+	const declares = [ ...src.text.matchAll(/rpc\.declare\(\{\s*object:\s*'([^']+)',\s*method:\s*'([^']+)'/g) ].map(m => m[1] + ' ' + m[2]);
+	assert.deepEqual(declares, [ 'uci get', 'network.interface dump' ]);
 });

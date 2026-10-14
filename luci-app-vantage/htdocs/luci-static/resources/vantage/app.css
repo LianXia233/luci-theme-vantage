@@ -334,6 +334,19 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-edit-hidden:empty { display: none; }
 .vt-app .vt-edit-hidden .vt-fchip .vt-ico { width: 13px; height: 13px; }
 .vt-app .vt-editbar-actions { display: flex; gap: 8px; margin-left: auto; }
+.vt-app .vt-edit-field { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vt-app .vt-edit-field label { font-size: var(--vt-fs-sm); color: var(--vt-text-2); white-space: nowrap; }
+.vt-app .vt-select {
+	appearance: none; -webkit-appearance: none; min-width: 0; max-width: 100%;
+	height: var(--vt-ctl); padding: 0 30px 0 10px; margin: 0;
+	border: 1px solid var(--vt-line-2); border-radius: var(--vt-r-ctl);
+	color: var(--vt-text); font: inherit; font-size: var(--vt-fs-base); box-shadow: none; cursor: pointer;
+	/* the chevron, as the theme's selects draw it */
+	background: var(--vt-surface) no-repeat;
+	background-image: linear-gradient(45deg, transparent 50%, var(--vt-text-3) 50%), linear-gradient(135deg, var(--vt-text-3) 50%, transparent 50%);
+	background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px, 5px 5px;
+}
+.vt-app .vt-select:hover { border-color: var(--vt-text-3); }
 @container vt (max-width: 699px) {
 	.vt-app .vt-editbar { padding: 8px 8px 8px 12px; gap: 8px; }
 	.vt-app .vt-editbar-text { flex-basis: 0; }
@@ -768,11 +781,21 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-series-line { fill: none; stroke: var(--vt-sc); stroke-width: 1.75; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
 .vt-app .vt-series-area { stroke: none; }
 .vt-app .vt-chart-mid { fill: none; stroke: color-mix(in oklab, var(--vt-chart-axis) 55%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+/* scale labels sit just above their line (top set per style), or just
+   below it */
 .vt-app .vt-mult-max {
-	position: absolute; right: 0; top: -3px; transform: translateY(-100%);
+	position: absolute; right: 0; top: 0; transform: translateY(calc(-100% - 3px));
 	font-size: var(--vt-fs-micro); line-height: 1; color: var(--vt-chart-axis); white-space: nowrap; pointer-events: none;
 }
-.vt-app .vt-mult-max-up { top: auto; bottom: -3px; transform: translateY(100%); }
+.vt-app .vt-mult-max-below { transform: translateY(3px); }
+/* a stretch without samples: hatched, named when there's room */
+.vt-app .vt-mult-gap {
+	position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+	border-radius: 3px; pointer-events: none;
+	background: repeating-linear-gradient(135deg, var(--vt-chart-grid) 0 2px, transparent 2px 6px);
+	font-size: var(--vt-fs-micro); line-height: 1; color: var(--vt-chart-axis); white-space: nowrap;
+}
+.vt-app .vt-mult-gap span { padding: 2px 4px; border-radius: 3px; background: var(--vt-surface); }
 .vt-app .vt-mult-dot {
 	position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; z-index: 2;
 	background: var(--vt-sc); box-shadow: 0 0 0 2px var(--vt-surface); pointer-events: none;
@@ -1097,6 +1120,67 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-rename-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .vt-app .vt-rename-actions .vt-hint { flex-basis: 100%; font-size: var(--vt-fs-micro); }
 .vt-app .vt-form-err { color: var(--vt-err); font-size: var(--vt-fs-sm); }
+
+/* ------------------------------------------- 11b. firewall overview */
+/* view/vantage/firewall.js: warnings, then tiles for what is open from
+   the internet, the zones and what is switched off */
+.vt-app .vt-fg-warns { display: grid; gap: 10px; margin-bottom: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+/* a warning's title is a sentence, not the dashboard's small caps label */
+.vt-app .vt-fg-warns .vt-chip-title { text-transform: none; letter-spacing: 0; font-size: var(--vt-fs-base); font-weight: 650; color: var(--vt-text); }
+.vt-app .vt-fg-warns .vt-chip-reason { margin-top: 2px; }
+.vt-app .vt-fg-grid { display: grid; gap: 14px; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+.vt-app .vt-fg-group {
+	margin: 2px 0 4px; color: var(--vt-text-3);
+	font-size: var(--vt-fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+}
+.vt-app .vt-fg-rows + .vt-fg-group { margin-top: 14px; }
+.vt-app .vt-fg-rows { display: flex; flex-direction: column; }
+.vt-app .vt-fg-row {
+	display: flex; align-items: center; gap: 12px;
+	min-height: var(--vt-ctl); padding: 8px 10px; margin: 0 -10px;
+	border-radius: var(--vt-r-sm); color: var(--vt-text); text-decoration: none;
+}
+.vt-app .vt-fg-row + .vt-fg-row { box-shadow: inset 0 1px 0 var(--vt-line); }
+.vt-app .vt-fg-row:hover { background: var(--vt-surface-2); text-decoration: none; }
+.vt-app .vt-fg-row-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.vt-app .vt-fg-row-name { font-size: var(--vt-fs-base); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vt-app .vt-fg-row-sub { color: var(--vt-text-3); font-size: var(--vt-fs-sm); }
+.vt-app .vt-fg-anywhere { color: var(--vt-text-2); }
+.vt-app .vt-fg-to { flex: none; display: inline-flex; align-items: center; gap: 6px; max-width: 45%; color: var(--vt-text-2); font-size: var(--vt-fs-sm); }
+.vt-app .vt-fg-to > .vt-mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vt-app .vt-fg-to .vt-ico, .vt-app .vt-fg-zone-to > .vt-ico { flex: none; width: 15px; height: 15px; color: var(--vt-text-3); }
+.vt-app .vt-fg-std { margin-top: 12px; }
+.vt-app .vt-fg-std > summary { cursor: pointer; padding: 4px 0; color: var(--vt-text-2); font-size: var(--vt-fs-sm); }
+.vt-app .vt-fg-std > .vt-hint { margin: 2px 0 6px; }
+.vt-app .vt-fg-zones { display: flex; flex-direction: column; }
+.vt-app .vt-fg-zone { padding: 10px 0; }
+.vt-app .vt-fg-zone:first-child { padding-top: 0; }
+.vt-app .vt-fg-zone + .vt-fg-zone { border-top: 1px solid var(--vt-line); }
+.vt-app .vt-fg-zone-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.vt-app .vt-fg-zone-name { font-size: var(--vt-fs-md); font-weight: 650; }
+.vt-app .vt-fg-tag {
+	padding: 1px 7px; border-radius: 999px;
+	background: var(--vt-info-soft); color: color-mix(in oklab, var(--vt-info) 80%, var(--vt-text));
+	font-size: var(--vt-fs-micro); font-weight: 600;
+}
+.vt-app .vt-fg-zone-in { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--vt-text-3); font-size: var(--vt-fs-sm); }
+.vt-app .vt-fg-pol { padding: 1px 8px; border-radius: var(--vt-r-sm); font-size: var(--vt-fs-sm); font-weight: 600; }
+.vt-app .vt-fg-pol.is-accept { background: var(--vt-ok-soft); color: color-mix(in oklab, var(--vt-ok) 72%, var(--vt-text)); }
+.vt-app .vt-fg-pol.is-stop { background: var(--vt-err-soft); color: color-mix(in oklab, var(--vt-err) 80%, var(--vt-text)); }
+.vt-app .vt-fg-pol.is-risk { background: var(--vt-warn-soft); color: color-mix(in oklab, var(--vt-warn) 65%, var(--vt-text)); box-shadow: inset 0 0 0 1px var(--vt-warn); }
+.vt-app .vt-fg-zone-to { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.vt-app .vt-fg-dests { display: flex; flex-wrap: wrap; gap: 6px; }
+.vt-app .vt-fg-dest { padding: 1px 8px; border: 1px solid var(--vt-line-2); border-radius: var(--vt-r-sm); font-size: var(--vt-fs-sm); font-weight: 600; }
+.vt-app .vt-fg-dest.is-risk { border-color: var(--vt-warn); background: var(--vt-warn-soft); }
+.vt-app .vt-fg-nets { margin-top: 4px; }
+.vt-app .vt-fg-note {
+	display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; padding: 8px 10px;
+	border-radius: var(--vt-r-sm); background: var(--vt-info-soft); color: var(--vt-text-2);
+	font-size: var(--vt-fs-sm); text-decoration: none;
+}
+.vt-app a.vt-fg-note:hover { color: var(--vt-text); text-decoration: none; }
+.vt-app .vt-fg-note > .vt-ico { flex: none; width: 15px; height: 15px; margin-top: 1px; color: var(--vt-info); }
+.vt-app .vt-fg-foot { margin: 12px 0 0; }
 
 /* ------------------------------------------------ 12. small screens, motion */
 

@@ -124,6 +124,110 @@ return baseclass.extend({
 		}).join('');
 	},
 
+	/* Throughput chart styles, the default first. chartGeom maps a value
+	   to a height for each direction (frac: 0 at the top of the plot, 1 at
+	   the bottom) and gives the baselines, grid lines and scale labels.
+	   Linear scales never go below CHART_FLOOR, so an idle link stays a
+	   flat line, and round up with niceCeil. */
+	CHART_STYLES: [ 'overlay', 'log', 'mirror', 'mirror-split', 'lanes' ],
+	CHART_FLOOR: 1e4,
+
+	chartGeom: function(style, peakDn, peakUp) {
+		var self = this, floor = this.CHART_FLOOR;
+		var pd = finite(peakDn) ? peakDn : 0, pu = finite(peakUp) ? peakUp : 0;
+		var nice = function(v) { return self.niceCeil(Math.max(v * 1.05, floor)); };
+		var clamp = function(x) { return Math.max(0, Math.min(1, x)); };
+		/* a direction drawn over [top, base] (rising) or [base, top] (hanging) */
+		var lin = function(scale, top, base) {
+			return { scale: scale, base: base, flip: base < top,
+				frac: function(v) { return base + (top - base) * clamp(v / scale); } };
+		};
+		var shared = nice(Math.max(pd, pu)), sd = nice(pd), su = nice(pu);
+		switch (style) {
+		case 'log':
+			/* a grid line per x10 from 1 kbit/s (less sits on the baseline)
+			   to at least 1 Mbit/s, so idle chatter stays low */
+			var lo = 1e3, hi = Math.max(1e6, Math.pow(10, Math.ceil(Math.log10(Math.max(pd, pu, 1) * 1.05))));
+			var span = Math.log10(hi / lo), grid = [];
+			var lf = function(v) { return 1 - clamp(Math.log10(Math.max(v, lo) / lo) / span); };
+			for (var v = lo * 10; v < hi; v *= 10) grid.push(lf(v));
+			var dir = { scale: hi, base: 1, flip: false, frac: lf };
+			return { dn: dir, up: dir, grid: [ 0 ].concat(grid), axis: [ 1 ],
+				labels: [ { at: 0, v: hi }, { at: 1, v: lo, below: true } ] };
+		case 'mirror':
+			return { dn: lin(shared, 0, .5), up: lin(shared, 1, .5), grid: [ 0, 1 ], axis: [ .5 ],
+				labels: [ { at: 0, v: shared }, { at: 1, v: shared, below: true } ] };
+		case 'mirror-split':
+			return { dn: lin(sd, 0, .5), up: lin(su, 1, .5), grid: [ 0, 1 ], axis: [ .5 ],
+				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: 1, v: su, dir: 'up', below: true } ] };
+		case 'lanes':
+			return { dn: lin(sd, 0, .44), up: lin(su, .6, 1), grid: [ 0, .6 ], axis: [ .44, 1 ],
+				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: 1, v: su, dir: 'up', below: true } ] };
+		default:
+			return { dn: lin(shared, 0, 1), up: lin(shared, 0, 1), grid: [ 0, .5 ], axis: [ 1 ],
+				labels: [ { at: 0, v: shared } ] };
+		}
+	},
+
+	/* Like segments(), with y = frac(v) * h for any scale */
+	trace: function(series, idx, t0, t1, w, h, maxGap, frac) {
+		var segs = [], cur = null, lastT = null, span = (t1 - t0) || 1;
+		(series || []).forEach(function(p) {
+			var v = p[idx];
+			if (!finite(v) || p[0] < t0 - (maxGap || 0)) { cur = null; return; }
+			if (cur && maxGap && lastT != null && p[0] - lastT > maxGap) cur = null;
+			if (!cur) { cur = []; segs.push(cur); }
+			cur.push([ r1((p[0] - t0) / span * w), r1(frac(v) * h) ]);
+			lastT = p[0];
+		});
+		return segs;
+	},
+
+	/* Stretches of [t0, t1] without samples (the page was hidden, polls
+	   failed), as [ x0, x1 ] fractions of the width */
+	gaps: function(series, t0, t1, maxGap) {
+		var out = [], span = (t1 - t0) || 1, prev = null;
+		(series || []).forEach(function(p) {
+			if (!Array.isArray(p) || !finite(p[0])) return;
+			if (prev != null && p[0] - prev > maxGap && p[0] > t0)
+				out.push([ Math.max(0, (prev - t0) / span), Math.min(1, (p[0] - t0) / span) ]);
+			prev = p[0];
+		});
+		return out;
+	},
+
+	/* Smooth path through each segment: monotone cubic (Fritsch-Carlson),
+	   so the curve never overshoots a sample */
+	curvePath: function(segs) {
+		return (segs || []).filter(function(s) { return s.length > 0; }).map(function(p) {
+			var n = p.length, d = [], m = [], i;
+			if (n < 3) return n === 1 ? 'M' + p[0][0] + ' ' + p[0][1] + 'h0.1' : 'M' + p[0][0] + ' ' + p[0][1] + 'L' + p[1][0] + ' ' + p[1][1];
+			for (i = 0; i < n - 1; i++) d.push((p[i + 1][1] - p[i][1]) / ((p[i + 1][0] - p[i][0]) || 1));
+			m[0] = d[0]; m[n - 1] = d[n - 2];
+			for (i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+			for (i = 0; i < n - 1; i++) {
+				if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+				var a = m[i] / d[i], b = m[i + 1] / d[i], s = a * a + b * b;
+				if (s > 9) { var k = 3 / Math.sqrt(s); m[i] = k * a * d[i]; m[i + 1] = k * b * d[i]; }
+			}
+			var out = 'M' + p[0][0] + ' ' + p[0][1];
+			for (i = 0; i < n - 1; i++) {
+				var h = (p[i + 1][0] - p[i][0]) / 3;
+				out += 'C' + r1(p[i][0] + h) + ' ' + r1(p[i][1] + m[i] * h) + ' ' + r1(p[i + 1][0] - h) + ' ' +
+					r1(p[i + 1][1] - m[i + 1] * h) + ' ' + p[i + 1][0] + ' ' + p[i + 1][1];
+			}
+			return out;
+		}).join('');
+	},
+
+	/* curvePath() closed down (or up) to the baseline y = base */
+	curveArea: function(segs, base) {
+		var self = this;
+		return (segs || []).filter(function(s) { return s.length > 1; }).map(function(s) {
+			return self.curvePath([ s ]) + 'L' + s[s.length - 1][0] + ' ' + base + 'L' + s[0][0] + ' ' + base + 'Z';
+		}).join('');
+	},
+
 	/* index of the point closest in time to t (for hover), or -1 */
 	nearest: function(series, t) {
 		var best = -1, bd = Infinity;

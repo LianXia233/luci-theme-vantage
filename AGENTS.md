@@ -13,7 +13,7 @@ Two OpenWrt 25.12 LuCI packages plus offline tooling. No npm, no
 | Path | What |
 |---|---|
 | `luci-theme-vantage/` | Theme: ucode templates (`ucode/template/themes/vantage/*.ut`), CSS and icons (`htdocs/luci-static/vantage/`), shell script (`htdocs/luci-static/resources/menu-vantage.js`, `vantage-theme/host.js`), `root/etc/uci-defaults/30_luci-theme-vantage`, `postrm` in the `Makefile` |
-| `luci-app-vantage/` | Dashboard at `admin/dashboard`: view (`htdocs/.../view/vantage/overview.js`), modules (`htdocs/.../vantage/*.js`), `app.css`, menu entry, rpcd ACL (`root/usr/share/rpcd/acl.d/`), rpcd ucode plugin `luci.vantage` (`root/usr/share/rpcd/ucode/luci.vantage`), default `/etc/config/vantage` |
+| `luci-app-vantage/` | Dashboard at `admin/dashboard`: views (`htdocs/.../view/vantage/overview.js`; `firewall.js`, the Network → Firewall → Overview tab), modules (`htdocs/.../vantage/*.js`), `app.css`, menu entry, rpcd ACL (`root/usr/share/rpcd/acl.d/`), rpcd ucode plugin `luci.vantage` (`root/usr/share/rpcd/ucode/luci.vantage`), default `/etc/config/vantage` |
 | `dev/replay/` | Offline LuCI server that replays a recording; see its README |
 | `dev/mirror/` | Recorders that read a real device. Do not run them (rule 1) |
 | `dev/build/` | `sdk-build.sh`: reproducible build in the OpenWrt SDK image (podman) |
