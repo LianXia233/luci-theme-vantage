@@ -2375,6 +2375,18 @@ html:not([data-darkmode="true"]) .vt-login-page {
 /* wide tables scroll inside their card, never the page. Sticky headers need
    a non-scrolling ancestor, so status tables only scroll when narrow. */
 .cbi-tblsection, .cbi-section:has(> .cbi-tblsection) { overflow-x: auto; }
+/* overlay scrollbars show nothing until touched: a shade on the side with
+   more table says it scrolls. The covers move with the content and hide
+   the shade at either end, so a card that fits looks as before. */
+.vt-main .cbi-tblsection, .vt-main .cbi-section:has(> .cbi-tblsection) {
+	background-image:
+		linear-gradient(to right, var(--s1) 50%, transparent), linear-gradient(to left, var(--s1) 50%, transparent),
+		linear-gradient(to right, var(--line-2), transparent), linear-gradient(to left, var(--line-2), transparent);
+	background-position: left top, right top, left top, right top;
+	background-size: 32px 100%, 32px 100%, 12px 100%, 12px 100%;
+	background-repeat: no-repeat;
+	background-attachment: local, local, scroll, scroll;
+}
 .cbi-section:has(.cbi-dropdown[open]), .cbi-tblsection:has(.cbi-dropdown[open]) { overflow: visible; }
 @media (720px < width <= 1180px) {
 	.cbi-section { overflow-x: auto; }
@@ -2455,8 +2467,11 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	outline: 2px solid var(--warn); outline-offset: 1px;
 }
 /* the zones table squeezed its policy selects to 42 px at 721-900 px; a
-   wider table scrolls inside its card instead */
-#cbi-firewall-zone .td select { min-width: 7.5em; }
+   wider table scrolls inside its card instead. Its long headers
+   ("Intra zone forward", "IPv4 Masquerading") wrap, so the table fits
+   (Edit and Delete in view) down to about 880 px, as in 1.0.5. */
+#cbi-firewall-zone .td select { min-width: 6.5em; }
+#cbi-firewall-zone .table .tr > .th { white-space: normal; }
 /* a rule that is switched off looks off, from the moment it is unticked:
    greyed rather than faded, so its name and match still read (4.5:1 and
    up) and the row's separator stays whole */
@@ -2660,6 +2675,13 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 		flex: none; width: auto !important; padding: 0 !important;
 	}
 	[id^="cbi-firewall-"] .table .tr > .td:has(input[data-widget-id$=".enabled"])::before { display: none; }
+	/* a 44 px tap target around the 20 px box: LuCI's empty label for it,
+	   stretched over the box and the space around it */
+	[id^="cbi-firewall-"] .table .tr > .td:has(input[data-widget-id$=".enabled"]) .cbi-checkbox { position: relative; }
+	[id^="cbi-firewall-"] .table .tr > .td:has(input[data-widget-id$=".enabled"]) .cbi-checkbox > label:empty {
+		display: block; position: absolute; left: 50%; top: 50%;
+		width: 44px; height: 44px; translate: -50% -50%;
+	}
 	[id^="cbi-firewall-"] .table .tr:has(> .td input[data-widget-id$=".enabled"]) > .td.cbi-section-table-titles { padding-right: calc(var(--card-px) + 40px) !important; }
 	[id^="cbi-firewall-"] .table .tr > .td:has(> small > br) { flex-basis: 100% !important; }
 	/* "From … To …" and a coloured verdict say what they are: no column labels */

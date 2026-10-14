@@ -257,3 +257,24 @@ test('switched-off rules are greyed, not faded: the name and match keep 4.5:1', 
 	assert.match(badges.body, /filter:\s*grayscale\(1\)/);
 	for (const t of [ light, dark ]) assert.ok(ratio(rgba(t, 'var(--text-3)'), rgba(t, 'var(--s1)')) >= 4.5);
 });
+
+test('firewall zones: long headers wrap, and a table wider than its card shows a scroll shade', () => {
+	const own = (sel) => themeRules.filter((r) => r.sel.includes(sel) && !r.media).map((r) => r.body).join(';');
+	assert.match(own('#cbi-firewall-zone .table .tr > .th'), /white-space:\s*normal/);
+	const shade = own('.vt-main .cbi-tblsection');
+	assert.match(shade, /background-attachment:\s*local, local, scroll, scroll/);
+	/* the covers are the card's own colour */
+	assert.match(shade, /linear-gradient\(to right, var\(--s1\) 50%, transparent\)/);
+	assert.match(own('.cbi-section, .cbi-map > fieldset'.split(', ')[0]), /background:\s*var\(--s1\)/);
+});
+
+test('phone rule cards: the corner on/off box has a 44 px tap target', () => {
+	const phone = themeRules.filter((r) => /max-width: 720px/.test(r.media));
+	const hit = phone.find((r) => r.sel.some((s) => /enabled"\]\) \.cbi-checkbox > label:empty$/.test(s)));
+	assert.ok(hit, 'found the label rule');
+	assert.match(hit.body, /display:\s*block/);
+	assert.match(hit.body, /width:\s*44px/);
+	assert.match(hit.body, /height:\s*44px/);
+	/* the label is LuCI's own <label for> the box, so a tap on it toggles the box */
+	assert.match(themeCss, /\.cbi-checkbox > label:empty \{ display: none; \}/);
+});

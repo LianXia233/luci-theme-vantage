@@ -143,8 +143,10 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   any forwarding into another zone get the warning colour instead. A
   rule that is switched off is greyed (not faded, so its name and match
   keep 4.5:1) from the moment it is unticked. The match reads From/To
-  first, the family/protocol line quieter. On phones a rule card carries
-  its on/off switch in the corner and no column labels.
+  first, the family/protocol line quieter. The zones table's long
+  headers wrap, and a table wider than its card shows a shade on the
+  side that scrolls. On phones a rule card carries its on/off switch in
+  the corner, with a 44 px tap target, and no column labels.
 
 ### Visual identity
 
