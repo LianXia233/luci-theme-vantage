@@ -1423,35 +1423,70 @@ return baseclass.extend({
 
 	/* ---------------------------------------------- row action menus */
 
-	/* A table row with three or more actions keeps its main one (Edit, else
-	   LuCI's "important" button) and gets a ⋯ button listing the rest.
-	   LuCI's buttons stay where LuCI put them, only hidden: a menu item
-	   clicks the original, so the handler, any confirmation and the current
-	   label (Enable or Disable) are LuCI's own. The drag handle stays. */
+	/* A table row folds when it has a main action (Edit, else LuCI's
+	   "important" button) and at least two others to put in a ⋯ menu.
+	   Add, "important" and plain action buttons stay out of the menu: they
+	   are what the row is for (Wireless's Add, Wake on LAN's Wake). Rows
+	   of peer actions (Startup, Processes) have no main one and stay as
+	   LuCI drew them. LuCI's buttons stay where LuCI put them, only
+	   hidden: a menu item clicks the original, so the handler, any
+	   confirmation and the current label (Enable or Disable) are LuCI's
+	   own. The drag handle stays. */
 	decorateRowActions() {
 		document.querySelectorAll('.cbi-section-actions > div').forEach(box => {
-			if (box.closest('.vt-app')) return;
-			const btns = Array.prototype.filter.call(box.children, n =>
-				n.matches('button, .btn, .cbi-button, input[type="button"], input[type="submit"]') &&
-				!n.matches('.drag-handle, .vt-acts-more') && !n.hidden && n.style.display !== 'none');
-			const more = box.querySelector(':scope > .vt-acts-more');
-			if (btns.length < 3) {
-				if (more) more.remove();
-				box.classList.remove('vt-acts');
-				btns.forEach(b => b.classList.remove('vt-acts-hidden'));
-				return;
-			}
-			const main = btns.find(b => b.matches('.cbi-button-edit')) || btns.find(b => b.matches('.important')) || btns[0];
-			btns.forEach(b => b.classList.toggle('vt-acts-hidden', b !== main));
-			box.classList.add('vt-acts');
-			if (!more) box.appendChild(this.moreButton(box));
+			if (!box.closest('.vt-app')) this.foldRow(box);
 		});
+	},
+
+	/* runs again whenever LuCI touches the row's buttons, so it only
+	   writes what changed (a write would wake its own observer) */
+	foldRow(box) {
+		const btns = Array.prototype.filter.call(box.children, n =>
+			n.matches('button, .btn, .cbi-button, input[type="button"], input[type="submit"]') &&
+			!n.matches('.drag-handle, .vt-acts-more') && !n.hidden && n.style.display !== 'none');
+		const main = btns.find(b => b.matches('.cbi-button-edit')) || btns.find(b => b.matches('.important'));
+		const fold = main ? btns.filter(b => b !== main && !b.matches('.important, .cbi-button-add, .cbi-button-action')) : [];
+		if (!box._vtWatch && window.MutationObserver) {
+			/* LuCI's class, disabled, hidden and relabel changes are not
+			   childList ones: the body observer misses them */
+			box._vtWatch = new window.MutationObserver(recs => {
+				const m = box.querySelector(':scope > .vt-acts-more');
+				if (recs.some(r => !(m && m.contains(r.target)))) this.foldRow(box);
+			});
+			box._vtWatch.observe(box, { subtree: true, characterData: true, attributes: true, attributeFilter: [ 'class', 'disabled', 'hidden', 'style', 'title' ] });
+		}
+		let more = box.querySelector(':scope > .vt-acts-more');
+		const on = fold.length >= 2;
+		Array.prototype.forEach.call(box.children, c => c.classList.toggle('vt-acts-hidden', on && fold.includes(c)));
+		box.classList.toggle('vt-acts', on);
+		if (!on) {
+			if (more) {
+				/* focus on ⋯ or in its menu moves to the row's first action */
+				const had = more.contains(document.activeElement) || (this.actBtn === more && this.actMenu.contains(document.activeElement));
+				if (this.actBtn === more) this.closeActMenu(false);
+				more.remove();
+				if (had && btns[0]) btns[0].focus();
+			}
+			return;
+		}
+		if (!more) more = box.appendChild(this.moreButton(box));
+		/* LuCI spins and disables the hidden original while its action
+		   runs (ui.createHandlerFn, or the view itself): ⋯ shows the
+		   spinner until it settles, and stays usable for the others */
+		const busy = fold.some(b => b.classList.contains('spinning'));
+		if (more.classList.contains('spinning') !== busy) {
+			more.classList.toggle('spinning', busy);
+			if (busy) more.setAttribute('aria-busy', 'true');
+			else more.removeAttribute('aria-busy');
+		}
+		if (this.actBtn === more) this.fillActMenu(box, false);
 	},
 
 	moreButton(box) {
 		const btn = E('button', {
 			'type': 'button', 'class': 'cbi-button cbi-button-neutral vt-acts-more',
-			'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': _('More actions'), 'title': _('More actions')
+			'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'vt-actmenu',
+			'aria-label': _('More actions'), 'title': _('More actions')
 		}, [ svg('more', 18) ]);
 		btn.addEventListener('click', ev => {
 			ev.preventDefault();
@@ -1473,7 +1508,9 @@ return baseclass.extend({
 			const items = Array.prototype.filter.call(menu.querySelectorAll('[role="menuitem"]'), n => !n.disabled);
 			const i = items.indexOf(document.activeElement);
 			if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); this.closeActMenu(true); }
-			else if (ev.key === 'Tab') this.closeActMenu(false);
+			/* back on ⋯ before the browser moves focus, so Tab goes on from
+			   the row, not from the menu at the end of the page */
+			else if (ev.key === 'Tab') this.closeActMenu(true);
 			else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Home' || ev.key === 'End') {
 				ev.preventDefault();
 				const n = items.length;
@@ -1481,39 +1518,88 @@ return baseclass.extend({
 				if (items[to]) items[to].focus();
 			}
 		});
+		/* opened with the mouse or a tap, focus stays on ⋯ (or nowhere):
+		   Escape and Tab still close it. Capture, so a modal under it
+		   does not take the same Escape. */
+		document.addEventListener('keydown', ev => {
+			if (!this.actBtn || menu.contains(ev.target)) return;
+			if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); this.closeActMenu(true); }
+			else if (ev.key === 'Tab') this.closeActMenu(false);
+		}, true);
 		document.addEventListener('pointerdown', ev => {
 			if (this.actBtn && !menu.contains(ev.target) && !this.actBtn.contains(ev.target)) this.closeActMenu(false);
 		}, true);
 		window.addEventListener('resize', () => this.closeActMenu(false));
-		window.addEventListener('scroll', () => this.closeActMenu(false), true);
+		/* the page scrolling away closes it; the menu's own scroll does not */
+		window.addEventListener('scroll', ev => { if (!menu.contains(ev.target)) this.closeActMenu(false); }, true);
 		document.body.appendChild(menu);
 		return (this.actMenu = menu);
+	},
+
+	/* one item per hidden original, with its current label, tooltip and
+	   disabled state. While open it is filled again when LuCI changes one
+	   (DDNS's poll disables Stop), but only then, since a refill is a
+	   childList change the body observer answers with another pass. */
+	fillActMenu(box, force) {
+		const menu = this.actMenuEl();
+		const origs = Array.prototype.slice.call(box.querySelectorAll(':scope > .vt-acts-hidden'));
+		const desc = origs.map(orig => {
+			const title = orig.getAttribute('title');
+			return {
+				orig, title,
+				label: (orig.tagName === 'INPUT' ? orig.value : orig.textContent.trim()) || title || orig.getAttribute('aria-label') || '',
+				danger: orig.matches('.cbi-button-remove, .cbi-button-negative, .remove'),
+				disabled: !!orig.disabled
+			};
+		});
+		const sig = JSON.stringify(desc.map(d => [ d.label, d.title, d.danger, d.disabled ]));
+		if (!force && sig === this.actSig && menu.children.length === origs.length &&
+		    Array.prototype.every.call(menu.children, (item, k) => item._vtOrig === origs[k])) return;
+		this.actSig = sig;
+		const had = menu.contains(document.activeElement) ? document.activeElement._vtOrig : null;
+		menu.textContent = '';
+		desc.forEach(d => {
+			const item = E('button', {
+				'type': 'button', 'role': 'menuitem', 'tabindex': '-1',
+				'class': 'vt-actmenu-item' + (d.danger ? ' is-danger' : ''),
+				'title': d.title || null,
+				'disabled': d.disabled ? 'disabled' : null
+			}, [ d.label ]);
+			item._vtOrig = d.orig;
+			item.addEventListener('click', () => {
+				this.closeActMenu(true);
+				d.orig.click();
+			});
+			menu.appendChild(item);
+		});
+		/* the focused item was replaced: focus its successor, or the first
+		   enabled one, so the arrow keys keep working */
+		if (had) {
+			const items = Array.prototype.filter.call(menu.children, n => !n.disabled);
+			const same = items.find(n => n._vtOrig === had);
+			if (same || items[0]) (same || items[0]).focus();
+			else this.closeActMenu(true);
+		}
 	},
 
 	openActMenu(btn, box, focusFirst, focusLast) {
 		this.closeActMenu(false);
 		const menu = this.actMenuEl();
-		menu.textContent = '';
-		box.querySelectorAll(':scope > .vt-acts-hidden').forEach(orig => {
-			const label = orig.tagName === 'INPUT' ? orig.value : orig.textContent.trim();
-			const item = E('button', {
-				'type': 'button', 'role': 'menuitem', 'tabindex': '-1',
-				'class': 'vt-actmenu-item' + (orig.matches('.cbi-button-remove, .cbi-button-negative, .remove') ? ' is-danger' : ''),
-				'disabled': orig.disabled ? 'disabled' : null
-			}, [ label ]);
-			item.addEventListener('click', () => {
-				this.closeActMenu(true);
-				orig.click();
-			});
-			menu.appendChild(item);
-		});
+		this.fillActMenu(box, true);
+		menu.style.maxHeight = '';
 		menu.hidden = false;
 		/* below the button, or above it when the screen (or the phone's
-		   bottom bar) leaves no room; right edges aligned */
+		   bottom bar) leaves no room; right edges aligned. When neither
+		   side fits (a landscape phone), the roomier one, scrolling, so
+		   the menu never covers its own button. */
 		const r = btn.getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
 		const rail = this.mqMobile && this.mqMobile.matches ? document.querySelector('.vt-rail') : null;
 		const floor = rail ? rail.getBoundingClientRect().top : window.innerHeight;
-		const top = r.bottom + 6 + h <= floor - 8 ? r.bottom + 6 : Math.max(8, r.top - 6 - h);
+		const below = floor - 8 - (r.bottom + 6), above = r.top - 6 - 8;
+		const down = h <= below || (h > above && below >= above);
+		const room = down ? below : above;
+		if (h > room) menu.style.maxHeight = Math.max(0, room).toFixed(0) + 'px';
+		const top = down ? r.bottom + 6 : r.top - 6 - Math.min(h, room);
 		const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
 		menu.style.top = top.toFixed(0) + 'px';
 		menu.style.left = left.toFixed(0) + 'px';

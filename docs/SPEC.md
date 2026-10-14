@@ -121,23 +121,32 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
 - Add-ons: adblock and banIP pick their status palettes from the OS
   colour scheme; the theme sets their own light or dark palette from
   `html[data-darkmode]` instead, so they follow the theme toggle.
-- **Row actions**: a table row with three or more actions shows its main
-  one (Edit, else LuCI's "important" button) and a ⋯ menu with the rest,
-  at one width so rows line up; LuCI's buttons stay in place, hidden, and
-  a menu item clicks the original (its handler, confirmation, label and
-  disabled state are LuCI's). A menu: arrows, Home/End, Escape back to ⋯;
-  it opens above the button when the screen or the phone bar leaves no
-  room below.
+- **Row actions**: a table row with a main action (Edit, else LuCI's
+  "important" button) and at least two others shows the main one and a ⋯
+  menu with those, at one width so rows line up. Add, "important" and
+  plain action buttons (an app's own, such as Wake on LAN's Wake) stay
+  visible; rows of peer actions with no main one (Startup, Processes)
+  stay as LuCI drew them; no menu holds a single item. LuCI's buttons
+  stay in place, hidden, and a menu item clicks the original (its
+  handler, confirmation, label, tooltip and disabled state are LuCI's,
+  and an open menu follows them); while an original is busy, ⋯ shows
+  the spinner. A menu: arrows, Home/End, Escape back to ⋯ (after a
+  mouse or tap open too), Tab goes on from ⋯; it opens above the button
+  when the screen or the phone bar leaves no room below, and on the
+  roomier side, scrolling, when neither side fits.
 - **Firewall**: a rule's or forward's verdict is a coloured badge (accept
   green, reject and drop red, forward and NAT blue) and zone or default
   policies are coloured in their dropdowns, both keyed on LuCI's raw
-  target values, never on the translated labels. Green means "passes",
-  not "safe": on the masquerading (internet-facing) zone, an accepting
-  input policy and any forwarding into another zone get the warning
-  colour instead. A rule that is switched
-  off is dimmed from the moment it is unticked. The match reads From/To
-  first, the family/protocol line quieter. On phones a rule card carries
-  its on/off switch in the corner and no column labels.
+  target values, never on the translated labels; badge and warning text
+  keeps 4.5:1 on a hovered row too. Green means "passes", not "safe": on
+  the masquerading (internet-facing) zone, an accepting input policy and
+  any forwarding into another zone get the warning colour instead. A
+  rule that is switched off is greyed (not faded, so its name and match
+  keep 4.5:1) from the moment it is unticked. The match reads From/To
+  first, the family/protocol line quieter. The zones table's long
+  headers wrap, and a table wider than its card shows a shade on the
+  side that scrolls. On phones a rule card carries its on/off switch in
+  the corner, with a 44 px tap target, and no column labels.
 
 ### Visual identity
 
