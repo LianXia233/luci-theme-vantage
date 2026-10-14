@@ -291,3 +291,26 @@ test('port status: boxes packed, hidden tooltips add no height, port cards may o
 	/* the palette takes Escape from a row menu left open */
 	assert.match(menuJs, /openPalette\(\) \{\s*if \(this\.pal\) return;\s*\/\*[^*]*\*\/\s*this\.closeActMenu\(false\);/);
 });
+
+/* rules for the 25.12 VM sweep (1.0.7) */
+const bodyOf = (pred, media) => themeRules.filter((r) => r.sel.some(pred) && (media === undefined || media.test(r.media))).map((r) => r.body).join(';');
+const phoneOf = (pred) => bodyOf(pred, /max-width: 720px/);
+
+test('VM sweep: Status -> Firewall (nftables) chains are cards, cells beat the view\'s !important padding, matches are inline', () => {
+	assert.match(bodyOf((s) => s === '.nft-chain'), /background:\s*var\(--s1\)/);
+	assert.match(bodyOf((s) => s === '.nft-chain > h4'), /border-bottom/);
+	/* LuCI: ".nft-rules tr > td { padding: .25em !important }" (0,1,2) */
+	assert.match(bodyOf((s) => s === '#view .nft-rules .tr > .td', /^$/), /padding:[^;]*!important/);
+	assert.match(phoneOf((s) => s.startsWith('#view .nft-rules .tr > .td')), /padding:[^;]*var\(--card-px\)\s*!important/);
+	/* inline-flex made every text run of a match a flex column on phones */
+	assert.match(bodyOf((s) => s === '#view .nft-rules .ifacebadge'), /display:\s*inline;/);
+});
+
+test('VM sweep: log viewers keep their size on touch and wrap on phones; the filter rows wrap', () => {
+	const touch = themeRules.find((r) => /pointer: coarse\), \(max-width: 720px\)/.test(r.media) && /font-size:\s*16px/.test(r.body));
+	assert.ok(touch.sel.includes('.vt-main textarea:not([readonly])') && !touch.sel.includes('.vt-main textarea'));
+	/* LuCI puts wrap="off" and an inline white-space on them */
+	assert.match(phoneOf((s) => s === '.vt-main textarea[readonly]'), /white-space:\s*pre-wrap\s*!important/);
+	assert.match(bodyOf((s) => s === '#content_syslog > div:has(> :is(input, select))'), /flex-wrap:\s*wrap/);
+	assert.match(bodyOf((s) => s === '#content_syslog > div:has(> :is(input, select)) > *'), /margin:\s*0\s*!important/);
+});

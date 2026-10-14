@@ -2497,6 +2497,58 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 [id^="cbi-firewall-"] .tr:has(input[data-widget-id$=".enabled"]:not(:checked)) > .td:not(.cbi-section-actions):not(:has(input[data-widget-id$=".enabled"])) { color: var(--text-3); }
 [id^="cbi-firewall-"] .tr:has(input[data-widget-id$=".enabled"]:not(:checked)) > .td:not(.cbi-section-actions) :is(var[data-tooltip], .zonebadge) { filter: grayscale(1); }
 
+/* Status -> Firewall (nftables): each chain a card, its heading the header
+   row, hook and policy under it, the rules edge to edge. The view injects
+   ".nft-rules tr > td { padding: .25em !important }" and a margin on its
+   badges, hence #view and !important. A match (span.ifacebadge per
+   expression) is inline text, never flex columns: its words wrap. */
+.nft-table > h3 { margin: 0 0 var(--sp-3); font-size: var(--fs-md); }
+.nft-table + .nft-table { margin-top: var(--sp-6); }
+.nft-chain {
+	margin: 0 0 var(--sp-4);
+	background: var(--s1);
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	box-shadow: var(--v-shadow);
+	overflow: clip;
+}
+.nft-chain > h4 {
+	display: flex; align-items: center;
+	min-height: 48px; margin: 0;
+	padding: 12px var(--card-px);
+	border-bottom: 1px solid var(--line);
+	font-size: var(--fs-md); font-weight: 600;
+}
+.nft-chain-hook { padding: 10px var(--card-px); border-bottom: 1px solid var(--line); color: var(--text-2); font-size: var(--fs-sm); }
+.nft-chain-hook > ul { display: flex; flex-wrap: wrap; gap: 2px var(--sp-5); margin: 0; padding: 0; list-style: none; }
+.nft-chain-hook strong { color: var(--text); }
+#view .nft-rules .tr > .td { padding: 9px 12px !important; }
+#view .nft-rules .tr > :is(.th, .td):first-child { padding-left: var(--card-px) !important; }
+#view .nft-rules .tr > :is(.th, .td):last-child { padding-right: var(--card-px) !important; }
+#view .nft-rules .ifacebadge {
+	display: inline;
+	margin: 0 12px 0 0; padding: 0;
+	background: none; border: 0; border-radius: 0; box-shadow: none;
+	font-size: inherit; white-space: normal; vertical-align: baseline;
+}
+#view .nft-rules .ifacebadge .ifacebadge { margin-right: 0; }
+/* the comment (#) and counter marks: quiet, their text is the tooltip */
+#view .nft-rules :is(.nft-comment, .nft-counter) { margin-right: 8px; color: var(--text-3); font-size: var(--fs-sm); }
+.nft-rules .td > div + div { margin-top: 2px; }
+.nft-rules .td > div > span:first-child:not(.ifacebadge) { margin-right: 6px; color: var(--text-3); }
+.nft-rules em { font-style: normal; color: var(--text-3); }
+
+/* Status -> System Log / Kernel Log: LuCI's filter rows (Not, box, label,
+   field) as wrapping rows; the gap replaces LuCI's inline margins */
+#content_syslog > div:has(> :is(input, select)) {
+	display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+	margin-bottom: var(--sp-3) !important;
+}
+#content_syslog > div:has(> :is(input, select)) > * { margin: 0 !important; }
+#content_syslog > div > :is(select, input:not([type="checkbox"])) { flex: 0 1 240px; min-width: 0; }
+#content_syslog > div > :is(select, input:not([type="checkbox"])) + label { margin-left: var(--sp-3) !important; }
+#content_syslog > div > #logSeveritySelect + label { margin-left: 0 !important; }   /* "and above" ends its own group */
+
 /* ----------------------------------------------------- responsive */
 
 @media (max-width: 1100px) {
@@ -2707,6 +2759,14 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	[id^="cbi-firewall-"] .table .tr:has(> .td input[data-widget-id$=".enabled"]) > .td:has(small, var[data-tooltip])::before { display: none; }
 	[id^="cbi-firewall-"] .table .td > small:has(> br) { line-height: 1.6; }
 	.cbi-section .table, .cbi-section .cbi-section-table { border: 0; }
+	/* nftables rule cards: LuCI's !important cell padding, on the card's edge */
+	#view .nft-rules .tr > .td, #view .nft-rules .tr > .td:is(:first-child, :last-child) { padding: 3px var(--card-px) !important; }
+	/* log filters: each field on its own line under its label */
+	#content_syslog > div > :is(select, input:not([type="checkbox"])) { flex: 1 1 100%; }
+	#content_syslog > div > :is(select, input:not([type="checkbox"])) + label { margin-left: 0 !important; }
+	/* read-only output (logs, Diagnostics) wraps instead of showing each
+	   line's first 40 characters (LuCI: wrap="off", inline white-space) */
+	.vt-main textarea[readonly] { white-space: pre-wrap !important; overflow-wrap: anywhere; }
 	.cbi-progressbar { max-width: none; }
 	.network-status-table > .ifacebox { max-width: none; }
 
@@ -2724,7 +2784,7 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 /* touch, at any width: 16px text in fields (iOS zooms below that),
    bigger check marks, a little more air between rows */
 @media (pointer: coarse), (max-width: 720px) {
-	.vt-main input, .vt-main select, .vt-main textarea, .cbi-dropdown:not(.btn, .cbi-button), .modal input, .modal select { font-size: 16px !important; }
+	.vt-main input, .vt-main select, .vt-main textarea:not([readonly]), .cbi-dropdown:not(.btn, .cbi-button), .modal input, .modal select { font-size: 16px !important; }
 }
 @media (pointer: coarse) {
 	input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
