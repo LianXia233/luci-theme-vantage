@@ -1132,6 +1132,8 @@ html[data-darkmode="true"] .vt-app {
 /* ------------------------------------------- 11b. firewall overview */
 /* view/vantage/firewall.js: warnings, then tiles for what is open from
    the internet, the zones and what is switched off */
+/* no internet-facing zone: the page cannot tell, neither green nor a warning */
+.vt-app .vt-orb-unknown { --vt-oc: var(--vt-text-3); }
 .vt-app .vt-fg-warns { display: grid; gap: 10px; margin-bottom: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
 /* a warning's title is a sentence, not the dashboard's small caps label */
 .vt-app .vt-fg-warns .vt-chip-title { text-transform: none; letter-spacing: 0; font-size: var(--vt-fs-base); font-weight: 650; color: var(--vt-text); }
