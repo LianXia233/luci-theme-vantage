@@ -221,6 +221,10 @@ return view.extend({
 			title = _('%s is in no zone and accepts every connection').format(w.family ? _('%s (IPv%d)').format(w.iface, w.family) : w.iface);
 			reason = _('The default Input policy applies there and accepts, so anything on the internet can reach the router itself. Add it to the wan zone or set Input to reject in General Settings.');
 		}
+		else if (w.code === 'zone-subnet') {
+			title = _('%s covers only some addresses').format(w.zone);
+			reason = _('Its Covered subnets setting leaves other internet traffic to the default Input policy, which accepts, so it can reach the router itself. Set Input to reject in General Settings.');
+		}
 		else if (w.code === 'uplinks-unknown') {
 			title = _('The uplinks could not be checked');
 			reason = _('The interface list could not be read, and the default Input policy accepts: an uplink in no zone would be open. Set Input to reject in General Settings.');

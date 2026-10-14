@@ -33,8 +33,9 @@
    A zone faces the internet when it masquerades (masq or masq6), holds an
    uplink (an interface with the default route and a public IPv4 address:
    a router with public addresses routes without NAT), or by OpenWrt's
-   naming is called wan or wan6 or holds the wan or wan6 network. A zone
-   matching by `subnet` only is not followed. */
+   naming is called wan or wan6 or holds the wan or wan6 network. A zone's
+   covered subnets leave every other address to the default policies; a
+   zone matching by `subnet` alone is not followed. */
 
 /* ports whose exposure from the internet deserves a warning: the router's
    own SSH, telnet and web admin */
@@ -166,6 +167,28 @@ function mac(v) {
 function setmatch(v) {
 	var m = invert(v);
 	return m && /^[a-zA-Z_.][a-zA-Z0-9\/_.-]*/.test(m.val) ? m : null;
+}
+
+/* ucode's +val: a number, NaN refused */
+function int(v) {
+	if (/^\s*[+-]?(inf|nan)/i.test(v)) return null;
+	var n = Number(v);
+	return n === n ? n : null;
+}
+
+function limit(v) {
+	var l = invert(v), m = l && /^([0-9]+)(\/([a-z]+))?$/.exec(l.val);
+	return m && (!m[3] || oneOf([ 'second', 'minute', 'hour', 'day' ])(m[3])) ? l : null;
+}
+
+var rejectCode = oneOf([ 'tcp-reset', 'port-unreachable', 'admin-prohibited', 'host-unreachable', 'no-route' ]);
+
+/* conntrack helpers firewall4 defines (/usr/share/firewall4/helpers); fw4
+   refuses any other name */
+var HELPERS = [ 'amanda', 'ftp', 'RAS', 'Q.931', 'irc', 'netbios-ns', 'pptp', 'sane', 'sip', 'snmp', 'tftp', 'rtsp' ];
+function cthelper(v) {
+	var h = invert(v);
+	return h && HELPERS.indexOf(h.val) >= 0 ? h : null;
 }
 
 /* inet_pton: a dotted quad without leading zeros, or IPv6 with an
@@ -410,7 +433,9 @@ return baseclass.extend({
 		/* an invalid defaults section stops fw4 before it writes any
 		   ruleset: what is loaded is then unknown */
 		var dsec = of('defaults')[0] || {};
-		var DEFS = { input: [ policy, 'drop' ], output: [ policy, 'drop' ], forward: [ policy, 'drop' ] };
+		var DEFS = { input: [ policy, 'drop' ], output: [ policy, 'drop' ], forward: [ policy, 'drop' ],
+			tcp_reject_code: [ rejectCode, 'tcp-reset' ], any_reject_code: [ rejectCode, 'port-unreachable' ],
+			synflood_rate: [ limit, '25/second' ], synflood_burst: [ int, '50' ], tcp_ecn: [ int ] };
 		[ 'drop_invalid', 'syn_flood', 'synflood_protect', 'tcp_syncookies', 'tcp_window_scaling', 'accept_redirects',
 			'accept_source_route', 'auto_helper', 'custom_chains', 'disable_ipv6', 'flow_offloading', 'flow_offloading_hw',
 			'auto_includes' ].forEach(function(k) { DEFS[k] = [ bool ]; });
@@ -420,6 +445,17 @@ return baseclass.extend({
 			defs = { input: 'drop', output: 'drop', forward: 'drop' };
 		}
 
+		/* network: an address, or a network name with the dump's addresses
+		   -> { invert, text, addrs } (addrs null: unknown, no dump) */
+		var network = function(v) {
+			var n = invert(v);
+			if (!n) return null;
+			var s = subnet(n.val);
+			if (s === null) return null;
+			if (s) return { invert: n.invert, text: n.val, addrs: [ s ] };
+			if (!ifs) return { invert: n.invert, text: n.val, addrs: null };
+			return ifs[n.val] ? { invert: n.invert, text: n.val, addrs: ifs[n.val].addrs } : null;
+		};
 		/* zones; a network or device entry is { net | dev, neg }. With the
 		   dump a network stands for its device, as fw4 matches it, and a
 		   network the dump puts in a zone (data.zone) joins that zone; a
@@ -437,11 +473,15 @@ return baseclass.extend({
 		of('zone').forEach(function(s) {
 			var nets = toArray(s.network).map(invert).filter(function(e) { return e && !e.invert; }).map(function(e) { return e.val; });
 			var item = { kind: 'zone', name: s.name != null ? String(s.name) : null };
+			/* every option fw4 parses: a value it refuses in any of them
+			   skips the zone */
 			var z = bool(s.enabled) === false ? null : parse(s, {
 				enabled: [ bool, '1' ], name: [ identifier ], family: [ family ],
-				network: [ device, null, true ], device: [ device, null, true ],
+				network: [ device, null, true ], device: [ device, null, true ], subnet: [ network, null, true ],
 				input: [ policy, defs.input ], output: [ policy, defs.output ], forward: [ policy, defs.forward ],
-				masq: [ bool ], masq6: [ bool ]
+				masq: [ bool ], masq_allow_invalid: [ bool ], masq_src: [ network, null, true ], masq_dest: [ network, null, true ],
+				masq6: [ bool ], extra: [ str ], extra_src: [ str ], extra_dest: [ str ], mtu_fix: [ bool ], custom_chains: [ bool ],
+				log: [ int ], log_limit: [ limit ], auto_helper: [ bool, '1' ], helper: [ cthelper, null, true ], counter: [ bool, '1' ]
 			});
 			if (!z || z.bad || !z.name) {
 				if (!z) off.push(item);
@@ -464,6 +504,11 @@ return baseclass.extend({
 				pos: ents.filter(function(e) { return !e.neg && e.dev !== '+'; }),
 				neg: ents.filter(function(e) { return e.neg; }),
 				anyDev: ents.some(function(e) { return !e.neg && e.dev === '+'; }),
+				/* covered subnets: fw4 takes only those addresses into the
+				   zone (of a family without one, none) */
+				limited: !!z.subnet && !(z.subnet.every(function(e) { return !e.invert; }) && [ 4, 6 ].every(function(f) {
+					return z.subnet.some(function(e) { return e.addrs && e.addrs.some(function(a) { return a.family === f && a.all; }); });
+				})),
 				to: [], internet: false
 			});
 		});
@@ -525,17 +570,6 @@ return baseclass.extend({
 		var zoneRef = function(v) { return (v === '*' || byName[v]) ? v : null; };
 		var zoneFam = function(ref) { return (ref && ref !== '*') ? byName[ref].family : null; };
 
-		/* network: an address, or a network name with the dump's addresses
-		   -> { invert, text, addrs } (addrs null: unknown, no dump) */
-		var network = function(v) {
-			var n = invert(v);
-			if (!n) return null;
-			var s = subnet(n.val);
-			if (s === null) return null;
-			if (s) return { invert: n.invert, text: n.val, addrs: [ s ] };
-			if (!ifs) return { invert: n.invert, text: n.val, addrs: null };
-			return ifs[n.val] ? { invert: n.invert, text: n.val, addrs: ifs[n.val].addrs } : null;
-		};
 		/* the router's own addresses: none known without the dump */
 		var own = ifs ? Object.keys(ifs).reduce(function(a, n) { return a.concat(ifs[n].ips); }, []) : null;
 		/* is an address (as fw4 DNATs to it: masked to its prefix, or a
@@ -631,6 +665,11 @@ return baseclass.extend({
 		});
 		outside.forEach(function(o) {
 			if (defs.input === 'accept') warnings.push({ level: 'err', code: 'outside-input', iface: o.name, family: o.family });
+		});
+		/* the addresses an internet zone's subnets leave out meet the
+		   default policy too */
+		internet.forEach(function(z) {
+			if (z.limited && defs.input === 'accept') warnings.push({ level: 'err', code: 'zone-subnet', zone: z.name });
 		});
 		/* without the dump an uplink outside every zone cannot be seen */
 		if (!ifs && routed && defs.input === 'accept' && !outside.length) warnings.push({ level: 'warn', code: 'uplinks-unknown' });

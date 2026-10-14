@@ -672,6 +672,50 @@ test('S6: without the dump a redirect\'s target stays unknown, and an admin port
 	assert.equal(wanRedirect({ src_dport: '2222', dest_port: '22' }).open[0].local, true, 'without dest_ip it is the router');
 });
 
+test('N1: a zone option fw4 refuses skips the zone; its networks meet the accepting default (CX N1)', () => {
+	const dump = [ LAN_DEV, WAN_DEV ];
+	for (const [ opts, bad ] of [
+		[ { log: 'yes' }, 'log' ], [ { subnet: 'nonsense' }, 'subnet' ], [ { subnet: '192.0.2.0/24 nosuch' }, 'subnet' ],
+		[ { masq_src: 'nosuchnet' }, 'masq_src' ], [ { masq_dest: '!192.0.002.1' }, 'masq_dest' ], [ { log_limit: '10/fortnight' }, 'log_limit' ],
+		[ { extra: [ 'a', 'b' ] }, 'extra' ], [ { custom_chains: 'Yes' }, 'custom_chains' ], [ { helper: 'bogus' }, 'helper' ],
+		[ { counter: 'maybe' }, 'counter' ], [ { mtu_fix: '2' }, 'mtu_fix' ], [ { masq_allow_invalid: 'y' }, 'masq_allow_invalid' ],
+		[ { auto_helper: 'nope' }, 'auto_helper' ], [ { log: [ '1', '2' ] }, 'log' ]
+	]) {
+		const r = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', opts))), dump);
+		assert.deepEqual(r.ignored.map(i => i.kind + ':' + i.bad), [ 'zone:' + bad ], JSON.stringify(opts));
+		assert.deepEqual(codes(r), [ 'outside-input:wan' ], JSON.stringify(opts));
+		assert.equal(r.level, 'err', JSON.stringify(opts));
+	}
+	for (const opts of [ { log: '1' }, { log: '0x10' }, { log_limit: '10/min' }, { helper: [ 'ftp', '!sip' ] }, { counter: 'off' },
+		{ masq_src: [ '192.0.2.0/24', '!192.0.2.9' ] }, { masq_dest: 'lan' }, { extra: '-m comment' }, { mtu_fix: 'yes' } ]) {
+		const r = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', opts))), dump);
+		assert.deepEqual(r.ignored, [], JSON.stringify(opts));
+		assert.equal(r.level, 'ok', JSON.stringify(opts));
+	}
+	/* the defaults section's numbers, limits and reject codes too */
+	for (const opts of [ { synflood_burst: 'x' }, { synflood_rate: 'fast' }, { tcp_reject_code: 'icmp' }, { tcp_ecn: 'on' } ])
+		assert.deepEqual(codes(fw.analyse(cfg(withDefaults(STOCK, opts)))).map(c => c.split(':')[0]), [ 'defaults-invalid' ], JSON.stringify(opts));
+	assert.deepEqual(fw.analyse(cfg(withDefaults(STOCK, { synflood_rate: '50/s', any_reject_code: 'admin' }))).warnings, []);
+});
+
+test('N1: an internet zone\'s covered subnets leave every other address to the default policy', () => {
+	const dump = [ LAN_DEV, WAN_DEV ];
+	/* fw4: meta nfproto ipv4 iifname "eth1" ip saddr 203.0.113.0/24 jump input_wan; the rest meets policy accept */
+	for (const subnet of [ '203.0.113.0/24', 'wan', '!203.0.113.0/24', [ '0.0.0.0/0' ] ]) {
+		const r = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet }))), dump);
+		assert.deepEqual(codes(r), [ 'zone-subnet:wan>' ], JSON.stringify(subnet));
+		assert.equal(r.level, 'err');
+	}
+	assert.deepEqual(fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet: [ '0.0.0.0/0', '::/0' ] }))), dump).warnings, [], 'both whole families');
+	assert.deepEqual(fw.analyse(cfg(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' })), dump).warnings, [], 'a rejecting default closes the rest');
+	/* a network name cannot be checked without the dump: the zone stays,
+	   and the accepting default with unknown interfaces is a caution */
+	const blind = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { masq_src: 'office' }))));
+	assert.deepEqual(blind.ignored, []);
+	assert.deepEqual(codes(blind), [ 'uplinks-unknown:' ]);
+	assert.notEqual(blind.level, 'ok');
+});
+
 /* ------------------------------------------------------- the overview */
 
 /* view/vantage/firewall.js with stub LuCI modules; E() builds plain
@@ -909,7 +953,7 @@ test('fw4 itself: the regressions\' openings are in the ruleset it writes', { sk
 	}
 });
 
-test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6)', { skip: NO_FW4 }, () => {
+test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6, N1)', { skip: NO_FW4 }, () => {
 	const LAN = LAN_DEV, WAN = WAN_DEV;
 	const modem = [ LAN, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
 		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
@@ -920,6 +964,8 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6)', { skip: NO_FW4 },
 		[ 'zone', { name: 'wan', network: 'wan', family: 'ipv4', input: 'REJECT', masq: '1' } ],
 		[ 'zone', { name: 'wan6', network: 'wan6', family: 'ipv6', input: 'REJECT' } ] ];
 	const redirect = dest_ip => MASQ.concat([ [ 'redirect', { name: 'P', src: 'wan', proto: 'tcp', src_dport: '2222', dest_ip, dest_port: '22' } ] ]);
+	const skipped = opts => [ acceptIn(zoneOpts(MASQ, 'wan', opts)), [ LAN, WAN ], 'outside-input',
+		rs => /policy accept;/.test(chain(rs, 'input')) && !/input_wan/.test(rs) && /skipped due to invalid options/.test(rs) ];
 	const cases = [
 		[ 'S4 modem alias', acceptIn(MASQ), modem, null, rs => /iifname "wwan0" jump input_wan/.test(chain(rs, 'input')) ],
 		[ 'S4 split families', SPLIT, split, null,
@@ -931,7 +977,15 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6)', { skip: NO_FW4 },
 		[ 'S6 prefix is the subnet base', redirect('192.0.2.1/24'), [ LAN, WAN ], null, rs => /dnat 192\.0\.2\.0:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) ],
 		[ 'S6 IPv6 spelling', MASQ.concat([ [ 'redirect', { name: 'P', src: 'wan', proto: 'tcp', family: 'ipv6', src_dport: '2222', dest_ip: '2001:DB8:0:0::1', dest_port: '22' } ] ]),
 			[ Object.assign({}, LAN, { 'ipv6-address': [ { address: '2001:db8::1', mask: 64 } ] }), WAN ], 'admin-open',
-			rs => /dnat \[2001:db8::1\]:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) ]
+			rs => /dnat \[2001:db8::1\]:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) ],
+		[ 'N1 log yes' ].concat(skipped({ log: 'yes' })),
+		[ 'N1 invalid subnet' ].concat(skipped({ subnet: 'nonsense' })),
+		[ 'N1 unknown masq_src network' ].concat(skipped({ masq_src: 'nosuchnet' })),
+		[ 'N1 log_limit unit' ].concat(skipped({ log_limit: '10/fortnight' })),
+		[ 'N1 extra as a list' ].concat(skipped({ extra: [ 'a', 'b' ] })),
+		[ 'N1 custom_chains Yes' ].concat(skipped({ custom_chains: 'Yes' })),
+		[ 'N1 covered subnet', acceptIn(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' })), [ LAN, WAN ], 'zone-subnet',
+			rs => /policy accept;/.test(chain(rs, 'input')) && /meta nfproto ipv4 iifname "eth1" ip saddr 203\.0\.113\.0\/24 jump input_wan/.test(chain(rs, 'input')) ]
 	];
 	for (const [ name, list, dump, code, check ] of cases) {
 		const values = cfg(list);
@@ -943,7 +997,7 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6)', { skip: NO_FW4 },
 	}
 });
 
-test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S6)', async () => {
+test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S6, N1)', async () => {
 	const modem = [ LAN_DEV, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
 		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
 	const alias = await page(cfg(acceptIn(MASQ)), modem);
@@ -958,6 +1012,13 @@ test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S6)'
 	assert.match(blind, /to 192\.0\.2\.1\/32\. The interface list could not be read/);
 	assert.match(blind, /Into your network\nRouter masked/);
 	assert.doesNotMatch(blind, /Router admin open|Nothing is open/);
+	const log = await page(cfg(acceptIn(zoneOpts(MASQ, 'wan', { log: 'yes' }))), [ LAN_DEV, WAN_DEV ]);
+	assert.match(log, /wan is in no zone and accepts every connection/);
+	assert.match(log, /Zone wan\nzone · ignored: option log has a value firewall4 refuses/);
+	assert.doesNotMatch(log, /Nothing is open/);
+	const sub = await page(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' }))), [ LAN_DEV, WAN_DEV ]);
+	assert.match(sub, /wan covers only some addresses/);
+	assert.doesNotMatch(sub, /Nothing is open/);
 });
 
 /* --------------------------- M1: ubus errors through LuCI's own rpc.js
