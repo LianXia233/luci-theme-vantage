@@ -121,6 +121,23 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
 - Add-ons: adblock and banIP pick their status palettes from the OS
   colour scheme; the theme sets their own light or dark palette from
   `html[data-darkmode]` instead, so they follow the theme toggle.
+- **Row actions**: a table row with three or more actions shows its main
+  one (Edit, else LuCI's "important" button) and a ⋯ menu with the rest,
+  at one width so rows line up; LuCI's buttons stay in place, hidden, and
+  a menu item clicks the original (its handler, confirmation, label and
+  disabled state are LuCI's). A menu: arrows, Home/End, Escape back to ⋯;
+  it opens above the button when the screen or the phone bar leaves no
+  room below.
+- **Firewall**: a rule's or forward's verdict is a coloured badge (accept
+  green, reject and drop red, forward and NAT blue) and zone or default
+  policies are coloured in their dropdowns, both keyed on LuCI's raw
+  target values, never on the translated labels. Green means "passes",
+  not "safe": on the masquerading (internet-facing) zone, an accepting
+  input policy and any forwarding into another zone get the warning
+  colour instead. A rule that is switched
+  off is dimmed from the moment it is unticked. The match reads From/To
+  first, the family/protocol line quieter. On phones a rule card carries
+  its on/off switch in the corner and no column labels.
 
 ### Visual identity
 
@@ -171,13 +188,44 @@ text around it so it looks the same size.
   link to the page that fixes it.
 - **Layout**: tiles are packed into columns (four, two or one by width);
   each tile has a column, a width and a place in the order, and stacks
-  under the earlier tiles in its columns. "Layout" lets the viewer drag
+  under the earlier tiles in its columns. "Customize" lets the viewer drag
   tiles, move them with buttons or arrow keys, change their width within
   a per-tile minimum and hide them. Saved in `localStorage` per screen
   class (and separately for wired devices), validated on read; never on
   the device. A tile whose content shrinks keeps its height for 30 s,
   then the layout settles on its own; while arranging, each tile's
   content starts below its handle bar.
+- **Throughput chart**: one row per link (uplink, then each radio), each
+  with its own scale. Under "Customize", the viewer picks how download and
+  upload share a row: overlaid on one scale (the default), overlaid on a
+  log scale (a grid line per ×10 from 1 kbit/s to at least 1 Mbit/s),
+  mirrored on one scale, mirrored with a scale per direction, or in
+  separate lanes. Linear scales never go below 10 kbit/s, so an idle link
+  stays flat. Lines are smoothed without overshooting a sample; a stretch
+  without samples (page hidden, failed polls) is hatched as "no data".
+  The pick is saved in `localStorage`, validated on read; the tile's size
+  and place don't change with it.
+- **Firewall overview** (Network → Firewall → Overview, first tab):
+  read-only, from uci `firewall`. A zone faces the internet when it
+  masquerades, holds the uplink (an interface with the IPv4 default route
+  and a public address, from `network.interface dump`: routers with
+  public addresses run without NAT; an access point's default route runs
+  over a private address and does not count), or, by OpenWrt's naming,
+  is called wan/wan6 or holds the wan/wan6 network. It lists what is open on the router and what
+  reaches the network (accepting rules from those zones, port forwards
+  with their target), keeps ping, multicast, IPsec and DHCP renewals
+  apart as standard housekeeping, maps each zone's input policy and
+  forwardings, lists what is switched off, and warns when the
+  internet-facing zone accepts input, forwards into another zone, or a
+  rule opens the router's SSH, telnet or web ports to any address. Every
+  item links to the LuCI tab that changes it. When no zone qualifies it
+  says it found none (expected on an access point) and shows the zones
+  only. It covers only
+  what the config says, and says so: with nothing open the headline is
+  "Nothing is open in your firewall rules"; ports UPnP opens at run time
+  get a note when luci-app-upnp is installed (its menu entry exists),
+  custom rule files when the config includes any, and otherwise a
+  footnote names both.
 - **Controls** (buttons, filter, chips, sort headers, icon buttons) take
   the theme's control height through `--v-ctl-h` (36 px, 44 px on
   touch) and the theme's control radius (`--v-r`); under another theme
@@ -202,7 +250,12 @@ text around it so it looks the same size.
   apart because its caller chooses the DNS server and port; the view
   checks the grant and skips reverse DNS without it.
   `luci-app-vantage-names` (write): `luci.vantage set_alias` only; no
-  group grants uci writes.
+  group grants uci writes. The firewall overview's menu entry depends on
+  LuCI's `luci-app-firewall` group, whose holder already reads and
+  changes `firewall`; it reads that config with `uci get` (and the
+  interfaces with `network.interface dump`, which LuCI's
+  luci-base-network-status group grants) and the app's groups grant
+  nothing for it.
 - rpcd ucode plugin `luci.vantage` (`/usr/share/rpcd/ucode/luci.vantage`):
   `wireless` returns `network.wireless status` reduced to the fields the
   view reads (no `key`, `sae_password`, RADIUS or 802.11r secrets, no EAP
