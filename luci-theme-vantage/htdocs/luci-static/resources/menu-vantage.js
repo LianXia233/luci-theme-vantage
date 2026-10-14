@@ -225,12 +225,12 @@ function parseBarTitle(title) {
 function fmtBytes(n) { return String.format('%1024.1mB', Math.max(0, n)); }
 function pctOf(n, total) { return total > 0 ? Math.round(100 * n / total) : 0; }
 
-/* the Overview .cbi-section whose title (text before the Hide/Show label) is `title` */
+/* the Overview .cbi-section whose title (text before the Hide/Show label) is `title`; LuCI 24.10: a bare first h3 */
 function statusSections(title) {
-	return Array.prototype.filter.call(document.querySelectorAll('#view .cbi-section > .cbi-title > h3'), hd => {
+	return Array.prototype.filter.call(document.querySelectorAll('#view .cbi-section > .cbi-title > h3, #view .cbi-section > h3:first-child'), hd => {
 		const t = hd.firstChild;
 		return t && t.nodeType === 3 && t.data.trim() === title;
-	}).map(hd => hd.parentNode.parentNode);
+	}).map(hd => hd.closest('.cbi-section'));
 }
 
 /* the include's freshly rendered table, if it has not been enhanced yet */

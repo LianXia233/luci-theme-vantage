@@ -2007,6 +2007,10 @@ body.modal-overlay-active #modal_overlay { display: block; }
 :is(#view, #view > div, .cbi-map, [data-tab-title]:not(.cbi-section)) > .table .tr > :is(.th, .td):first-child { padding-left: var(--card-px); }
 :is(#view, #view > div, .cbi-map, [data-tab-title]:not(.cbi-section)) > .table .tr > :is(.th, .td):last-child { padding-right: var(--card-px); }
 #view > h3, #view > div > h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--fs-md); }
+/* LuCI 24.10: Status -> Overview's sections are #view's children with the
+   heading first (25.12 wraps it in .cbi-title): it keeps the header row's
+   bleed, which the rule above would replace */
+#view > .cbi-section > h3:first-child { margin: calc(-1 * var(--card-py)) calc(-1 * var(--card-px)) var(--card-py); }
 #view > h2:not(:first-child), #view > h3:not(:first-child) { margin-top: var(--sp-6); }
 .cbi-section > .table + h3, .cbi-section > .table + .cbi-title, .cbi-section > div + h3 { margin-top: var(--sp-6); }
 .includes { margin-top: var(--sp-4); }
@@ -2598,6 +2602,36 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 #view > .controls > * { padding-left: 0; padding-right: 0; }
 #view > .controls :is(.btn, .cbi-button).cbi-button-positive:not(.important) { color: var(--text); }
 
+/* LuCI 24.10: a named table section (Traffic Rules, Port Forwards, NAT)
+   has no name cell; the name is the row's data-title and the theme draws
+   it, as Bootstrap does. 25.12 renders a real cell (and sets no
+   data-title on its title row), so none of this matches there. */
+.table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-titles.named[data-title]::before {
+	content: attr(data-title);
+	display: table-cell; vertical-align: middle;
+	height: 36px; padding: 6px 12px 6px var(--card-px);
+	background: var(--s1);
+	border-bottom: 1px solid var(--line-2);
+	color: var(--text-3);
+	font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+	white-space: nowrap;
+}
+.table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-row[data-title]:not(:has(> .cbi-section-table-titles))::before {
+	content: attr(data-title);
+	display: table-cell; vertical-align: middle;
+	padding: 9px 12px 9px var(--card-px);
+	border-bottom: 1px solid var(--line);
+	color: var(--text);
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+}
+.table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-row[data-title]:last-child::before { border-bottom: 0; }
+.table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-row[data-title]:hover::before { background: color-mix(in srgb, var(--s3) 55%, transparent); }
+@media (width > 720px) {
+	.table:has(.cbi-section-table-titles.named[data-title]) .tr:not(.placeholder) > :is(.th, .td):first-child { padding-left: 12px; }   /* the name leads */
+}
+[id^="cbi-firewall-"] .table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-row[data-title]:has(input[data-widget-id$=".enabled"]:not(:checked))::before { color: var(--text-3); }
+
 /* ----------------------------------------------------- responsive */
 
 @media (max-width: 1100px) {
@@ -2820,6 +2854,14 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	#connections .tr:not(.table-titles) > .td:is(:nth-child(3), :nth-child(4)) { white-space: normal; overflow-wrap: anywhere; }
 	/* a zone and its forwards read across the card */
 	#cbi-firewall-zone .tr > .td:has(.zone-forwards) { flex-basis: 100%; }
+	/* LuCI 24.10: a named row's drawn name heads its card */
+	.table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-row[data-title]:not(:has(> .cbi-section-table-titles))::before {
+		display: block; flex: 1 1 100%;
+		padding: 4px var(--card-px); border: 0;
+		font-weight: 600;
+	}
+	[id^="cbi-firewall-"] .table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-row[data-title]:has(input[data-widget-id$=".enabled"])::before { padding-right: calc(var(--card-px) + 40px); }
+	.table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-row[data-title]:hover::before { background: none; }
 	/* nftables rule cards: LuCI's !important cell padding, on the card's edge */
 	#view .nft-rules .tr > .td, #view .nft-rules .tr > .td:is(:first-child, :last-child) { padding: 3px var(--card-px) !important; }
 	/* log filters: each field on its own line under its label */

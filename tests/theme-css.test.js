@@ -352,3 +352,43 @@ test('VM sweep: unzoned grey, short header rows, placeholders, view toggles and 
 	assert.match(bodyOf((s) => s === '.cbi-value-field > .cbi-checkbox + .cbi-value-description', /width > 720px/), /margin-top:\s*calc\(/);
 	assert.match(bodyOf((s) => s === '.cbi-value-field > br + .control-group'), /margin-top/);
 });
+
+/* LuCI 24.10 markup, as its form.js and status view render it */
+const M2410 = {
+	titles: '<tr class="tr cbi-section-table-titles named" data-title="Name"><th class="th cbi-section-table-cell">Match</th></tr>',
+	row: '<tr class="tr cbi-section-table-row" data-title="Allow-Ping"><td class="td cbi-value-field" data-title="Match"></td></tr>',
+	overview: '<div id="view"><div class="cbi-section"><h3>Memory</h3><div><table class="table"></table></div></div></div>'
+};
+const M2512 = {
+	titles: '<tr class="tr cbi-section-table-titles named"><th class="th cbi-section-table-cell">Name</th></tr>',
+	row: '<tr class="tr cbi-section-table-row" data-title="Allow-Ping"><td class="td cbi-value-field cbi-section-table-titles">Allow-Ping</td></tr>',
+	overview: '<div id="view"><div><div class="cbi-section"><div class="cbi-title"><h3>Memory<span class="label">Hide</span></h3></div><div></div></div></div></div>'
+};
+
+test('LuCI 24.10: a named row\'s name is drawn from data-title, and only where LuCI drew no name cell', () => {
+	const head = themeRules.find((r) => r.sel.some((s) => /\.cbi-section-table-titles\.named\[data-title\]::before$/.test(s)));
+	const row = themeRules.find((r) => !r.media && r.sel.some((s) => /\.cbi-section-table-row\[data-title\]:not\(:has\(> \.cbi-section-table-titles\)\)::before$/.test(s)));
+	assert.ok(head && row, 'found the rules');
+	for (const r of [ head, row ]) assert.match(r.body, /content:\s*attr\(data-title\);[\s\S]*display:\s*table-cell/);
+	/* the header pseudo needs data-title on the titles row: 24.10 sets it, 25.12 does not */
+	assert.match(M2410.titles, /cbi-section-table-titles named" data-title=/);
+	assert.doesNotMatch(M2512.titles, /data-title/);
+	/* both releases put data-title on rows; only 25.12 adds the name cell, which the row rule excludes */
+	assert.match(M2410.row, /data-title="Allow-Ping"/);
+	assert.doesNotMatch(M2410.row, /td [^>]*cbi-section-table-titles/);
+	assert.match(M2512.row, /td [^>]*cbi-section-table-titles/);
+	/* on phones the drawn name heads the card */
+	assert.match(phoneOf((s) => /\.cbi-section-table-row\[data-title\]:not\(:has\(> \.cbi-section-table-titles\)\)::before$/.test(s)), /display:\s*block[\s\S]*font-weight:\s*600/);
+});
+
+test('LuCI 24.10: Status -> Overview headings keep the card\'s header row', () => {
+	/* "#view > div > h3" (1,0,2) matched 24.10's bare section headings and
+	   pushed the header row down; the fix outweighs it */
+	assert.match(M2410.overview, /<div id="view"><div class="cbi-section"><h3>/);
+	assert.doesNotMatch(M2512.overview, /cbi-section"><h3>/);
+	const fix = bodyOf((s) => s === '#view > .cbi-section > h3:first-child');
+	assert.match(fix, /margin:\s*calc\(-1 \* var\(--card-py\)\) calc\(-1 \* var\(--card-px\)\) var\(--card-py\)/);
+	assert.match(themeCss, /#view > h3, #view > div > h3 \{ margin: var\(--sp-6\) 0 var\(--sp-3\);[^}]*\}[\s\S]*#view > \.cbi-section > h3:first-child \{/);
+	/* the memory / storage enhancers find the bare heading too */
+	assert.match(menuJs, /'#view \.cbi-section > \.cbi-title > h3, #view \.cbi-section > h3:first-child'/);
+});

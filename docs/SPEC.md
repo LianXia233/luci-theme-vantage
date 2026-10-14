@@ -121,6 +121,11 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   cell, hide empty cells, and give LuCI's wide columns (descriptions,
   addresses) the card's width. A tooltip is never clipped by the box
   that holds it and is sized to its text.
+- **LuCI 24.10** markup is supported where it differs, detected by
+  markup, never by version: Status → Overview's bare section headings
+  (header row, memory and storage meters) and named table sections whose
+  name is only the row's `data-title` (drawn as the name cell, the card
+  title on phones). These rules match nothing on 25.12.
 - 404 / CSRF pages render in the theme without leaking anything.
 - Focused fields show a 2 px `--focus` outline (border plus ring, at
   least 3:1 against field and card in both modes); text on coloured
