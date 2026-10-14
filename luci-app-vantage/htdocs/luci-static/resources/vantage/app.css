@@ -336,6 +336,11 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-editbar-actions { display: flex; gap: 8px; margin-left: auto; }
 .vt-app .vt-edit-field { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .vt-app .vt-edit-field label { font-size: var(--vt-fs-sm); color: var(--vt-text-2); white-space: nowrap; }
+/* narrow: the label above, the select across the bar, so a long choice
+   ("Mirrored, scale per direction") is not cut */
+@container vt (max-width: 699px) {
+	.vt-app .vt-edit-field { flex: 1 1 100%; flex-direction: column; align-items: stretch; gap: 4px; }
+}
 .vt-app .vt-select {
 	appearance: none; -webkit-appearance: none; min-width: 0; max-width: 100%;
 	height: var(--vt-ctl); padding: 0 30px 0 10px; margin: 0;
@@ -796,6 +801,9 @@ html[data-darkmode="true"] .vt-app {
 	font-size: var(--vt-fs-micro); line-height: 1; color: var(--vt-chart-axis); white-space: nowrap;
 }
 .vt-app .vt-mult-gap span { padding: 2px 4px; border-radius: 3px; background: var(--vt-surface); }
+/* a band too narrow for its label shows the hatching alone */
+.vt-app .vt-mult-gap { container-type: inline-size; }
+@container (max-width: 60px) { .vt-app .vt-mult-gap span { display: none; } }
 .vt-app .vt-mult-dot {
 	position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; z-index: 2;
 	background: var(--vt-sc); box-shadow: 0 0 0 2px var(--vt-surface); pointer-events: none;

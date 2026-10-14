@@ -23,12 +23,13 @@ return baseclass.extend({
 	/* Stored series (sessionStorage) are untrusted: keep arrays of exactly
 	   `width` finite numbers with values >= 0 (except t), strictly
 	   increasing t, nothing after notAfter, at most maxLen (newest). */
-	valid: function(arr, width, maxLen, notAfter) {
+	/* maxValue (optional): larger values are dropped as well */
+	valid: function(arr, width, maxLen, notAfter, maxValue) {
 		if (!Array.isArray(arr)) return [];
 		var out = [], lastT = -Infinity;
 		for (var i = 0; i < arr.length; i++) {
 			var p = arr[i], ok = Array.isArray(p) && p.length === width;
-			for (var j = 0; ok && j < width; j++) ok = finite(p[j]) && (j === 0 || p[j] >= 0);
+			for (var j = 0; ok && j < width; j++) ok = finite(p[j]) && (j === 0 || (p[j] >= 0 && !(maxValue != null && p[j] > maxValue)));
 			if (!ok || p[0] <= lastT || (notAfter != null && p[0] > notAfter)) continue;
 			out.push(p.slice());
 			lastT = p[0];
@@ -134,7 +135,9 @@ return baseclass.extend({
 
 	chartGeom: function(style, peakDn, peakUp) {
 		var self = this, floor = this.CHART_FLOOR;
-		var pd = finite(peakDn) ? peakDn : 0, pu = finite(peakUp) ? peakUp : 0;
+		/* peaks are capped so the scale arithmetic stays finite */
+		var cap = function(v) { return finite(v) ? Math.min(Math.max(v, 0), 1e13) : 0; };
+		var pd = cap(peakDn), pu = cap(peakUp);
 		var nice = function(v) { return self.niceCeil(Math.max(v * 1.05, floor)); };
 		var clamp = function(x) { return Math.max(0, Math.min(1, x)); };
 		/* a direction drawn over [top, base] (rising) or [base, top] (hanging) */
@@ -162,7 +165,8 @@ return baseclass.extend({
 				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: 1, v: su, dir: 'up', below: true } ] };
 		case 'lanes':
 			return { dn: lin(sd, 0, .44), up: lin(su, .6, 1), grid: [ 0, .6 ], axis: [ .44, 1 ],
-				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: 1, v: su, dir: 'up', below: true } ] };
+				/* each lane's scale at its own top line */
+				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: .6, v: su, dir: 'up', below: true } ] };
 		default:
 			return { dn: lin(shared, 0, 1), up: lin(shared, 0, 1), grid: [ 0, .5 ], axis: [ 1 ],
 				labels: [ { at: 0, v: shared } ] };

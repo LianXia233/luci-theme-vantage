@@ -505,7 +505,7 @@ return view.extend({
 		var net = Object.create(null);
 		if (stored.net && typeof stored.net === 'object')
 			Object.keys(stored.net).forEach(function(k) {
-				if (/^[A-Za-z0-9_.:-]{1,40}$/.test(k)) net[k] = series.valid(stored.net[k], 3, HIST_MAX, now);
+				if (/^[A-Za-z0-9_.:-]{1,40}$/.test(k)) net[k] = series.valid(stored.net[k], 3, HIST_MAX, now, model.MAX_BPS);
 			});
 		var clientHist = Object.create(null);
 		if (stored.clients && typeof stored.clients === 'object')

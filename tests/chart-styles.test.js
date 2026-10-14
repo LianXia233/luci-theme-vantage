@@ -150,3 +150,26 @@ test('chart style pick: read back, junk ignored, a change repaints and is rememb
 		assert.ok(!('vantage.chart.v1' in store), 'the default is not stored');
 	});
 });
+
+test('chart styles: the lanes upload label sits at its lane\'s top line', () => {
+	const g = series.chartGeom('lanes', 40e6, .8e6);
+	const up = g.labels.find((l) => l.dir === 'up');
+	near(up.at, .6);
+	assert.ok(g.grid.includes(.6), 'on a grid line');
+});
+
+test('chart history: restored values above the rate ceiling are dropped; scales stay finite', () => {
+	const t = Date.now();
+	const stored = [ [ t - 2000, 5e6, 1e6 ], [ t - 1000, Number.MAX_VALUE, Number.MAX_VALUE ], [ t, 5e11, 1 ] ];
+	assert.deepEqual(series.valid(stored, 3, 90, t, 400e9).map((p) => p[0]), [ t - 2000 ], 'MAX_VALUE and 5e11 dropped');
+	assert.equal(series.valid(stored, 3, 90, t).length, 3, 'without a ceiling nothing changes');
+	for (const style of series.CHART_STYLES)
+		for (const peak of [ Number.MAX_VALUE, 1e300, Infinity ]) {
+			const g = series.chartGeom(style, peak, peak);
+			for (const d of [ g.dn, g.up ]) {
+				assert.ok(Number.isFinite(d.scale), `${style} ${peak}: scale ${d.scale}`);
+				const f = d.frac(peak);
+				assert.ok(f >= 0 && f <= 1, `${style}: ${f}`);
+			}
+		}
+});
