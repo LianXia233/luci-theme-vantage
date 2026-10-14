@@ -25,8 +25,9 @@
      spelled out; 'all' matches everything; fw4 drops a leading '!'; ports
      only apply to tcp and udp;
    - a rule without a target does nothing; a redirect whose target is not
-     snat is a DNAT, to the router itself without dest_ip, and is skipped
-     from '*' or without a source zone;
+     snat is a DNAT, to the router itself without dest_ip or to one of its
+     addresses (masked to the prefix given), and is skipped from '*' or
+     without a source zone;
    - a script include needs fw4_compatible (default on, except for
      /etc/firewall.user).
    A zone faces the internet when it masquerades (masq or masq6), holds an
@@ -167,31 +168,96 @@ function setmatch(v) {
 	return m && /^[a-zA-Z_.][a-zA-Z0-9\/_.-]*/.test(m.val) ? m : null;
 }
 
-function ipFamily(a) {
-	if (/^\d{1,3}(\.\d{1,3}){3}$/.test(a)) return a.split('.').every(function(x) { return +x <= 255; }) ? 4 : 0;
-	return /^[0-9a-f.]*:[0-9a-f:.]*$/i.test(a) ? 6 : 0;
+/* inet_pton: a dotted quad without leading zeros, or IPv6 with an
+   optional :: and trailing quad -> [ byte ], null when it is neither */
+function ipBytes(a) {
+	a = String(a);
+	var q = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(a);
+	if (q) {
+		q = q.slice(1);
+		return q.every(function(x) { return (x === '0' || x[0] !== '0') && +x <= 255; }) ? q.map(Number) : null;
+	}
+	if (a.indexOf(':') < 0) return null;
+	var tail = [], m = /^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/.exec(a);
+	if (m) {
+		tail = ipBytes(m[2]);
+		if (!tail) return null;
+		a = /::$/.test(m[1]) ? m[1] : m[1].slice(0, -1);
+	}
+	var halves = a.split('::');
+	if (halves.length > 2) return null;
+	var groups = function(s) { return s === '' ? [] : s.split(':'); };
+	var head = groups(halves[0]), rest = halves.length === 2 ? groups(halves[1]) : [];
+	var need = 8 - tail.length / 2, n = head.length + rest.length;
+	if (head.concat(rest).some(function(g) { return !/^[0-9a-f]{1,4}$/i.test(g); })) return null;
+	if (halves.length === 2 ? n > need - 1 : n !== need) return null;
+	while (halves.length === 2 && head.length + rest.length < need) head.push('0');
+	var out = [];
+	head.concat(rest).forEach(function(g) { var x = parseInt(g, 16); out.push(x >> 8, x & 255); });
+	return out.concat(tail);
 }
 
-var ZERO = /^[0.:]+$/;
+function ipFamily(a) {
+	var b = ipBytes(a);
+	return b ? (b.length === 4 ? 4 : 6) : 0;
+}
 
-/* an address, address/bits, address/mask or range -> { family, all }
-   (all: the whole address space, as 0.0.0.0/0 or ::/0); null when it
-   is malformed, undefined when it is no address (a network name) */
+/* the leading one bits of a mask, -1 when they are not contiguous */
+function maskBits(m) {
+	var bits = 0, zero = false;
+	for (var i = 0; i < m.length; i++) {
+		for (var b = 7; b >= 0; b--) {
+			if (m[i] & (1 << b)) { if (zero) return -1; bits++; }
+			else zero = true;
+		}
+	}
+	return bits;
+}
+
+/* the address with all but its first `bits` bits cleared */
+function masked(bytes, bits) {
+	return bytes.map(function(x, i) {
+		var b = Math.max(0, Math.min(8, bits - 8 * i));
+		return x & ((0xff << (8 - b)) & 0xff);
+	});
+}
+
+function cmpBytes(a, b) {
+	for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
+	return 0;
+}
+
+/* an address, address/bits, address/mask or range -> { family, all,
+   bytes, bits, nc } or { family, all, range: [ lo, hi ] } (all: the
+   whole address space, as 0.0.0.0/0 or ::/0; nc: a mask that is not
+   contiguous, which fw4 applies to the address); null when it is
+   malformed, undefined when it is no address (a network name) */
 function subnet(s) {
-	var p = s.split('/'), r = s.split('-'), f;
+	var p = s.split('/'), r, a, b, bits;
 	if (p.length === 2) {
-		f = ipFamily(p[0]);
-		if (!f) return null;
-		if (/^\d+$/.test(p[1])) return { family: f, all: +p[1] === 0 };
-		return ipFamily(p[1]) === f ? { family: f, all: ZERO.test(p[1]) } : null;
+		a = ipBytes(p[0]);
+		if (!a) return null;
+		b = ipBytes(p[1]);
+		if (b) {
+			if (b.length !== a.length) return null;
+			bits = maskBits(b);
+			return { family: a.length === 4 ? 4 : 6, all: bits === 0, nc: bits < 0,
+				bytes: bits < 0 ? a.map(function(x, i) { return x & b[i]; }) : a, bits: bits };
+		}
+		if (!/^\d+$/.test(p[1])) return null;
+		return { family: a.length === 4 ? 4 : 6, all: +p[1] === 0, bytes: a, bits: +p[1] };
 	}
 	if (p.length > 2) return null;
-	if (r.length === 2 && ipFamily(r[0])) {
-		f = ipFamily(r[0]);
-		return ipFamily(r[1]) === f ? { family: f, all: ZERO.test(r[0]) && (r[1] === '255.255.255.255' || /^(ffff:){7}ffff$/i.test(r[1])) } : null;
+	r = s.split('-');
+	if (r.length === 2 && ipBytes(r[0])) {
+		a = ipBytes(r[0]);
+		b = ipBytes(r[1]);
+		if (!b || b.length !== a.length) return null;
+		return { family: a.length === 4 ? 4 : 6, range: [ a, b ],
+			all: a.every(function(x) { return x === 0; }) && b.every(function(x) { return x === 255; }) };
 	}
-	f = ipFamily(s);
-	return f ? { family: f, all: false } : undefined;
+	a = ipBytes(s);
+	return a ? { family: a.length === 4 ? 4 : 6, all: false, bytes: a, bits: a.length * 8 } : undefined;
 }
 
 /* ---- the interface dump */
@@ -203,22 +269,27 @@ function isUplink(i) {
 }
 
 /* network.interface dump -> { name: { up, uplink, device, zone, addrs, ips } },
-   null when there is none. The device is fw4's: l3_device, else device */
+   null when there is none. As fw4 reads it: the device is l3_device, else
+   device; addrs are the interface's subnets (what its name stands for in
+   a rule), ips the router's own addresses on it as bytes */
 function interfaces(dump) {
 	if (!Array.isArray(dump)) return null;
 	var out = Object.create(null);
+	var list = function(v) { return (Array.isArray(v) ? v : []).filter(function(a) { return a && a.address && ipBytes(a.address); }); };
 	dump.forEach(function(i) {
 		if (!i || !i.interface) return;
 		var dev = i.l3_device != null ? i.l3_device : i.device;
-		var a4 = (i['ipv4-address'] || []).filter(function(a) { return a && a.address; }),
-			a6 = (i['ipv6-address'] || []).filter(function(a) { return a && a.address; });
+		var own = list(i['ipv4-address']).concat(list(i['ipv6-address']),
+			list((Array.isArray(i['ipv6-prefix-assignment']) ? i['ipv6-prefix-assignment'] : []).map(function(p) { return p && p['local-address']; })));
 		out[String(i.interface)] = {
 			up: !!i.up, uplink: isUplink(i),
 			device: dev ? String(dev) : null,
 			zone: (i.data && i.data.zone) ? String(i.data.zone) : null,
-			addrs: a4.map(function(a) { return { family: 4, all: +a.mask === 0 }; })
-				.concat(a6.map(function(a) { return { family: 6, all: +a.mask === 0 }; })),
-			ips: a4.concat(a6).map(function(a) { return String(a.address); })
+			addrs: own.map(function(a) {
+				var b = ipBytes(a.address);
+				return { family: b.length === 4 ? 4 : 6, all: +a.mask === 0, bytes: b, bits: +a.mask };
+			}),
+			ips: own.map(function(a) { return ipBytes(a.address); })
 		};
 	});
 	return out;
@@ -465,8 +536,15 @@ return baseclass.extend({
 			if (!ifs) return { invert: n.invert, text: n.val, addrs: null };
 			return ifs[n.val] ? { invert: n.invert, text: n.val, addrs: ifs[n.val].addrs } : null;
 		};
-		var routerAddr = function(text) {
-			return !!ifs && Object.keys(ifs).some(function(n) { return ifs[n].ips.indexOf(text) >= 0; });
+		/* the router's own addresses: none known without the dump */
+		var own = ifs ? Object.keys(ifs).reduce(function(a, n) { return a.concat(ifs[n].ips); }, []) : null;
+		/* is an address (as fw4 DNATs to it: masked to its prefix, or a
+		   range) one of them? */
+		var isOwn = function(x) {
+			return own.some(function(b) {
+				if (x.range) return b.length === x.range[0].length && cmpBytes(b, x.range[0]) >= 0 && cmpBytes(b, x.range[1]) <= 0;
+				return b.length === x.bytes.length && cmpBytes(b, masked(x.bytes, x.bits)) === 0;
+			});
 		};
 
 		/* what a rule or redirect matches, read leniently so that a section
@@ -598,7 +676,7 @@ return baseclass.extend({
 			if (!r.bad && r.target === 'snat') return;
 			if (!r.bad && !r.src) r.bad = 'src';
 			if (!r.bad && r.src === '*') r.bad = 'src-any';
-			if (!r.bad && r.dest_ip && r.dest_ip.invert) r.bad = 'dest_ip';
+			if (!r.bad && r.dest_ip && (r.dest_ip.invert || (r.dest_ip.addrs || []).some(function(a) { return a.nc; }))) r.bad = 'dest_ip';
 			if (r.bad || !item.families.length) { item.bad = r.bad || 'family'; ignored.push(item); return; }
 			if (!fromInternet(r.src)) return;
 			/* the port on the target: dest_port, or the same as outside (fw4
@@ -606,7 +684,16 @@ return baseclass.extend({
 			var l4 = item.proto.some(function(p) { return p === 'tcp' || p === 'udp'; });
 			var inner = !l4 ? null : r.dest_port ? portRanges([ r.dest_port ]) : item.ports;
 			item.hostPort = inner ? rangeText(inner.pos) : '';
-			item.local = !r.dest_ip || routerAddr(r.dest_ip.text);
+			/* local: to the router itself (no dest_ip, or one of its own
+			   addresses however it is spelled); null when that cannot be
+			   told without the dump */
+			item.local = !r.dest_ip ? true : (!own || !r.dest_ip.addrs) ? null : r.dest_ip.addrs.some(isOwn);
+			if (item.local === null) {
+				fwd.push(item);
+				if (admin(item, inner))
+					warnings.push({ level: 'warn', code: 'admin-unsure', kind: 'redirect', name: item.name, host: item.host, ports: item.portText });
+				return;
+			}
 			if (!item.local) { fwd.push(item); return; }
 			open.push(item);
 			if (admin(item, inner))

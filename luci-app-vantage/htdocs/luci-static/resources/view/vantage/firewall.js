@@ -234,6 +234,11 @@ return view.extend({
 			reason = _('It accepts every port from any address, like a zone forwarding. Limit it to the ports and addresses you need.');
 			tab = 'rules';
 		}
+		else if (w.code === 'admin-unsure') {
+			title = _('%s may open the router\'s admin').format(w.name || w.ports);
+			reason = _('It forwards SSH or web ports from any address on the internet to %s. The interface list could not be read, so this page cannot tell whether that is the router itself.').format(w.host);
+			tab = 'forwards';
+		}
 		else {
 			title = _('Router admin open: %s').format(w.name || w.ports);
 			reason = _('SSH or the web interface answers any address on the internet. Limit the rule to the addresses you use.');

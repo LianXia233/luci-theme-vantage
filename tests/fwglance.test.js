@@ -75,7 +75,7 @@ test('fwglance: a stock router opens nothing; its default rules are standard hou
 });
 
 test('fwglance: open ports, forwards into the network and port forwards are listed', () => {
-	const r = fw.analyse(cfg(STOCK.concat([
+	const conf = cfg(STOCK.concat([
 		[ 'rule', { name: 'SSH from office', src: 'wan', src_ip: '203.0.113.10', proto: 'tcp', dest_port: '22', target: 'ACCEPT' } ],
 		[ 'rule', { name: 'Game', src: 'wan', proto: 'tcp udp', dest_port: '27015-27030', target: 'ACCEPT' } ],
 		[ 'rule', { name: 'NAS from wan', src: 'wan', dest: 'lan', dest_port: '5001', proto: 'tcp', target: 'ACCEPT' } ],
@@ -83,7 +83,8 @@ test('fwglance: open ports, forwards into the network and port forwards are list
 		[ 'rule', { name: 'No target does nothing', src: 'wan', dest_port: '9000' } ],
 		[ 'redirect', { name: 'Web server', src: 'wan', src_dport: '443', dest: 'lan', dest_ip: '192.0.2.20', dest_port: '443', proto: 'tcp' } ],
 		[ 'redirect', { name: 'Hairpin SNAT', src: 'lan', dest: 'wan', target: 'SNAT' } ]
-	])));
+	]));
+	const r = fw.analyse(conf, [ iface('lan', '192.0.2.1') ]);
 	assert.deepEqual(r.open.map(i => i.name), [ 'SSH from office', 'Game' ]);
 	assert.deepEqual(r.open[0].from, { anywhere: false, only: [ '203.0.113.10' ], except: [] });
 	assert.equal(r.open[0].family, 4, 'an IPv4 source makes the rule IPv4 only');
@@ -98,6 +99,11 @@ test('fwglance: open ports, forwards into the network and port forwards are list
 	assert.equal(web.local, false);
 	assert.equal(r.level, 'info', 'open but nothing risky: SSH is limited to one address');
 	assert.deepEqual(r.warnings, []);
+	/* without the dump the router's own addresses are unknown: so is
+	   whether 192.0.2.20 is one of them, and 443 there could be its admin */
+	const blind = fw.analyse(conf);
+	assert.equal(blind.forwards[1].local, null);
+	assert.deepEqual(codes(blind), [ 'admin-unsure:Web server' ]);
 });
 
 test('fwglance: the risky cases warn', () => {
@@ -430,7 +436,7 @@ const wanRedirect = (opts, dump) => fw.analyse(cfg(BASE.concat([ [ 'redirect', O
 
 test('A6: any redirect target but SNAT is a DNAT (CX M3, CS N2)', () => {
 	for (const target of [ 'ACCEPT', 'dnat', 'DNAT', 'drop', 'masquerade', 'acc' ]) {
-		const r = wanRedirect({ src_dport: '443', dest_ip: '192.0.2.10', dest_port: '443', target });
+		const r = wanRedirect({ src_dport: '443', dest_ip: '192.0.2.10', dest_port: '443', target }, [ iface('lan', '192.0.2.1') ]);
 		assert.deepEqual(r.forwards.map(i => i.name), [ 'P' ], target);
 		assert.equal(r.level, 'info', target);
 	}
@@ -628,6 +634,42 @@ test('S4: device wildcards and exclusions still decide (CX S4)', () => {
 	assert.deepEqual(codes(zone({ device: 'eth+' })), [ 'outside-input:wan_4' ], 'a wildcard for other devices');
 	assert.deepEqual(zone({ network: '!lan' }).outside, [], 'an exclusion alone takes every other device');
 	assert.deepEqual(codes(zone({ device: 'ww+an' })), [ 'outside-input:wan_4' ], 'fw4 skips a wildcard not at the end');
+});
+
+const ROUTER = [ Object.assign({}, LAN_DEV, { 'ipv6-address': [ { address: '2001:db8::1', mask: 64 } ],
+	'ipv6-prefix-assignment': [ { address: '2001:db8:1::', mask: 48, 'local-address': { address: '2001:db8:1::1', mask: 64 } } ] }), WAN_DEV ];
+
+test('S6: a redirect to the router\'s own address counts as local however it is spelled (CX S6)', () => {
+	for (const [ dest_ip, family ] of [ [ '192.0.2.1/32' ], [ '192.0.2.1/255.255.255.255' ], [ '192.0.2.1' ], [ '192.0.2.0-192.0.2.9' ],
+		[ '2001:DB8:0:0::1', 'ipv6' ], [ '2001:db8::1/128', 'ipv6' ], [ '2001:db8:0:0:0:0:0:1', 'ipv6' ], [ '2001:db8:1::1', 'ipv6' ] ]) {
+		const r = wanRedirect({ name: 'Router', src_dport: '2222', dest_ip, dest_port: '22', family }, ROUTER);
+		assert.deepEqual(r.open.map(i => [ i.name, i.local ]), [ [ 'Router', true ] ], dest_ip);
+		assert.deepEqual(r.forwards, [], dest_ip);
+		assert.deepEqual(codes(r), [ 'admin-open:Router' ], dest_ip);
+	}
+	/* fw4 DNATs to the address masked to its prefix: 192.0.2.0, a host */
+	for (const dest_ip of [ '192.0.2.1/24', '192.0.2.10', '2001:db8::10' ]) {
+		const r = wanRedirect({ name: 'Host', src_dport: '2222', dest_ip, dest_port: '22' }, ROUTER);
+		assert.deepEqual(r.forwards.map(i => [ i.name, i.local ]), [ [ 'Host', false ] ], dest_ip);
+		assert.deepEqual(r.warnings, [], dest_ip);
+	}
+	/* a network name stands for its subnet: fw4 DNATs to its base */
+	assert.equal(wanRedirect({ src_dport: '2222', dest_ip: 'lan', dest_port: '22' }, ROUTER).forwards[0].local, false);
+	/* fw4 refuses a mask that is not contiguous in dest_ip */
+	assert.deepEqual(wanRedirect({ src_dport: '2222', dest_ip: '192.0.2.1/255.0.255.255' }, ROUTER).ignored.map(i => i.bad), [ 'dest_ip' ]);
+});
+
+test('S6: without the dump a redirect\'s target stays unknown, and an admin port says so (CX S6)', () => {
+	for (const dest_ip of [ '192.0.2.1/32', '192.0.2.1', 'lan' ]) {
+		const r = wanRedirect({ name: 'Maybe', src_dport: '2222', dest_ip, dest_port: '22' });
+		assert.deepEqual(r.forwards.map(i => [ i.name, i.local ]), [ [ 'Maybe', null ] ], dest_ip);
+		assert.deepEqual(r.open, [], dest_ip);
+		assert.deepEqual(codes(r), [ 'admin-unsure:Maybe' ], dest_ip);
+		assert.equal(r.warnings[0].host, dest_ip);
+		assert.equal(r.level, 'warn');
+	}
+	assert.deepEqual(wanRedirect({ src_dport: '8080', dest_ip: '192.0.2.1', dest_port: '8080' }).warnings, [], 'no admin port: listed only');
+	assert.equal(wanRedirect({ src_dport: '2222', dest_port: '22' }).open[0].local, true, 'without dest_ip it is the router');
 });
 
 /* ------------------------------------------------------- the overview */
@@ -867,7 +909,7 @@ test('fw4 itself: the regressions\' openings are in the ruleset it writes', { sk
 	}
 });
 
-test('fw4 itself: the 1.0.7 final check\'s cases (CX S4)', { skip: NO_FW4 }, () => {
+test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6)', { skip: NO_FW4 }, () => {
 	const LAN = LAN_DEV, WAN = WAN_DEV;
 	const modem = [ LAN, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
 		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
@@ -877,12 +919,19 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4)', { skip: NO_FW4 }, () 
 		[ 'zone', { name: 'lan', network: 'lan', input: 'ACCEPT' } ],
 		[ 'zone', { name: 'wan', network: 'wan', family: 'ipv4', input: 'REJECT', masq: '1' } ],
 		[ 'zone', { name: 'wan6', network: 'wan6', family: 'ipv6', input: 'REJECT' } ] ];
+	const redirect = dest_ip => MASQ.concat([ [ 'redirect', { name: 'P', src: 'wan', proto: 'tcp', src_dport: '2222', dest_ip, dest_port: '22' } ] ]);
 	const cases = [
 		[ 'S4 modem alias', acceptIn(MASQ), modem, null, rs => /iifname "wwan0" jump input_wan/.test(chain(rs, 'input')) ],
 		[ 'S4 split families', SPLIT, split, null,
 			rs => /meta nfproto ipv4 iifname "eth1" jump input_wan /.test(chain(rs, 'input')) && /meta nfproto ipv6 iifname "eth1" jump input_wan6/.test(chain(rs, 'input')) ],
 		[ 'S4 excluded alias', [ [ 'defaults', { input: 'ACCEPT', forward: 'REJECT' } ], [ 'zone', { name: 'wan', device: 'wwan+', network: '!wan_4', input: 'REJECT' } ] ], modem, 'outside-input',
-			rs => /iifname "wwan\*" iifname != "wwan0" jump input_wan/.test(chain(rs, 'input')) && /policy accept;/.test(chain(rs, 'input')) ]
+			rs => /iifname "wwan\*" iifname != "wwan0" jump input_wan/.test(chain(rs, 'input')) && /policy accept;/.test(chain(rs, 'input')) ],
+		[ 'S6 masked router address', redirect('192.0.2.1/32'), [ LAN, WAN ], 'admin-open',
+			rs => /dnat 192\.0\.2\.1:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) && /ct status dnat accept/.test(chain(rs, 'input_wan')) ],
+		[ 'S6 prefix is the subnet base', redirect('192.0.2.1/24'), [ LAN, WAN ], null, rs => /dnat 192\.0\.2\.0:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) ],
+		[ 'S6 IPv6 spelling', MASQ.concat([ [ 'redirect', { name: 'P', src: 'wan', proto: 'tcp', family: 'ipv6', src_dport: '2222', dest_ip: '2001:DB8:0:0::1', dest_port: '22' } ] ]),
+			[ Object.assign({}, LAN, { 'ipv6-address': [ { address: '2001:db8::1', mask: 64 } ] }), WAN ], 'admin-open',
+			rs => /dnat \[2001:db8::1\]:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) ]
 	];
 	for (const [ name, list, dump, code, check ] of cases) {
 		const values = cfg(list);
@@ -894,12 +943,21 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4)', { skip: NO_FW4 }, () 
 	}
 });
 
-test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4)', async () => {
+test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S6)', async () => {
 	const modem = [ LAN_DEV, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
 		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
 	const alias = await page(cfg(acceptIn(MASQ)), modem);
 	assert.match(alias, /Nothing is open in your firewall rules/);
 	assert.doesNotMatch(alias, /in no zone/);
+	const masked = cfg(MASQ.concat([ [ 'redirect', { name: 'Router masked', src: 'wan', proto: 'tcp', src_dport: '2222', dest_ip: '192.0.2.1/32', dest_port: '22' } ] ]));
+	const local = await page(masked, [ LAN_DEV, WAN_DEV ]);
+	assert.match(local, /On this router\nRouter masked\nIPv4 TCP 2222 · from anywhere\nrouter port 22/);
+	assert.match(local, /Router admin open: Router masked/);
+	const blind = await page(masked);
+	assert.match(blind, /Router masked may open the router's admin/);
+	assert.match(blind, /to 192\.0\.2\.1\/32\. The interface list could not be read/);
+	assert.match(blind, /Into your network\nRouter masked/);
+	assert.doesNotMatch(blind, /Router admin open|Nothing is open/);
 });
 
 /* --------------------------- M1: ubus errors through LuCI's own rpc.js

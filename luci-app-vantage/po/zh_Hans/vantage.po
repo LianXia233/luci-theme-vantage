@@ -137,7 +137,7 @@ msgstr "%s（%s）已启用但未上线"
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:186
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:221
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:336
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:341
 msgid "%s (IPv%d)"
 msgstr "%s（IPv%d）"
 
@@ -246,6 +246,10 @@ msgstr "%s 让互联网进入 %s"
 #: luci-app-vantage/htdocs/luci-static/resources/vantage/insight.js:56
 msgid "%s link"
 msgstr "%s 链路"
+
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:238
+msgid "%s may open the router's admin"
+msgstr "%s 可能开放了路由器管理"
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:1215
 msgid "%s moved"
@@ -586,7 +590,7 @@ msgstr "自启动以来的计数器"
 msgid "Country"
 msgstr "国家"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:305
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:310
 msgid ""
 "Custom rule files are configured (%s); rules in them are not listed here."
 msgstr "已配置自定义规则文件（%s）；其中的规则不会在此列出。"
@@ -747,7 +751,7 @@ msgstr "筛选客户端"
 msgid "Firmware"
 msgstr "固件"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:349
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:354
 msgid "Forwarding %s to %s"
 msgstr "从 %s 转发到 %s"
 
@@ -775,7 +779,7 @@ msgstr "来自设备：%s"
 msgid "From network"
 msgstr "来自网络"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:309
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:314
 msgid ""
 "From the firewall configuration. Ports opened by UPnP or by custom rule "
 "files are not shown."
@@ -790,7 +794,7 @@ msgstr "网关"
 msgid "Gbit/s"
 msgstr "Gbit/s"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:340
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:345
 msgid "General Settings"
 msgstr "基本设置"
 
@@ -856,7 +860,7 @@ msgstr "IPv6"
 msgid "Identity"
 msgstr "身份"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:337
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:342
 msgid "In no zone: the default policies apply."
 msgstr "不属于任何区域：适用默认策略。"
 
@@ -864,7 +868,7 @@ msgstr "不属于任何区域：适用默认策略。"
 msgid "In use"
 msgstr "使用中"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:327
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:332
 msgid "Input"
 msgstr "入站数据"
 
@@ -889,7 +893,7 @@ msgstr "互联网"
 msgid "Internet-facing: %s"
 msgstr "面向互联网：%s"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:286
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:291
 msgid "Into your network"
 msgstr "进入你的网络"
 
@@ -900,6 +904,15 @@ msgid ""
 msgstr ""
 "它接受来自任意地址的所有端口，相当于区域转发。请将其限制为你需要的端口和地"
 "址。"
+
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:239
+msgid ""
+"It forwards SSH or web ports from any address on the internet to %s. The "
+"interface list could not be read, so this page cannot tell whether that is "
+"the router itself."
+msgstr ""
+"它将来自互联网上任何地址的 SSH 或网页端口转发到 %s。无法读取接口列表，因此本"
+"页无法判断该地址是否为路由器本身。"
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:2746
 msgid "Kernel"
@@ -1114,7 +1127,7 @@ msgstr "网络路径"
 msgid "Networks"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:334
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:339
 msgid "Networks: %s"
 msgstr "网络：%s"
 
@@ -1194,7 +1207,7 @@ msgstr "未检测到问题"
 msgid "No radios reported"
 msgstr "未报告射频"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:289
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:294
 msgid ""
 "No rule or port forward opens anything; the warnings above say what does."
 msgstr "没有规则或端口转发开放任何内容；上方的警告说明了开放的内容。"
@@ -1224,7 +1237,7 @@ msgstr ""
 "没有区域启用 IP 动态伪装、包含上行接口或名为 wan，因此本页无法判断哪一侧面向"
 "互联网。在接入点上这是正常的；在路由器上，请检查下方的区域。"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:339
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:344
 msgid "No zones are configured."
 msgstr "尚未配置区域。"
 
@@ -1265,7 +1278,7 @@ msgstr "不是站点 MAC 地址"
 msgid "Not connected"
 msgstr "未连接"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:357
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:362
 msgid "Not in effect"
 msgstr "未生效"
 
@@ -1285,7 +1298,7 @@ msgstr "无更多信息；地址已随机化"
 msgid "Nothing is open in your firewall rules"
 msgstr "你的防火墙规则中没有开放的内容"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:290
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:295
 msgid "Nothing is open in your firewall rules."
 msgstr "你的防火墙规则中没有开放的内容。"
 
@@ -1301,7 +1314,7 @@ msgstr "较旧的 %s 设备"
 msgid "Older Wi-Fi generation than the radio; uses more airtime"
 msgstr "比射频支持的 Wi-Fi 代际更旧；占用更多空口时间"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:285
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:290
 msgid "On this router"
 msgstr "在此路由器上"
 
@@ -1323,7 +1336,7 @@ msgstr "开放"
 msgid "Open details of %s"
 msgstr "打开 %s 的详情"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:310
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:315
 msgid "Open from the internet"
 msgstr "对互联网开放"
 
@@ -1371,7 +1384,7 @@ msgstr "隐藏时暂停"
 msgid "PiB"
 msgstr "PiB"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:294
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:299
 msgid ""
 "Ping and other control messages, multicast, DHCP renewals and IPsec passed "
 "on to your network: what every router lets in."
@@ -1475,11 +1488,11 @@ msgstr "其地址的反向 DNS"
 msgid "Root (overlay)"
 msgstr "Root（overlay）"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:238
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:243
 msgid "Router admin open: %s"
 msgstr "路由器管理已开放：%s"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:239
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:244
 msgid ""
 "SSH or the web interface answers any address on the internet. Limit the rule "
 "to the addresses you use."
@@ -1552,7 +1565,7 @@ msgstr "未报告信号"
 msgid "Speed"
 msgstr "速率"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:293
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:298
 msgid "Standard housekeeping: %d rule"
 msgid_plural "Standard housekeeping: %d rules"
 msgstr[0] "标准常规规则：%d 条"
@@ -1590,7 +1603,7 @@ msgstr "信号强，%s"
 msgid "Swap"
 msgstr "交换分区"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:357
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:362
 msgid "Switched off"
 msgstr "已关闭"
 
@@ -1658,7 +1671,7 @@ msgstr "无法检查上行接口"
 msgid "This access point"
 msgstr "此接入点"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:337
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:342
 msgid "This address family is in no zone: the default policies apply."
 msgstr "此地址族不属于任何区域：适用默认策略。"
 
@@ -1735,8 +1748,8 @@ msgstr "流量大户"
 msgid "Traffic"
 msgstr "流量"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:310
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:357
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:315
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:362
 msgid "Traffic Rules"
 msgstr "通信规则"
 
@@ -1758,7 +1771,7 @@ msgstr "当前流量"
 msgid "Tx power"
 msgstr "发射功率"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:302
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:307
 msgid ""
 "UPnP is installed: devices on your network can open ports on their own while "
 "it runs, and those are not listed here."
@@ -2002,11 +2015,11 @@ msgstr "无线设置"
 msgid "Your name for this device"
 msgstr "你为此设备设置的名称"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:351
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:356
 msgid "Zone %s"
 msgstr "区域 %s"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:340
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:345
 msgid "Zones"
 msgstr "区域"
 
@@ -2030,7 +2043,7 @@ msgstr ""
 msgid "any zone"
 msgstr "任意区域"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:319
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:324
 msgid "any zone (default policy)"
 msgstr "任意区域（默认策略）"
 
@@ -2059,7 +2072,7 @@ msgstr "采集中 · 首个样本"
 msgid "collecting…"
 msgstr "采集中…"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:353
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:358
 msgid "custom rule file"
 msgstr "自定义规则文件"
 
@@ -2079,7 +2092,7 @@ msgstr "例如：客厅电视"
 msgid "except %s"
 msgstr "除 %s 外"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:320
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:325
 msgid "forwards nowhere"
 msgstr "不转发到任何区域"
 
@@ -2135,7 +2148,7 @@ msgstr "已忽略：选项 %s 的值被 firewall4 拒绝"
 msgid "ignored: zone %s does not exist or is switched off"
 msgstr "已忽略：区域 %s 不存在或已关闭"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:326
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:331
 msgid "internet"
 msgstr "互联网"
 
@@ -2240,7 +2253,7 @@ msgstr "峰值"
 msgid "per core"
 msgstr "每核"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:355
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:360
 msgid "port forward"
 msgstr "端口转发"
 
@@ -2268,7 +2281,7 @@ msgstr "在 %s 上发送"
 msgid "short GI"
 msgstr "短 GI"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:347
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:352
 msgid "switched off"
 msgstr "已关闭"
 
@@ -2276,7 +2289,7 @@ msgstr "已关闭"
 msgid "this router"
 msgstr "此路由器"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:355
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:360
 msgid "traffic rule"
 msgstr "通信规则"
 
@@ -2288,11 +2301,11 @@ msgstr "已运行 %s"
 msgid "who uses the bandwidth"
 msgstr "带宽使用者"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:351
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:356
 msgid "zone"
 msgstr "区域"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:349
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:354
 msgid "zone forwarding"
 msgstr "区域转发"
 
