@@ -206,26 +206,46 @@ text around it so it looks the same size.
   The pick is saved in `localStorage`, validated on read; the tile's size
   and place don't change with it.
 - **Firewall overview** (Network → Firewall → Overview, first tab):
-  read-only, from uci `firewall`. A zone faces the internet when it
-  masquerades, holds the uplink (an interface with the IPv4 default route
-  and a public address, from `network.interface dump`: routers with
-  public addresses run without NAT; an access point's default route runs
-  over a private address and does not count), or, by OpenWrt's naming,
-  is called wan/wan6 or holds the wan/wan6 network. It lists what is open on the router and what
-  reaches the network (accepting rules from those zones, port forwards
-  with their target), keeps ping, multicast, IPsec and DHCP renewals
-  apart as standard housekeeping, maps each zone's input policy and
-  forwardings, lists what is switched off, and warns when the
-  internet-facing zone accepts input, forwards into another zone, or a
-  rule opens the router's SSH, telnet or web ports to any address. Every
-  item links to the LuCI tab that changes it. When no zone qualifies it
-  says it found none (expected on an access point) and shows the zones
-  only. It covers only
-  what the config says, and says so: with nothing open the headline is
-  "Nothing is open in your firewall rules"; ports UPnP opens at run time
-  get a note when luci-app-upnp is installed (its menu entry exists),
-  custom rule files when the config includes any, and otherwise a
-  footnote names both.
+  read-only, from uci `firewall`, read the way firewall4 (fw4, as 25.12
+  ships it) reads it: its boolean spellings (1/on/true/yes, 0/off/false/
+  no), policies and targets by prefix, sections it skips (a value it
+  refuses, a switched-off zone and the rules naming it, a port forward
+  from `*`) listed as not in effect, zone policies falling back to the
+  `defaults` section and then to DROP. A zone faces the internet when it
+  masquerades (`masq` or `masq6`), holds the uplink (an interface with the
+  IPv4 default route and a public address, from `network.interface dump`,
+  by network, device or the interface's own zone; public means outside
+  the IANA special-purpose blocks that are not globally reachable:
+  routers with public addresses run without NAT; an access point's
+  default route runs over a private address and does not count), or, by
+  OpenWrt's naming, is called wan/wan6 or holds the wan/wan6 network. An
+  uplink in no zone, the networks of a switched-off internet zone and the
+  family an internet zone leaves out meet the `defaults` policies, and
+  are shown as such. It lists what is open on the router (accepting
+  rules, and port forwards without a target address or to the router's
+  own) and what reaches the network (accepting rules into a zone, port
+  forwards with their target and port); protocols, ports and sources as
+  fw4 matches them ('all' ignores ports, numeric and `tcpudp` spellings,
+  `0.0.0.0/0` and negated sources are no restriction), with the address
+  family when the item has only one. Ping, multicast, DHCP renewals and
+  IPsec passed on to the network are kept apart as standard housekeeping;
+  IKE or ESP to the router itself is an opening. It maps each zone's
+  input policy and forwardings (with a forwarding from `*` in every zone,
+  and an accepting default forward policy as "any zone"), and warns when
+  an internet-facing zone or uplink accepts input, the internet is
+  forwarded into another zone (by a forwarding, also from `*`, by an
+  accepting rule for every port and address, or by the default forward
+  policy), or a rule or port forward opens the router's SSH, telnet or
+  web ports to any address. Every item links to the LuCI tab that changes
+  it. When no zone or uplink qualifies it says it found none (expected on
+  an access point), with a neutral marker, and shows the zones only; a
+  config it cannot read is an error, not that. It covers only what the
+  config says, and says so: with nothing open the headline is "Nothing is
+  open in your firewall rules"; ports UPnP opens at run time get a note
+  when luci-app-upnp is installed (its menu entry exists), custom rule
+  files when the config names any (said to be configured: fw4 ignores a
+  script include without `fw4_compatible`, shown as not in effect), and
+  otherwise a footnote names both.
 - **Controls** (buttons, filter, chips, sort headers, icon buttons) take
   the theme's control height through `--v-ctl-h` (36 px, 44 px on
   touch) and the theme's control radius (`--v-r`); under another theme
