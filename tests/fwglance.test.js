@@ -75,7 +75,7 @@ test('fwglance: a stock router opens nothing; its default rules are standard hou
 });
 
 test('fwglance: open ports, forwards into the network and port forwards are listed', () => {
-	const r = fw.analyse(cfg(STOCK.concat([
+	const conf = cfg(STOCK.concat([
 		[ 'rule', { name: 'SSH from office', src: 'wan', src_ip: '203.0.113.10', proto: 'tcp', dest_port: '22', target: 'ACCEPT' } ],
 		[ 'rule', { name: 'Game', src: 'wan', proto: 'tcp udp', dest_port: '27015-27030', target: 'ACCEPT' } ],
 		[ 'rule', { name: 'NAS from wan', src: 'wan', dest: 'lan', dest_port: '5001', proto: 'tcp', target: 'ACCEPT' } ],
@@ -83,7 +83,8 @@ test('fwglance: open ports, forwards into the network and port forwards are list
 		[ 'rule', { name: 'No target does nothing', src: 'wan', dest_port: '9000' } ],
 		[ 'redirect', { name: 'Web server', src: 'wan', src_dport: '443', dest: 'lan', dest_ip: '192.0.2.20', dest_port: '443', proto: 'tcp' } ],
 		[ 'redirect', { name: 'Hairpin SNAT', src: 'lan', dest: 'wan', target: 'SNAT' } ]
-	])));
+	]));
+	const r = fw.analyse(conf, [ iface('lan', '192.0.2.1') ]);
 	assert.deepEqual(r.open.map(i => i.name), [ 'SSH from office', 'Game' ]);
 	assert.deepEqual(r.open[0].from, { anywhere: false, only: [ '203.0.113.10' ], except: [] });
 	assert.equal(r.open[0].family, 4, 'an IPv4 source makes the rule IPv4 only');
@@ -98,6 +99,11 @@ test('fwglance: open ports, forwards into the network and port forwards are list
 	assert.equal(web.local, false);
 	assert.equal(r.level, 'info', 'open but nothing risky: SSH is limited to one address');
 	assert.deepEqual(r.warnings, []);
+	/* without the dump the router's own addresses are unknown: so is
+	   whether 192.0.2.20 is one of them, and 443 there could be its admin */
+	const blind = fw.analyse(conf);
+	assert.equal(blind.forwards[1].local, null);
+	assert.deepEqual(codes(blind), [ 'admin-unsure:Web server' ]);
 });
 
 test('fwglance: the risky cases warn', () => {
@@ -430,7 +436,7 @@ const wanRedirect = (opts, dump) => fw.analyse(cfg(BASE.concat([ [ 'redirect', O
 
 test('A6: any redirect target but SNAT is a DNAT (CX M3, CS N2)', () => {
 	for (const target of [ 'ACCEPT', 'dnat', 'DNAT', 'drop', 'masquerade', 'acc' ]) {
-		const r = wanRedirect({ src_dport: '443', dest_ip: '192.0.2.10', dest_port: '443', target });
+		const r = wanRedirect({ src_dport: '443', dest_ip: '192.0.2.10', dest_port: '443', target }, [ iface('lan', '192.0.2.1') ]);
 		assert.deepEqual(r.forwards.map(i => i.name), [ 'P' ], target);
 		assert.equal(r.level, 'info', target);
 	}
@@ -565,23 +571,205 @@ test('B21: includes are configured, and fw4 ignores a script without fw4_compati
 	assert.deepEqual(fw.analyse(cfg(STOCK)).includes, []);
 });
 
+/* ---------------------------------------- 1.0.7 final check (Codex) */
+
+const acceptIn = list => withDefaults(list, { input: 'ACCEPT' });
+const zoneOpts = (list, name, opts) => list.map(([ t, o ]) => [ t, t === 'zone' && o.name === name ? Object.assign({}, o, opts) : o ]);
+const LAN_DEV = Object.assign(iface('lan', '192.0.2.1'), { device: 'br-lan', l3_device: 'br-lan' });
+const WAN_DEV = Object.assign(iface('wan', '198.51.100.2'), { device: 'eth1', l3_device: 'eth1' });
+const MASQ = zoneOpts(BASE, 'wan', { masq: '1' });
+
+test('S4: networks on one device are one to fw4: an alias of the wan device is in the wan zone (CX S4)', () => {
+	/* a modem: wan holds the device, dynamic wan_4 the address and route */
+	const modem = [ LAN_DEV, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
+		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
+	for (const list of [ acceptIn(MASQ), MASQ ]) {
+		const r = fw.analyse(cfg(list), modem);
+		assert.deepEqual(r.outside, [], 'wan_4 arrives on wwan0, which the wan zone takes');
+		assert.deepEqual(r.warnings, []);
+		assert.equal(r.level, 'ok');
+	}
+	/* fw4 takes l3_device when set, else device; one without a device matches nothing */
+	assert.deepEqual(fw.analyse(cfg(acceptIn(MASQ)), [ Object.assign(iface('wan', null), { device: 'wwan0', l3_device: null }),
+		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: 'wwan0', l3_device: undefined }) ]).outside, []);
+	/* a network the dump puts in a zone (data.zone) brings its device along */
+	const byData = fw.analyse(cfg(acceptIn([ [ 'defaults', {} ], [ 'zone', { name: 'wan', input: 'REJECT', masq: '1' } ] ])),
+		[ Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0', data: { zone: 'wan' } }),
+			Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { l3_device: 'wwan0' }) ]);
+	assert.deepEqual(byData.outside, []);
+	/* without the dump networks still compare by name */
+	assert.deepEqual(fw.analyse(cfg(acceptIn(MASQ))).outside, []);
+});
+
+test('S4: zones split by family on one device take both families (CX S4)', () => {
+	const split = [
+		[ 'defaults', { input: 'ACCEPT', output: 'ACCEPT', forward: 'REJECT' } ],
+		[ 'zone', { name: 'lan', network: 'lan', input: 'ACCEPT', output: 'ACCEPT', forward: 'ACCEPT' } ],
+		[ 'zone', { name: 'wan', network: 'wan', family: 'ipv4', input: 'REJECT', output: 'ACCEPT', forward: 'REJECT', masq: '1' } ],
+		[ 'zone', { name: 'wan6', network: 'wan6', family: 'ipv6', input: 'REJECT', output: 'ACCEPT', forward: 'REJECT' } ]
+	];
+	const wan6 = Object.assign(iface('wan6', null), { device: 'eth1', l3_device: 'eth1', 'ipv6-address': [ { address: '2001:db8::2', mask: 64 } ] });
+	const dump = [ LAN_DEV, Object.assign({}, WAN_DEV, { route: [ { target: '0.0.0.0', mask: 0 } ], 'ipv4-address': [ { address: PUBLIC, mask: 24 } ] }), wan6 ];
+	const r = fw.analyse(cfg(split), dump);
+	assert.deepEqual(r.outside, [], 'no complementary-family row: the other zone takes it on eth1');
+	assert.deepEqual(r.warnings, []);
+	assert.equal(r.level, 'ok');
+	/* on separate devices each family the other zone does not take is outside */
+	const apart = fw.analyse(cfg(split), [ LAN_DEV, dump[1], Object.assign({}, wan6, { device: 'eth2', l3_device: 'eth2' }) ]);
+	assert.deepEqual(apart.outside, [ { name: 'wan', family: 6, zone: true }, { name: 'wan6', family: 4, zone: true } ]);
+	assert.deepEqual(codes(apart), [ 'outside-input:wan', 'outside-input:wan6' ]);
+	/* the other family must cover everything the zone takes, not just one network */
+	const half = fw.analyse(cfg(acceptIn([ [ 'zone', { name: 'wan', network: [ 'wan', 'wan6' ], family: 'ipv4', input: 'REJECT' } ],
+		[ 'zone', { name: 'v6', network: 'wan6', family: 'ipv6', input: 'REJECT' } ] ])));
+	assert.deepEqual(half.outside, [ { name: 'wan', family: 6, zone: true } ]);
+});
+
+test('S4: device wildcards and exclusions still decide (CX S4)', () => {
+	const wan = Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' });
+	const wan4 = Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' });
+	const zone = opts => fw.analyse(cfg([ [ 'defaults', { input: 'ACCEPT', forward: 'REJECT' } ], [ 'zone', Object.assign({ name: 'wan', input: 'REJECT' }, opts) ] ]), [ LAN_DEV, wan, wan4 ]);
+	assert.deepEqual(zone({ device: 'wwan+' }).outside, [], 'a wildcard takes wwan0');
+	/* excluding wan_4 excludes its device: fw4 writes iifname "wwan*" iifname != "wwan0" */
+	assert.deepEqual(codes(zone({ device: 'wwan+', network: '!wan_4' })), [ 'outside-input:wan_4' ]);
+	assert.deepEqual(codes(zone({ device: 'eth+' })), [ 'outside-input:wan_4' ], 'a wildcard for other devices');
+	assert.deepEqual(zone({ network: '!lan' }).outside, [], 'an exclusion alone takes every other device');
+	assert.deepEqual(codes(zone({ device: 'ww+an' })), [ 'outside-input:wan_4' ], 'fw4 skips a wildcard not at the end');
+});
+
+const withSet = (set, rule) => fw.analyse(cfg(BASE.concat(set ? [ [ 'ipset', Object.assign({ name: 'mine', family: 'ipv4', entry: [ '203.0.113.5' ] }, set) ] ] : [],
+	[ [ 'rule', Object.assign({ name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' }, rule) ] ])));
+
+test('S5: a set limits who connects only when it matches the source address (CX S5)', () => {
+	/* fw4: tcp dport 22 ip daddr @mine accept: anyone may connect */
+	const dst = withSet({ match: 'dest_ip' });
+	assert.deepEqual(dst.open[0].from, { anywhere: true, only: [], except: [] });
+	assert.deepEqual(codes(dst), [ 'admin-open:SSH' ]);
+	for (const [ set, rule, why ] of [
+		[ { match: 'dst_net' }, {}, 'a destination net set' ],
+		[ { match: 'src_ip' }, { ipset: 'mine dst' }, 'a source set matched on the destination' ],
+		[ { match: 'src_ip' }, { ipset: '!mine' }, 'a negated set' ],
+		[ { match: 'src_mac' }, {}, 'a MAC set: the upstream router\'s' ],
+		[ { match: 'dest_port' }, {}, 'a port set' ],
+		[ null, {}, 'a set this config does not define' ],
+		[ { match: 'src_ip', enabled: '0' }, {}, 'a set that is switched off' ],
+		[ { match: 'src_ip', family: 'any' }, {}, 'an address set fw4 refuses' ],
+		[ { match: 'src_ip', maxelem: 'lots' }, {}, 'a set with a value fw4 refuses' ],
+		[ {}, {}, 'a set without match types' ]
+	]) {
+		const r = withSet(set, rule);
+		assert.equal(r.open[0].from.anywhere, true, why);
+		assert.deepEqual(codes(r), [ 'admin-open:SSH' ], why);
+	}
+	for (const [ set, rule, why ] of [
+		[ { match: 'src_ip' }, {}, 'a source address set' ],
+		[ { match: 'ip' }, {}, 'unprefixed is the source' ],
+		[ { match: 'dest_ip' }, { ipset: 'mine src' }, 'a destination set matched on the source' ],
+		[ { match: [ 'src_net', 'dest_port' ] }, {}, 'a source and port set' ]
+	]) {
+		const r = withSet(set, rule);
+		assert.deepEqual(r.open[0].from, { anywhere: false, only: [ '@mine' ], except: [] }, why);
+		assert.deepEqual(r.warnings, [], why);
+	}
+	/* the set's family is the rule's, as fw4 infers it */
+	assert.equal(withSet({ match: 'src_ip', family: 'ipv6', entry: [ '2001:db8::5' ] }).open[0].family, 6);
+});
+
+const ROUTER = [ Object.assign({}, LAN_DEV, { 'ipv6-address': [ { address: '2001:db8::1', mask: 64 } ],
+	'ipv6-prefix-assignment': [ { address: '2001:db8:1::', mask: 48, 'local-address': { address: '2001:db8:1::1', mask: 64 } } ] }), WAN_DEV ];
+
+test('S6: a redirect to the router\'s own address counts as local however it is spelled (CX S6)', () => {
+	for (const [ dest_ip, family ] of [ [ '192.0.2.1/32' ], [ '192.0.2.1/255.255.255.255' ], [ '192.0.2.1' ], [ '192.0.2.0-192.0.2.9' ],
+		[ '2001:DB8:0:0::1', 'ipv6' ], [ '2001:db8::1/128', 'ipv6' ], [ '2001:db8:0:0:0:0:0:1', 'ipv6' ], [ '2001:db8:1::1', 'ipv6' ] ]) {
+		const r = wanRedirect({ name: 'Router', src_dport: '2222', dest_ip, dest_port: '22', family }, ROUTER);
+		assert.deepEqual(r.open.map(i => [ i.name, i.local ]), [ [ 'Router', true ] ], dest_ip);
+		assert.deepEqual(r.forwards, [], dest_ip);
+		assert.deepEqual(codes(r), [ 'admin-open:Router' ], dest_ip);
+	}
+	/* fw4 DNATs to the address masked to its prefix: 192.0.2.0, a host */
+	for (const dest_ip of [ '192.0.2.1/24', '192.0.2.10', '2001:db8::10' ]) {
+		const r = wanRedirect({ name: 'Host', src_dport: '2222', dest_ip, dest_port: '22' }, ROUTER);
+		assert.deepEqual(r.forwards.map(i => [ i.name, i.local ]), [ [ 'Host', false ] ], dest_ip);
+		assert.deepEqual(r.warnings, [], dest_ip);
+	}
+	/* a network name stands for its subnet: fw4 DNATs to its base */
+	assert.equal(wanRedirect({ src_dport: '2222', dest_ip: 'lan', dest_port: '22' }, ROUTER).forwards[0].local, false);
+	/* fw4 refuses a mask that is not contiguous in dest_ip */
+	assert.deepEqual(wanRedirect({ src_dport: '2222', dest_ip: '192.0.2.1/255.0.255.255' }, ROUTER).ignored.map(i => i.bad), [ 'dest_ip' ]);
+});
+
+test('S6: without the dump a redirect\'s target stays unknown, and an admin port says so (CX S6)', () => {
+	for (const dest_ip of [ '192.0.2.1/32', '192.0.2.1', 'lan' ]) {
+		const r = wanRedirect({ name: 'Maybe', src_dport: '2222', dest_ip, dest_port: '22' });
+		assert.deepEqual(r.forwards.map(i => [ i.name, i.local ]), [ [ 'Maybe', null ] ], dest_ip);
+		assert.deepEqual(r.open, [], dest_ip);
+		assert.deepEqual(codes(r), [ 'admin-unsure:Maybe' ], dest_ip);
+		assert.equal(r.warnings[0].host, dest_ip);
+		assert.equal(r.level, 'warn');
+	}
+	assert.deepEqual(wanRedirect({ src_dport: '8080', dest_ip: '192.0.2.1', dest_port: '8080' }).warnings, [], 'no admin port: listed only');
+	assert.equal(wanRedirect({ src_dport: '2222', dest_port: '22' }).open[0].local, true, 'without dest_ip it is the router');
+});
+
+test('N1: a zone option fw4 refuses skips the zone; its networks meet the accepting default (CX N1)', () => {
+	const dump = [ LAN_DEV, WAN_DEV ];
+	for (const [ opts, bad ] of [
+		[ { log: 'yes' }, 'log' ], [ { subnet: 'nonsense' }, 'subnet' ], [ { subnet: '192.0.2.0/24 nosuch' }, 'subnet' ],
+		[ { masq_src: 'nosuchnet' }, 'masq_src' ], [ { masq_dest: '!192.0.002.1' }, 'masq_dest' ], [ { log_limit: '10/fortnight' }, 'log_limit' ],
+		[ { extra: [ 'a', 'b' ] }, 'extra' ], [ { custom_chains: 'Yes' }, 'custom_chains' ], [ { helper: 'bogus' }, 'helper' ],
+		[ { counter: 'maybe' }, 'counter' ], [ { mtu_fix: '2' }, 'mtu_fix' ], [ { masq_allow_invalid: 'y' }, 'masq_allow_invalid' ],
+		[ { auto_helper: 'nope' }, 'auto_helper' ], [ { log: [ '1', '2' ] }, 'log' ]
+	]) {
+		const r = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', opts))), dump);
+		assert.deepEqual(r.ignored.map(i => i.kind + ':' + i.bad), [ 'zone:' + bad ], JSON.stringify(opts));
+		assert.deepEqual(codes(r), [ 'outside-input:wan' ], JSON.stringify(opts));
+		assert.equal(r.level, 'err', JSON.stringify(opts));
+	}
+	for (const opts of [ { log: '1' }, { log: '0x10' }, { log_limit: '10/min' }, { helper: [ 'ftp', '!sip' ] }, { counter: 'off' },
+		{ masq_src: [ '192.0.2.0/24', '!192.0.2.9' ] }, { masq_dest: 'lan' }, { extra: '-m comment' }, { mtu_fix: 'yes' } ]) {
+		const r = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', opts))), dump);
+		assert.deepEqual(r.ignored, [], JSON.stringify(opts));
+		assert.equal(r.level, 'ok', JSON.stringify(opts));
+	}
+	/* the defaults section's numbers, limits and reject codes too */
+	for (const opts of [ { synflood_burst: 'x' }, { synflood_rate: 'fast' }, { tcp_reject_code: 'icmp' }, { tcp_ecn: 'on' } ])
+		assert.deepEqual(codes(fw.analyse(cfg(withDefaults(STOCK, opts)))).map(c => c.split(':')[0]), [ 'defaults-invalid' ], JSON.stringify(opts));
+	assert.deepEqual(fw.analyse(cfg(withDefaults(STOCK, { synflood_rate: '50/s', any_reject_code: 'admin' }))).warnings, []);
+});
+
+test('N1: an internet zone\'s covered subnets leave every other address to the default policy', () => {
+	const dump = [ LAN_DEV, WAN_DEV ];
+	/* fw4: meta nfproto ipv4 iifname "eth1" ip saddr 203.0.113.0/24 jump input_wan; the rest meets policy accept */
+	for (const subnet of [ '203.0.113.0/24', 'wan', '!203.0.113.0/24', [ '0.0.0.0/0' ] ]) {
+		const r = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet }))), dump);
+		assert.deepEqual(codes(r), [ 'zone-subnet:wan>' ], JSON.stringify(subnet));
+		assert.equal(r.level, 'err');
+	}
+	assert.deepEqual(fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet: [ '0.0.0.0/0', '::/0' ] }))), dump).warnings, [], 'both whole families');
+	assert.deepEqual(fw.analyse(cfg(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' })), dump).warnings, [], 'a rejecting default closes the rest');
+	/* a network name cannot be checked without the dump: the zone stays,
+	   and the accepting default with unknown interfaces is a caution */
+	const blind = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { masq_src: 'office' }))));
+	assert.deepEqual(blind.ignored, []);
+	assert.deepEqual(codes(blind), [ 'uplinks-unknown:' ]);
+	assert.notEqual(blind.level, 'ok');
+});
+
 /* ------------------------------------------------------- the overview */
 
 /* view/vantage/firewall.js with stub LuCI modules; E() builds plain
-   objects and text() reads them back */
-function loadView(replies) {
+   objects and text() reads them back. `replies` stand in for whole rpc
+   calls: 'object method' -> () => Promise of what the call resolves to
+   (the ubus reply data, as a declaration without `expect` returns it).
+   With `rpc` the view gets that module instead (LuCI's own rpc.js). */
+function loadView(replies, rpc) {
 	const src = fs.readFileSync(path.join(RES, 'view/vantage/firewall.js'), 'utf8');
 	global.E = (tag, attrs, children) => ({ tag, attrs: attrs || {}, children: children == null ? [] : [].concat(children) });
 	global.document = { createElementNS: () => ({ setAttribute() {}, appendChild() {} }) };
 	global.fetch = () => Promise.reject(new Error('no fetch'));
-	global.L = {
-		url: (...p) => '/' + p.join('/'),
-		resource: p => '/' + p,
-		resolveDefault: (p, d) => Promise.resolve(p).catch(() => d)
-	};
+	global.L = luciL();
 	const stubs = {
 		view: { extend: p => p },
-		rpc: { declare: o => () => replies[o.object + ' ' + o.method]() },
+		rpc: rpc ? rpc() : { declare: o => () => replies[o.object + ' ' + o.method]() },
 		ui: { menu: { load: () => Promise.resolve({ children: {} }) } },
 		'vantage.fwglance': fw
 	};
@@ -593,6 +781,19 @@ function loadView(replies) {
 	return new Function(...params, src)(...values);
 }
 
+/* the parts of LuCI's L the view and rpc.js use */
+function luciL() {
+	return {
+		env: {},
+		url: (...p) => '/' + p.join('/'),
+		resource: p => '/' + p,
+		resolveDefault: (p, d) => Promise.resolve(p).catch(() => d),
+		isObject: v => v != null && typeof v === 'object' && !Array.isArray(v),
+		bind: (fn, self, ...args) => fn.bind(self, ...args),
+		raise: (type, fmt, ...args) => { const e = new Error(fmt.format(...args)); e.name = type; throw e; }
+	};
+}
+
 function text(n) {
 	if (n == null || n === '') return '';
 	if (typeof n === 'string') return n;
@@ -601,7 +802,8 @@ function text(n) {
 }
 
 async function page(values, dump) {
-	const v = loadView({ 'uci get': () => Promise.resolve(values), 'network.interface dump': () => Promise.resolve(dump === undefined ? null : dump) });
+	const v = loadView({ 'uci get': () => Promise.resolve({ values }),
+		'network.interface dump': () => dump == null ? Promise.reject(new Error('no dump')) : Promise.resolve({ interface: dump }) });
 	return text(v.render(await v.load()));
 }
 
@@ -652,7 +854,7 @@ test('overview: descriptions carry the family, exceptions and configured include
 });
 
 test('B6: a failed read of the firewall config is an error, not the access point text (CS S6)', async () => {
-	const v = loadView({ 'uci get': () => Promise.reject(new Error('Access denied')), 'network.interface dump': () => Promise.resolve([]) });
+	const v = loadView({ 'uci get': () => Promise.reject(new Error('Access denied')), 'network.interface dump': () => Promise.resolve({ interface: [] }) });
 	const fwr = await v.load();
 	assert.deepEqual(fwr, { error: true });
 	const node = v.render(fwr);
@@ -661,12 +863,12 @@ test('B6: a failed read of the firewall config is an error, not the access point
 	assert.doesNotMatch(t, /access point|Nothing is open/);
 	assert.match(JSON.stringify(node), /vt-orb-err/);
 	/* a failed interface dump is not an error: the page still reads the config */
-	const v2 = loadView({ 'uci get': () => Promise.resolve(cfg(STOCK)), 'network.interface dump': () => Promise.reject(new Error('x')) });
+	const v2 = loadView({ 'uci get': () => Promise.resolve({ values: cfg(STOCK) }), 'network.interface dump': () => Promise.reject(new Error('x')) });
 	const r2 = await v2.load();
 	assert.equal(r2.level, 'ok');
 	assert.equal(r2.interfaces, false);
 	/* an access point reads as unknown, with a neutral orb */
-	const ap = loadView({ 'uci get': () => Promise.resolve(cfg([ [ 'zone', { name: 'lan', network: 'lan' } ] ])), 'network.interface dump': () => Promise.resolve([]) });
+	const ap = loadView({ 'uci get': () => Promise.resolve({ values: cfg([ [ 'zone', { name: 'lan', network: 'lan' } ] ]) }), 'network.interface dump': () => Promise.resolve({ interface: [] }) });
 	const apNode = ap.render(await ap.load());
 	assert.match(text(apNode), /No internet-facing zone found/);
 	assert.match(JSON.stringify(apNode), /vt-orb-unknown/);
@@ -786,5 +988,165 @@ test('fw4 itself: the regressions\' openings are in the ruleset it writes', { sk
 		const r = fw.analyse(values, DUMP);
 		if (code) assert.ok(r.warnings.some(w => w.code === code), name + ': model ' + codes(r));
 		else assert.ok(!r.warnings.some(w => w.level === 'err'), name + ': model ' + codes(r));
+	}
+});
+
+test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S5, S6, N1)', { skip: NO_FW4 }, () => {
+	const LAN = LAN_DEV, WAN = WAN_DEV;
+	const modem = [ LAN, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
+		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
+	const split = [ LAN, Object.assign({}, WAN, { route: [ { target: '0.0.0.0', mask: 0 } ], 'ipv4-address': [ { address: PUBLIC, mask: 24 } ] }),
+		Object.assign(iface('wan6', null), { device: 'eth1', l3_device: 'eth1', 'ipv6-address': [ { address: '2001:db8::2', mask: 64 } ] }) ];
+	const SPLIT = [ [ 'defaults', { input: 'ACCEPT', output: 'ACCEPT', forward: 'REJECT' } ],
+		[ 'zone', { name: 'lan', network: 'lan', input: 'ACCEPT' } ],
+		[ 'zone', { name: 'wan', network: 'wan', family: 'ipv4', input: 'REJECT', masq: '1' } ],
+		[ 'zone', { name: 'wan6', network: 'wan6', family: 'ipv6', input: 'REJECT' } ] ];
+	const set = (match, ref) => MASQ.concat([ [ 'ipset', { name: 'mine', match, family: 'ipv4', entry: [ '203.0.113.5' ] } ],
+		[ 'rule', { name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: ref || 'mine', target: 'ACCEPT' } ] ]);
+	const redirect = dest_ip => MASQ.concat([ [ 'redirect', { name: 'P', src: 'wan', proto: 'tcp', src_dport: '2222', dest_ip, dest_port: '22' } ] ]);
+	const skipped = opts => [ acceptIn(zoneOpts(MASQ, 'wan', opts)), [ LAN, WAN ], 'outside-input',
+		rs => /policy accept;/.test(chain(rs, 'input')) && !/input_wan/.test(rs) && /skipped due to invalid options/.test(rs) ];
+	const cases = [
+		[ 'S4 modem alias', acceptIn(MASQ), modem, null, rs => /iifname "wwan0" jump input_wan/.test(chain(rs, 'input')) ],
+		[ 'S4 split families', SPLIT, split, null,
+			rs => /meta nfproto ipv4 iifname "eth1" jump input_wan /.test(chain(rs, 'input')) && /meta nfproto ipv6 iifname "eth1" jump input_wan6/.test(chain(rs, 'input')) ],
+		[ 'S4 excluded alias', [ [ 'defaults', { input: 'ACCEPT', forward: 'REJECT' } ], [ 'zone', { name: 'wan', device: 'wwan+', network: '!wan_4', input: 'REJECT' } ] ], modem, 'outside-input',
+			rs => /iifname "wwan\*" iifname != "wwan0" jump input_wan/.test(chain(rs, 'input')) && /policy accept;/.test(chain(rs, 'input')) ],
+		[ 'S5 destination set', set('dest_ip'), [ LAN, WAN ], 'admin-open', rs => /tcp dport 22 ip daddr @mine counter accept/.test(chain(rs, 'input_wan')) ],
+		[ 'S5 source set as dst', set('src_ip', 'mine dst'), [ LAN, WAN ], 'admin-open', rs => /tcp dport 22 ip daddr @mine counter accept/.test(chain(rs, 'input_wan')) ],
+		[ 'S5 source set', set('src_ip'), [ LAN, WAN ], null, rs => /tcp dport 22 ip saddr @mine counter accept/.test(chain(rs, 'input_wan')) ],
+		[ 'S6 masked router address', redirect('192.0.2.1/32'), [ LAN, WAN ], 'admin-open',
+			rs => /dnat 192\.0\.2\.1:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) && /ct status dnat accept/.test(chain(rs, 'input_wan')) ],
+		[ 'S6 prefix is the subnet base', redirect('192.0.2.1/24'), [ LAN, WAN ], null, rs => /dnat 192\.0\.2\.0:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) ],
+		[ 'S6 IPv6 spelling', MASQ.concat([ [ 'redirect', { name: 'P', src: 'wan', proto: 'tcp', family: 'ipv6', src_dport: '2222', dest_ip: '2001:DB8:0:0::1', dest_port: '22' } ] ]),
+			[ Object.assign({}, LAN, { 'ipv6-address': [ { address: '2001:db8::1', mask: 64 } ] }), WAN ], 'admin-open',
+			rs => /dnat \[2001:db8::1\]:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) ],
+		[ 'N1 log yes' ].concat(skipped({ log: 'yes' })),
+		[ 'N1 invalid subnet' ].concat(skipped({ subnet: 'nonsense' })),
+		[ 'N1 unknown masq_src network' ].concat(skipped({ masq_src: 'nosuchnet' })),
+		[ 'N1 log_limit unit' ].concat(skipped({ log_limit: '10/fortnight' })),
+		[ 'N1 extra as a list' ].concat(skipped({ extra: [ 'a', 'b' ] })),
+		[ 'N1 custom_chains Yes' ].concat(skipped({ custom_chains: 'Yes' })),
+		[ 'N1 covered subnet', acceptIn(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' })), [ LAN, WAN ], 'zone-subnet',
+			rs => /policy accept;/.test(chain(rs, 'input')) && /meta nfproto ipv4 iifname "eth1" ip saddr 203\.0\.113\.0\/24 jump input_wan/.test(chain(rs, 'input')) ]
+	];
+	for (const [ name, list, dump, code, check ] of cases) {
+		const values = cfg(list);
+		const rs = fw4Ruleset(values, dump);
+		assert.ok(check(rs), name + ':\n' + rs.slice(0, 4000));
+		const r = fw.analyse(values, dump);
+		if (code) assert.ok(r.warnings.some(w => w.code === code), name + ': model ' + codes(r));
+		else assert.deepEqual(r.warnings, [], name + ': model ' + codes(r));
+	}
+});
+
+test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S5, S6, N1)', async () => {
+	const modem = [ LAN_DEV, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
+		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
+	const alias = await page(cfg(acceptIn(MASQ)), modem);
+	assert.match(alias, /Nothing is open in your firewall rules/);
+	assert.doesNotMatch(alias, /in no zone/);
+	const dst = await page(cfg(MASQ.concat([ [ 'ipset', { name: 'mine', match: 'dest_ip', family: 'ipv4', entry: [ '198.51.100.2' ] } ],
+		[ 'rule', { name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' } ] ])), [ LAN_DEV, WAN_DEV ]);
+	assert.match(dst, /Router admin open: SSH/);
+	assert.match(dst, /SSH\nIPv4 TCP 22 · from anywhere/);
+	assert.doesNotMatch(dst, /@mine/);
+	const masked = cfg(MASQ.concat([ [ 'redirect', { name: 'Router masked', src: 'wan', proto: 'tcp', src_dport: '2222', dest_ip: '192.0.2.1/32', dest_port: '22' } ] ]));
+	const local = await page(masked, [ LAN_DEV, WAN_DEV ]);
+	assert.match(local, /On this router\nRouter masked\nIPv4 TCP 2222 · from anywhere\nrouter port 22/);
+	assert.match(local, /Router admin open: Router masked/);
+	const blind = await page(masked);
+	assert.match(blind, /Router masked may open the router's admin/);
+	assert.match(blind, /to 192\.0\.2\.1\/32\. The interface list could not be read/);
+	assert.match(blind, /Into your network\nRouter masked/);
+	assert.doesNotMatch(blind, /Router admin open|Nothing is open/);
+	const log = await page(cfg(acceptIn(zoneOpts(MASQ, 'wan', { log: 'yes' }))), [ LAN_DEV, WAN_DEV ]);
+	assert.match(log, /wan is in no zone and accepts every connection/);
+	assert.match(log, /Zone wan\nzone · ignored: option log has a value firewall4 refuses/);
+	assert.doesNotMatch(log, /Nothing is open/);
+	const sub = await page(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' }))), [ LAN_DEV, WAN_DEV ]);
+	assert.match(sub, /wan covers only some addresses/);
+	assert.doesNotMatch(sub, /Nothing is open/);
+});
+
+/* --------------------------- M1: ubus errors through LuCI's own rpc.js
+
+   LuCI's rpc.js (from the rootfs dump; skipped without it) decodes the
+   JSON-RPC frames a ubus call returns, so a status like [ 6 ] (permission
+   denied) takes the same path as on a router, not a mocked rejection. */
+const RPC_JS = path.join(ROOTFS, 'www/luci-static/resources/rpc.js');
+const NO_RPC = fs.existsSync(RPC_JS) ? false : 'no rpc.js in the rootfs dump (set VANTAGE_ROOTFS)';
+
+/* the view on LuCI's rpc.js; frames: 'object method' -> the reply's
+   `result`, or a function of the request returning the whole frame */
+async function rpcPage(frames) {
+	const src = fs.readFileSync(RPC_JS, 'utf8');
+	const request = {
+		post: (url, msg) => Promise.resolve({ ok: true, status: 200, json: () => {
+			const f = frames[msg.params[1] + ' ' + msg.params[2]];
+			return typeof f === 'function' ? f(msg) : { jsonrpc: '2.0', id: msg.id, result: f };
+		} })
+	};
+	const v = loadView(null, () => new Function('baseclass', 'request', src)({ extend: p => p }, request));
+	const r = await v.load();
+	const node = v.render(r);
+	return { r, node, t: text(node) };
+}
+
+const PERMISSIVE = cfg(acceptIn(MASQ));
+
+test('M1: ubus errors on the firewall config reach the error path, not the access point text (CX M1)', { skip: NO_RPC }, async () => {
+	const okDump = [ 0, { interface: [ LAN_DEV, WAN_DEV ] } ];
+	for (const [ uci, why ] of [
+		[ [ 6 ], 'permission denied' ], [ [ 9 ], 'unspecified error' ], [ [ 4 ], 'not found' ], [ [ 0 ], 'no data' ],
+		[ [ 0, { values: 'bad' } ], 'values not an object' ], [ [ 0, { values: [] } ], 'values a list' ], [ [ 0, {} ], 'no values' ],
+		[ msg => ({ jsonrpc: '2.0', id: msg.id, error: { code: -32002, message: 'Access denied' } }), 'a JSON-RPC error' ]
+	]) {
+		const { r, node, t } = await rpcPage({ 'uci get': uci, 'network.interface dump': okDump });
+		assert.deepEqual(r, { error: true }, why);
+		assert.match(t, /Could not read the firewall configuration/, why);
+		assert.doesNotMatch(t, /No internet-facing zone|access point|Nothing is open/, why);
+		assert.match(JSON.stringify(node), /vt-orb-err/, why);
+	}
+});
+
+test('M1: ubus errors on the interface dump leave the uplinks unknown, never "Nothing is open" (CX M1)', { skip: NO_RPC }, async () => {
+	for (const [ dump, why ] of [
+		[ [ 9 ], 'unspecified error' ], [ [ 6 ], 'permission denied' ], [ [ 0 ], 'no data' ],
+		[ [ 0, { interface: 'x' } ], 'interface not a list' ], [ [ 0, { interface: {} } ], 'interface an object' ], [ [ 0, {} ], 'no interface' ]
+	]) {
+		const { r, t } = await rpcPage({ 'uci get': [ 0, { values: PERMISSIVE } ], 'network.interface dump': dump });
+		assert.equal(r.error, undefined, why);
+		assert.equal(r.interfaces, false, why);
+		assert.deepEqual(codes(r), [ 'uplinks-unknown:' ], why);
+		assert.match(t, /The uplinks could not be checked/, why);
+		assert.doesNotMatch(t, /Nothing is open/, why);
+	}
+});
+
+test('M1: when both reads succeed through rpc.js the data is used as it is (CX M1)', { skip: NO_RPC }, async () => {
+	/* an access point still reads as one */
+	const ap = await rpcPage({ 'uci get': [ 0, { values: cfg([ [ 'defaults', { input: 'ACCEPT' } ], [ 'zone', { name: 'lan', network: 'lan' } ] ]) } ],
+		'network.interface dump': [ 0, { interface: [ LAN_DEV ] } ] });
+	assert.equal(ap.r.interfaces, true);
+	assert.match(ap.t, /No internet-facing zone found/);
+	assert.match(JSON.stringify(ap.node), /vt-orb-unknown/);
+	/* an empty firewall config is a config, not an error */
+	assert.match((await rpcPage({ 'uci get': [ 0, { values: {} } ], 'network.interface dump': [ 0, { interface: [] } ] })).t, /No internet-facing zone found/);
+	/* a router whose uplink is zoned: nothing open is a true statement */
+	const ok = await rpcPage({ 'uci get': [ 0, { values: PERMISSIVE } ],
+		'network.interface dump': [ 0, { interface: [ LAN_DEV, Object.assign({}, WAN_DEV, { route: [ { target: '0.0.0.0', mask: 0 } ], 'ipv4-address': [ { address: PUBLIC, mask: 24 } ] }) ] } ] });
+	assert.equal(ok.r.interfaces, true);
+	assert.deepEqual(ok.r.warnings, []);
+	assert.match(ok.t, /Nothing is open in your firewall rules/);
+});
+
+test('M1: both calls reject on a ubus error and have no `expect` default to fall back on (CX M1)', () => {
+	const src = fs.readFileSync(path.join(RES, 'view/vantage/firewall.js'), 'utf8');
+	const decls = [ ...src.matchAll(/rpc\.declare\(\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\)/g) ].map(m => m[1]);
+	assert.equal(decls.length, 2);
+	for (const d of decls) {
+		assert.match(d, /\breject:\s*true\b/, d);
+		assert.doesNotMatch(d, /\bexpect\b/, d);
 	}
 });
