@@ -13,6 +13,8 @@
    - a switched-off or skipped zone does not exist: rules naming it are
      skipped, and its networks, like an uplink no zone holds or the
      family a zone leaves out, meet the `defaults` policies;
+   - zones match devices: networks on one device (a modem's wan and
+     wan_4, wan and wan6) are one, whichever of them a zone names;
    - zone policies fall back to `defaults`, whose own fallback is DROP; a
      zone's forward policy only covers traffic back out of the same zone,
      so traffic into another zone without a forwarding or rule meets
@@ -201,17 +203,18 @@ function isUplink(i) {
 }
 
 /* network.interface dump -> { name: { up, uplink, device, zone, addrs, ips } },
-   null when there is none */
+   null when there is none. The device is fw4's: l3_device, else device */
 function interfaces(dump) {
 	if (!Array.isArray(dump)) return null;
 	var out = Object.create(null);
 	dump.forEach(function(i) {
 		if (!i || !i.interface) return;
+		var dev = i.l3_device != null ? i.l3_device : i.device;
 		var a4 = (i['ipv4-address'] || []).filter(function(a) { return a && a.address; }),
 			a6 = (i['ipv6-address'] || []).filter(function(a) { return a && a.address; });
 		out[String(i.interface)] = {
 			up: !!i.up, uplink: isUplink(i),
-			device: i.l3_device || i.device || null,
+			device: dev ? String(dev) : null,
 			zone: (i.data && i.data.zone) ? String(i.data.zone) : null,
 			addrs: a4.map(function(a) { return { family: 4, all: +a.mask === 0 }; })
 				.concat(a6.map(function(a) { return { family: 6, all: +a.mask === 0 }; })),
@@ -346,10 +349,19 @@ return baseclass.extend({
 			defs = { input: 'drop', output: 'drop', forward: 'drop' };
 		}
 
-		/* zones; a network or device entry is { net | dev, neg } */
+		/* zones; a network or device entry is { net | dev, neg }. With the
+		   dump a network stands for its device, as fw4 matches it, and a
+		   network the dump puts in a zone (data.zone) joins that zone; a
+		   network the dump does not have, or without a device, matches
+		   nothing. Without it, networks compare by name. */
 		var zones = [], lostNets = [];
 		var internetish = function(s, nets) {
 			return bool(s.masq) || bool(s.masq6) || WAN.test(String(s.name)) || nets.some(function(n) { return WAN.test(n) || ups.indexOf(n) >= 0; });
+		};
+		var resolve = function(e) {
+			if (e.net == null || !ifs) return e;
+			var i = ifs[e.net];
+			return i && i.device ? { net: e.net, dev: i.device, neg: e.neg } : null;
 		};
 		of('zone').forEach(function(s) {
 			var nets = toArray(s.network).map(invert).filter(function(e) { return e && !e.invert; }).map(function(e) { return e.val; });
@@ -368,7 +380,11 @@ return baseclass.extend({
 				return;
 			}
 			var ents = (z.network || []).map(function(e) { return { net: e.val, neg: e.invert }; })
-				.concat((z.device || []).map(function(e) { return { dev: e.val, neg: e.invert }; }));
+				.concat(ifs ? Object.keys(ifs).filter(function(n) { return ifs[n].zone === z.name; }).map(function(n) { return { net: n, neg: false }; }) : [])
+				.map(resolve)
+				.concat((z.device || []).map(function(e) { return { dev: e.val, neg: e.invert }; }))
+				/* fw4 skips a wildcard that is not at the end */
+				.filter(function(e) { return e && !(e.dev != null && /\+./.test(e.dev)); });
 			zones.push({
 				name: z.name, family: z.family || null,
 				input: z.input.toUpperCase(), output: z.output.toUpperCase(), forward: z.forward.toUpperCase(),
@@ -383,24 +399,26 @@ return baseclass.extend({
 		var byName = Object.create(null);
 		zones.forEach(function(z) { if (!byName[z.name]) byName[z.name] = z; });
 
-		/* does zone z take traffic from interface n (fw4's zone match on the
-		   devices its networks and devices name)? */
-		var covers = function(z, n) {
-			var i = ifs && ifs[n];
-			if (i && i.zone === z.name) return true;
-			var hit = function(e) {
-				if (e.net != null) return e.net === n;
-				if (!i || !i.device) return false;
-				return /\+$/.test(e.dev) ? i.device.indexOf(e.dev.slice(0, -1)) === 0 : i.device === e.dev;
-			};
-			if (z.neg.some(hit)) return false;
-			return z.pos.length ? z.pos.some(hit) : (z.neg.length > 0 || z.anyDev);
+		/* traffic from network n: its name and, with the dump, its device */
+		var via = function(n) { return { net: n, dev: ifs && ifs[n] ? ifs[n].device : null }; };
+		var hit = function(e, t) {
+			if (e.dev == null) return e.net === t.net;
+			if (!t.dev) return false;
+			return /\+$/.test(e.dev) ? t.dev.indexOf(e.dev.slice(0, -1)) === 0 : t.dev === e.dev;
 		};
+		/* does zone z take traffic t (fw4's zone match on devices: one
+		   excluded is never taken; with none named, an exclusion or '+'
+		   takes every other device)? */
+		var takes = function(z, t) {
+			if (z.neg.some(function(e) { return hit(e, t); })) return false;
+			return z.pos.length ? z.pos.some(function(e) { return hit(e, t); }) : (z.neg.length > 0 || z.anyDev);
+		};
+		var covers = function(z, n) { return takes(z, via(n)); };
 		var zoned = function(n) { return zones.some(function(z) { return covers(z, n); }); };
 
 		zones.forEach(function(z) {
 			z.internet = z.masq || WAN.test(z.name) ||
-				z.pos.some(function(e) { return e.net != null && WAN.test(e.net); }) ||
+				z.networks.some(function(n) { return WAN.test(n); }) ||
 				ups.some(function(u) { return covers(z, u); });
 		});
 		var internet = zones.filter(function(z) { return z.internet; });
@@ -416,11 +434,16 @@ return baseclass.extend({
 			if (ifs && !(ifs[n] && ifs[n].up)) return;
 			if (!zoned(n)) addOut(n, null);
 		});
+		/* a zone limited to one family leaves the other family of what it
+		   takes (with the dump: the interfaces that are up on its devices)
+		   to another zone, or to the default policies */
 		internet.forEach(function(z) {
 			if (!z.family) return;
 			var other = z.family === 4 ? 6 : 4;
-			var taken = zones.some(function(y) {
-				return y !== z && y.family !== z.family && z.pos.some(function(e) { return e.net != null && covers(y, e.net); });
+			var what = ifs ? Object.keys(ifs).filter(function(n) { return ifs[n].up && covers(z, n); }).map(via)
+				: z.pos.map(function(e) { return { net: e.net != null ? e.net : null, dev: e.dev != null ? e.dev : null }; });
+			var taken = what.length > 0 && what.every(function(t) {
+				return zones.some(function(y) { return y !== z && y.family !== z.family && takes(y, t); });
 			});
 			if (!taken) addOut(z.name, other, true);
 		});

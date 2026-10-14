@@ -573,6 +573,63 @@ const LAN_DEV = Object.assign(iface('lan', '192.0.2.1'), { device: 'br-lan', l3_
 const WAN_DEV = Object.assign(iface('wan', '198.51.100.2'), { device: 'eth1', l3_device: 'eth1' });
 const MASQ = zoneOpts(BASE, 'wan', { masq: '1' });
 
+test('S4: networks on one device are one to fw4: an alias of the wan device is in the wan zone (CX S4)', () => {
+	/* a modem: wan holds the device, dynamic wan_4 the address and route */
+	const modem = [ LAN_DEV, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
+		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
+	for (const list of [ acceptIn(MASQ), MASQ ]) {
+		const r = fw.analyse(cfg(list), modem);
+		assert.deepEqual(r.outside, [], 'wan_4 arrives on wwan0, which the wan zone takes');
+		assert.deepEqual(r.warnings, []);
+		assert.equal(r.level, 'ok');
+	}
+	/* fw4 takes l3_device when set, else device; one without a device matches nothing */
+	assert.deepEqual(fw.analyse(cfg(acceptIn(MASQ)), [ Object.assign(iface('wan', null), { device: 'wwan0', l3_device: null }),
+		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: 'wwan0', l3_device: undefined }) ]).outside, []);
+	/* a network the dump puts in a zone (data.zone) brings its device along */
+	const byData = fw.analyse(cfg(acceptIn([ [ 'defaults', {} ], [ 'zone', { name: 'wan', input: 'REJECT', masq: '1' } ] ])),
+		[ Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0', data: { zone: 'wan' } }),
+			Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { l3_device: 'wwan0' }) ]);
+	assert.deepEqual(byData.outside, []);
+	/* without the dump networks still compare by name */
+	assert.deepEqual(fw.analyse(cfg(acceptIn(MASQ))).outside, []);
+});
+
+test('S4: zones split by family on one device take both families (CX S4)', () => {
+	const split = [
+		[ 'defaults', { input: 'ACCEPT', output: 'ACCEPT', forward: 'REJECT' } ],
+		[ 'zone', { name: 'lan', network: 'lan', input: 'ACCEPT', output: 'ACCEPT', forward: 'ACCEPT' } ],
+		[ 'zone', { name: 'wan', network: 'wan', family: 'ipv4', input: 'REJECT', output: 'ACCEPT', forward: 'REJECT', masq: '1' } ],
+		[ 'zone', { name: 'wan6', network: 'wan6', family: 'ipv6', input: 'REJECT', output: 'ACCEPT', forward: 'REJECT' } ]
+	];
+	const wan6 = Object.assign(iface('wan6', null), { device: 'eth1', l3_device: 'eth1', 'ipv6-address': [ { address: '2001:db8::2', mask: 64 } ] });
+	const dump = [ LAN_DEV, Object.assign({}, WAN_DEV, { route: [ { target: '0.0.0.0', mask: 0 } ], 'ipv4-address': [ { address: PUBLIC, mask: 24 } ] }), wan6 ];
+	const r = fw.analyse(cfg(split), dump);
+	assert.deepEqual(r.outside, [], 'no complementary-family row: the other zone takes it on eth1');
+	assert.deepEqual(r.warnings, []);
+	assert.equal(r.level, 'ok');
+	/* on separate devices each family the other zone does not take is outside */
+	const apart = fw.analyse(cfg(split), [ LAN_DEV, dump[1], Object.assign({}, wan6, { device: 'eth2', l3_device: 'eth2' }) ]);
+	assert.deepEqual(apart.outside, [ { name: 'wan', family: 6, zone: true }, { name: 'wan6', family: 4, zone: true } ]);
+	assert.deepEqual(codes(apart), [ 'outside-input:wan', 'outside-input:wan6' ]);
+	/* the other family must cover everything the zone takes, not just one network */
+	const half = fw.analyse(cfg(acceptIn([ [ 'zone', { name: 'wan', network: [ 'wan', 'wan6' ], family: 'ipv4', input: 'REJECT' } ],
+		[ 'zone', { name: 'v6', network: 'wan6', family: 'ipv6', input: 'REJECT' } ] ])));
+	assert.deepEqual(half.outside, [ { name: 'wan', family: 6, zone: true } ]);
+});
+
+test('S4: device wildcards and exclusions still decide (CX S4)', () => {
+	const wan = Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' });
+	const wan4 = Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' });
+	const zone = opts => fw.analyse(cfg([ [ 'defaults', { input: 'ACCEPT', forward: 'REJECT' } ], [ 'zone', Object.assign({ name: 'wan', input: 'REJECT' }, opts) ] ]), [ LAN_DEV, wan, wan4 ]);
+	assert.deepEqual(zone({ device: 'wwan+' }).outside, [], 'a wildcard takes wwan0');
+	/* excluding wan_4 excludes its device: fw4 writes iifname "wwan*" iifname != "wwan0" */
+	assert.deepEqual(codes(zone({ device: 'wwan+', network: '!wan_4' })), [ 'outside-input:wan_4' ]);
+	assert.deepEqual(codes(zone({ device: 'eth+' })), [ 'outside-input:wan_4' ], 'a wildcard for other devices');
+	assert.deepEqual(zone({ network: '!lan' }).outside, [], 'an exclusion alone takes every other device');
+	assert.deepEqual(codes(zone({ device: 'ww+an' })), [ 'outside-input:wan_4' ], 'fw4 skips a wildcard not at the end');
+});
+
 /* ------------------------------------------------------- the overview */
 
 /* view/vantage/firewall.js with stub LuCI modules; E() builds plain
@@ -808,6 +865,41 @@ test('fw4 itself: the regressions\' openings are in the ruleset it writes', { sk
 		if (code) assert.ok(r.warnings.some(w => w.code === code), name + ': model ' + codes(r));
 		else assert.ok(!r.warnings.some(w => w.level === 'err'), name + ': model ' + codes(r));
 	}
+});
+
+test('fw4 itself: the 1.0.7 final check\'s cases (CX S4)', { skip: NO_FW4 }, () => {
+	const LAN = LAN_DEV, WAN = WAN_DEV;
+	const modem = [ LAN, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
+		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
+	const split = [ LAN, Object.assign({}, WAN, { route: [ { target: '0.0.0.0', mask: 0 } ], 'ipv4-address': [ { address: PUBLIC, mask: 24 } ] }),
+		Object.assign(iface('wan6', null), { device: 'eth1', l3_device: 'eth1', 'ipv6-address': [ { address: '2001:db8::2', mask: 64 } ] }) ];
+	const SPLIT = [ [ 'defaults', { input: 'ACCEPT', output: 'ACCEPT', forward: 'REJECT' } ],
+		[ 'zone', { name: 'lan', network: 'lan', input: 'ACCEPT' } ],
+		[ 'zone', { name: 'wan', network: 'wan', family: 'ipv4', input: 'REJECT', masq: '1' } ],
+		[ 'zone', { name: 'wan6', network: 'wan6', family: 'ipv6', input: 'REJECT' } ] ];
+	const cases = [
+		[ 'S4 modem alias', acceptIn(MASQ), modem, null, rs => /iifname "wwan0" jump input_wan/.test(chain(rs, 'input')) ],
+		[ 'S4 split families', SPLIT, split, null,
+			rs => /meta nfproto ipv4 iifname "eth1" jump input_wan /.test(chain(rs, 'input')) && /meta nfproto ipv6 iifname "eth1" jump input_wan6/.test(chain(rs, 'input')) ],
+		[ 'S4 excluded alias', [ [ 'defaults', { input: 'ACCEPT', forward: 'REJECT' } ], [ 'zone', { name: 'wan', device: 'wwan+', network: '!wan_4', input: 'REJECT' } ] ], modem, 'outside-input',
+			rs => /iifname "wwan\*" iifname != "wwan0" jump input_wan/.test(chain(rs, 'input')) && /policy accept;/.test(chain(rs, 'input')) ]
+	];
+	for (const [ name, list, dump, code, check ] of cases) {
+		const values = cfg(list);
+		const rs = fw4Ruleset(values, dump);
+		assert.ok(check(rs), name + ':\n' + rs.slice(0, 4000));
+		const r = fw.analyse(values, dump);
+		if (code) assert.ok(r.warnings.some(w => w.code === code), name + ': model ' + codes(r));
+		else assert.deepEqual(r.warnings, [], name + ': model ' + codes(r));
+	}
+});
+
+test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4)', async () => {
+	const modem = [ LAN_DEV, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
+		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
+	const alias = await page(cfg(acceptIn(MASQ)), modem);
+	assert.match(alias, /Nothing is open in your firewall rules/);
+	assert.doesNotMatch(alias, /in no zone/);
 });
 
 /* --------------------------- M1: ubus errors through LuCI's own rpc.js
