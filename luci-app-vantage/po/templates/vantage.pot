@@ -736,7 +736,7 @@ msgstr ""
 msgid "Firmware"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:339
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:340
 msgid "Forwarding %s to %s"
 msgstr ""
 
@@ -1250,7 +1250,7 @@ msgstr ""
 msgid "Not connected"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:347
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:348
 msgid "Not in effect"
 msgstr ""
 
@@ -1295,8 +1295,11 @@ msgid "Online"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:192
-msgid "Only standard housekeeping (ping, DHCP renewals and the like): %d rules"
-msgstr ""
+msgid "Only standard housekeeping (ping, DHCP renewals and the like): %d rule"
+msgid_plural ""
+"Only standard housekeeping (ping, DHCP renewals and the like): %d rules"
+msgstr[0] ""
+msgstr[1] ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/vantage/wifi.js:24
 msgid "Open"
@@ -1531,8 +1534,10 @@ msgid "Speed"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:284
-msgid "Standard housekeeping: %d rules"
-msgstr ""
+msgid "Standard housekeeping: %d rule"
+msgid_plural "Standard housekeeping: %d rules"
+msgstr[0] ""
+msgstr[1] ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:2240
 msgid "Stations appear here as soon as they associate with one of the SSIDs."
@@ -1567,7 +1572,7 @@ msgstr ""
 msgid "Swap"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:347
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:348
 msgid "Switched off"
 msgstr ""
 
@@ -1709,7 +1714,7 @@ msgid "Traffic"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:301
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:347
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:348
 msgid "Traffic Rules"
 msgstr ""
 
@@ -1972,7 +1977,7 @@ msgstr ""
 msgid "Your name for this device"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:341
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:342
 msgid "Zone %s"
 msgstr ""
 
@@ -2029,7 +2034,7 @@ msgstr ""
 msgid "collecting…"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:343
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:344
 msgid "custom rule file"
 msgstr ""
 
@@ -2210,7 +2215,7 @@ msgstr ""
 msgid "per core"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:345
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:346
 msgid "port forward"
 msgstr ""
 
@@ -2238,11 +2243,15 @@ msgstr ""
 msgid "short GI"
 msgstr ""
 
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:338
+msgid "switched off"
+msgstr ""
+
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:101
 msgid "this router"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:345
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:346
 msgid "traffic rule"
 msgstr ""
 
@@ -2254,11 +2263,11 @@ msgstr ""
 msgid "who uses the bandwidth"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:341
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:342
 msgid "zone"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:339
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:340
 msgid "zone forwarding"
 msgstr ""
 

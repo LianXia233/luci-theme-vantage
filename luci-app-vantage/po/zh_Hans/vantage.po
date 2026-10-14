@@ -747,7 +747,7 @@ msgstr "筛选客户端"
 msgid "Firmware"
 msgstr "固件"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:339
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:340
 msgid "Forwarding %s to %s"
 msgstr "从 %s 转发到 %s"
 
@@ -1265,7 +1265,7 @@ msgstr "不是站点 MAC 地址"
 msgid "Not connected"
 msgstr "未连接"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:347
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:348
 msgid "Not in effect"
 msgstr "未生效"
 
@@ -1310,8 +1310,10 @@ msgid "Online"
 msgstr "在线"
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:192
-msgid "Only standard housekeeping (ping, DHCP renewals and the like): %d rules"
-msgstr "只有标准的常规规则（ping、DHCP 续租等）：%d 条"
+msgid "Only standard housekeeping (ping, DHCP renewals and the like): %d rule"
+msgid_plural ""
+"Only standard housekeeping (ping, DHCP renewals and the like): %d rules"
+msgstr[0] "只有标准的常规规则（ping、DHCP 续租等）：%d 条"
 
 #: luci-app-vantage/htdocs/luci-static/resources/vantage/wifi.js:24
 msgid "Open"
@@ -1551,8 +1553,9 @@ msgid "Speed"
 msgstr "速率"
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:284
-msgid "Standard housekeeping: %d rules"
-msgstr "标准常规规则：%d 条"
+msgid "Standard housekeeping: %d rule"
+msgid_plural "Standard housekeeping: %d rules"
+msgstr[0] "标准常规规则：%d 条"
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:2240
 msgid "Stations appear here as soon as they associate with one of the SSIDs."
@@ -1587,7 +1590,7 @@ msgstr "信号强，%s"
 msgid "Swap"
 msgstr "交换分区"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:347
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:348
 msgid "Switched off"
 msgstr "已关闭"
 
@@ -1733,7 +1736,7 @@ msgid "Traffic"
 msgstr "流量"
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:301
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:347
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:348
 msgid "Traffic Rules"
 msgstr "通信规则"
 
@@ -1999,7 +2002,7 @@ msgstr "无线设置"
 msgid "Your name for this device"
 msgstr "你为此设备设置的名称"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:341
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:342
 msgid "Zone %s"
 msgstr "区域 %s"
 
@@ -2056,7 +2059,7 @@ msgstr "采集中 · 首个样本"
 msgid "collecting…"
 msgstr "采集中…"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:343
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:344
 msgid "custom rule file"
 msgstr "自定义规则文件"
 
@@ -2237,7 +2240,7 @@ msgstr "峰值"
 msgid "per core"
 msgstr "每核"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:345
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:346
 msgid "port forward"
 msgstr "端口转发"
 
@@ -2265,11 +2268,15 @@ msgstr "在 %s 上发送"
 msgid "short GI"
 msgstr "短 GI"
 
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:338
+msgid "switched off"
+msgstr "已关闭"
+
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:101
 msgid "this router"
 msgstr "此路由器"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:345
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:346
 msgid "traffic rule"
 msgstr "通信规则"
 
@@ -2281,11 +2288,11 @@ msgstr "已运行 %s"
 msgid "who uses the bandwidth"
 msgstr "带宽使用者"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:341
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:342
 msgid "zone"
 msgstr "区域"
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:339
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:340
 msgid "zone forwarding"
 msgstr "区域转发"
 
@@ -2297,6 +2304,13 @@ msgstr "↑ %s · 经 %s"
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:1916
 msgid "−%d min"
 msgstr "−%d 分钟"
+
+#~ msgid ""
+#~ "Only standard housekeeping (ping, DHCP renewals and the like): %d rules"
+#~ msgstr "只有标准的常规规则（ping、DHCP 续租等）：%d 条"
+
+#~ msgid "Standard housekeeping: %d rules"
+#~ msgstr "标准常规规则：%d 条"
 
 #~ msgid ""
 #~ "Custom rule files are loaded (%s); rules in them are not listed here."

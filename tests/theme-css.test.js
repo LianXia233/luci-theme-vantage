@@ -278,3 +278,16 @@ test('phone rule cards: the corner on/off box has a 44 px tap target', () => {
 	/* the label is LuCI's own <label for> the box, so a tap on it toggles the box */
 	assert.match(themeCss, /\.cbi-checkbox > label:empty \{ display: none; \}/);
 });
+
+test('port status: boxes packed, hidden tooltips add no height, port cards may overflow at mid widths', () => {
+	/* LuCI's inline grid spreads the boxes over columns as wide as the card */
+	const pack = themeRules.find((r) => r.sel.some((s) => s === 'div:has(> .ifacebox > .ifacebox-head.cbi-tooltip-container)'));
+	assert.ok(pack && /grid-template-columns:[^;]*!important/.test(pack.body));
+	/* a hidden tooltip parked below its box made the card scroll at 721-1180 px */
+	const parked = themeRules.find((r) => r.sel.includes('.cbi-tooltip-container > .cbi-tooltip'));
+	assert.match(parked.body, /top:\s*0\b/);
+	const mid = themeRules.find((r) => /720px < width <= 1180px/.test(r.media) && r.sel.includes('.cbi-section:has(.ifacebox .cbi-tooltip-container)'));
+	assert.ok(mid && /overflow:\s*visible/.test(mid.body));
+	/* the palette takes Escape from a row menu left open */
+	assert.match(menuJs, /openPalette\(\) \{\s*if \(this\.pal\) return;\s*\/\*[^*]*\*\/\s*this\.closeActMenu\(false\);/);
+});

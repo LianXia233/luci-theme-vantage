@@ -165,8 +165,9 @@ return baseclass.extend({
 				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: 1, v: su, dir: 'up', below: true } ] };
 		case 'lanes':
 			return { dn: lin(sd, 0, .44), up: lin(su, .6, 1), grid: [ 0, .6 ], axis: [ .44, 1 ],
-				/* each lane's scale at its own top line */
-				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: .6, v: su, dir: 'up', below: true } ] };
+				/* each lane's scale on its own top line, the upload's in the gap
+				   between the lanes, clear of both curves */
+				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: .6, v: su, dir: 'up' } ] };
 		default:
 			return { dn: lin(shared, 0, 1), up: lin(shared, 0, 1), grid: [ 0, .5 ], axis: [ 1 ],
 				labels: [ { at: 0, v: shared } ] };

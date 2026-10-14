@@ -1637,6 +1637,12 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
    let it out, so its rounded corners come from the first and last child
    instead of from clipping */
 .ifacebox:has(.cbi-tooltip-container) { overflow: visible; }
+/* Status -> Port status: LuCI spreads the boxes over equal columns as wide
+   as the card (inline grid, boxes capped at 100 px); pack them instead */
+div:has(> .ifacebox > .ifacebox-head.cbi-tooltip-container) {
+	grid-template-columns: repeat(auto-fill, minmax(108px, 124px)) !important; gap: 12px; justify-content: start;
+}
+div:has(> .ifacebox > .ifacebox-head.cbi-tooltip-container) > .ifacebox { width: 100%; max-width: none !important; margin: 0 !important; }
 .ifacebox:has(.cbi-tooltip-container) > :first-child { border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0; }
 .ifacebox:has(.cbi-tooltip-container) > :last-child { border-radius: 0 0 calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px); }
 .ifacebox-head.active { background: var(--accent-soft); color: var(--accent-text); }
@@ -1807,7 +1813,8 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 .cbi-tooltip.info { background: var(--info); border-color: var(--info); color: var(--info-ink); }
 .cbi-tooltip-container { position: relative; cursor: help; }
 /* sized to its text, not to a narrow container such as a 100 px port box */
-.cbi-tooltip-container > .cbi-tooltip { left: -10000px; top: auto; margin-top: 6px; white-space: normal; width: max-content; max-width: min(360px, calc(100vw - 32px)); }
+/* parked at the top while hidden, so it adds no height below its box */
+.cbi-tooltip-container > .cbi-tooltip { left: -10000px; top: 0; margin-top: 6px; white-space: normal; width: max-content; max-width: min(360px, calc(100vw - 32px)); }
 .cbi-tooltip-container:hover > .cbi-tooltip { left: 0; top: 100%; opacity: 1; translate: var(--vt-tip-dx, 0px) 0; }
 .cbi-tooltip-container > .cbi-tooltip.left { right: 0; }
 .cbi-tooltip-container:hover > .cbi-tooltip.left { left: auto; right: 0; }
@@ -2391,12 +2398,24 @@ html:not([data-darkmode="true"]) .vt-login-page {
 @media (720px < width <= 1180px) {
 	.cbi-section { overflow-x: auto; }
 	.cbi-section:has(.cbi-dropdown[open]) { overflow: visible; }
+	/* Port status: boxes wrap, and their tooltips must get out */
+	.cbi-section:has(.ifacebox .cbi-tooltip-container) { overflow: visible; }
 	/* a free-standing table card (Processes, Wireless's stations) has no
 	   section to scroll in: the card itself scrolls, its rows held in one
 	   table box (LuCI puts every row, titles too, in the tbody, so the
 	   columns stay aligned), its header static as in sections */
 	:is(#view, #view > div, .cbi-map, #view > div > div > [data-tab-title]:not(.cbi-section)) > .table:not(:has(> thead)) {
 		display: block; overflow-x: auto;
+	}
+	/* and says so with the same shade as the table cards (Processes) */
+	.vt-main :is(#view, #view > div, .cbi-map, #view > div > div > [data-tab-title]:not(.cbi-section)) > .table:not(:has(> thead)) {
+		background-image:
+			linear-gradient(to right, var(--s1) 50%, transparent), linear-gradient(to left, var(--s1) 50%, transparent),
+			linear-gradient(to right, var(--line-2), transparent), linear-gradient(to left, var(--line-2), transparent);
+		background-position: left top, right top, left top, right top;
+		background-size: 32px 100%, 32px 100%, 12px 100%, 12px 100%;
+		background-repeat: no-repeat;
+		background-attachment: local, local, scroll, scroll;
 	}
 	:is(#view, #view > div, .cbi-map, #view > div > div > [data-tab-title]:not(.cbi-section)) > .table:not(:has(> thead)) > tbody { display: table; width: 100%; }
 	:is(#view, #view > div, .cbi-map, #view > div > div > [data-tab-title]:not(.cbi-section)) > .table:has(.cbi-dropdown[open]) { overflow: visible; }

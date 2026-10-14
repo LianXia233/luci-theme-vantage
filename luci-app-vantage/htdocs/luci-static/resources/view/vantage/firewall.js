@@ -189,7 +189,7 @@ return view.extend({
 		}
 		else {
 			head = _('Nothing is open in your firewall rules');
-			sub = fw.standard.length ? _('Only standard housekeeping (ping, DHCP renewals and the like): %d rules').format(fw.standard.length) : _('Internet-facing: %s').format(facing);
+			sub = fw.standard.length ? N_(fw.standard.length, 'Only standard housekeeping (ping, DHCP renewals and the like): %d rule', 'Only standard housekeeping (ping, DHCP renewals and the like): %d rules').format(fw.standard.length) : _('Internet-facing: %s').format(facing);
 		}
 		return this.head(fw.level, head, sub);
 	},
@@ -281,7 +281,7 @@ return view.extend({
 				: _('Nothing is open in your firewall rules.') ]));
 		if (fw.standard.length)
 			body.push(E('details', { 'class': 'vt-fg-std' }, [
-				E('summary', {}, [ _('Standard housekeeping: %d rules').format(fw.standard.length) ]),
+				E('summary', {}, [ N_(fw.standard.length, 'Standard housekeeping: %d rule', 'Standard housekeeping: %d rules').format(fw.standard.length) ]),
 				E('p', { 'class': 'vt-hint' }, [ _('Ping and other control messages, multicast, DHCP renewals and IPsec passed on to your network: what every router lets in.') ]),
 				E('div', { 'class': 'vt-fg-rows' }, fw.standard.map(function(i) {
 					return self.row(page('rules'), named(i), [ what(i) ]);
@@ -334,7 +334,8 @@ return view.extend({
 	renderOff: function(fw) {
 		var self = this;
 		var rows = fw.off.concat(fw.ignored).map(function(i) {
-			var why = i.bad ? [ ' · ', ignoredWhy(i) ] : [];
+			/* under "Not in effect", what is merely off says so too */
+			var why = i.bad ? [ ' · ', ignoredWhy(i) ] : fw.ignored.length ? [ ' · ', _('switched off') ] : [];
 			if (i.kind === 'forwarding')
 				return self.row(page('zones'), _('Forwarding %s to %s').format(i.src || '?', i.dest || '?'), [ _('zone forwarding') ].concat(why));
 			if (i.kind === 'zone')

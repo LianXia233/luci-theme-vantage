@@ -1088,6 +1088,8 @@ return baseclass.extend({
 
 	openPalette() {
 		if (this.pal) return;
+		/* a row menu left open would take the palette's Escape */
+		this.closeActMenu(false);
 		/* focus inside the flyout goes back to what opened the flyout, since
 		   closing it hides the element that had focus */
 		const from = document.activeElement;
@@ -1522,7 +1524,7 @@ return baseclass.extend({
 		   Escape and Tab still close it. Capture, so a modal under it
 		   does not take the same Escape. */
 		document.addEventListener('keydown', ev => {
-			if (!this.actBtn || menu.contains(ev.target)) return;
+			if (!this.actBtn || this.pal || menu.contains(ev.target)) return;
 			if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); this.closeActMenu(true); }
 			else if (ev.key === 'Tab') this.closeActMenu(false);
 		}, true);

@@ -284,9 +284,15 @@ test('every declared call is granted and every grant is used', () => {
    sources, or a mutated copy): each declared function only in direct
    calls, uci with the literal config the file may read, file.read with a
    literal granted path, no fs module, no LuCI uci module calls. */
-function callProblems(srcs, declVars) {
+function callProblems(srcs) {
 	const out = [];
 	for (const { file, text } of srcs) {
+		/* a declared function is local to its file: check each file
+		   against its own declarations, read from its own text, so two
+		   files declaring the same name cannot vouch for each other */
+		const declVars = new Map();
+		for (const m of text.matchAll(/(?:var|let|const)\s+(\w+)\s*=\s*rpc\.declare\(\{\s*object:\s*'([^']+)',\s*method:\s*'([^']+)'/g))
+			declVars.set(m[1], { obj: m[2], method: m[3] });
 		for (const [ v, d ] of declVars) {
 			for (const m of text.matchAll(new RegExp('\\b' + v + '\\b(\\s*\\(([^,)]*))?', 'g'))) {
 				const before = text.slice(Math.max(0, m.index - 80), m.index);
@@ -367,7 +373,7 @@ function requireProblems(srcs) {
 }
 
 test('uci calls name the vantage config; file.read names a granted path; declared calls are only called directly', () => {
-	assert.deepEqual(callProblems(sources, vars), []);
+	assert.deepEqual(callProblems(sources), []);
 });
 
 test('the firewall overview requires only its pinned modules; no app file loads other configs through LuCI', () => {
@@ -381,6 +387,25 @@ function mutate(file, edit) {
 	return sources.map(s => s.file.endsWith(file) ? { file: s.file, text: edit(s.text) } : s);
 }
 
+test('negative controls: a name declared in another file does not vouch for a call', () => {
+	/* the dashboard declares callUciGet for uci; a second file declaring the
+	   same name for the same object must still be held to its own rules */
+	const extra = { file: 'htdocs/luci-static/resources/view/vantage/extra.js',
+		text: "var callUciGet = rpc.declare({ object: 'uci', method: 'get', params: [ 'config' ] });\ncallUciGet('wireless');\n" };
+	assert.match(callProblems(sources.concat([ extra ])).join('\n'), /extra\.js: callUciGet\('wireless'\)/);
+	/* and a file without the declaration cannot call it at all unnoticed: the
+	   name is undeclared there, so the call is not one of the app's calls */
+	const borrow = { file: 'htdocs/luci-static/resources/view/vantage/borrow.js',
+		text: "var callUciGet = rpc.declare({ object: 'uci', method: 'get', params: [ 'config' ] });\nvar g = callUciGet; g('wireless');\n" };
+	assert.match(callProblems(sources.concat([ borrow ])).join('\n'), /borrow\.js: callUciGet used other than in a direct call/);
+	/* the case a global name map missed: another file declares the same
+	   name for a harmless object, and the dashboard's uci call reads wireless */
+	const shadow = { file: 'htdocs/luci-static/resources/view/vantage/shadow.js',
+		text: "var callUciGet = rpc.declare({ object: 'system', method: 'info' });\ncallUciGet();\n" };
+	const mutant = mutate('view/vantage/overview.js', t => t + "\ncallUciGet('wireless');\n").concat([ shadow ]);
+	assert.match(callProblems(mutant).join('\n'), /overview\.js: callUciGet\('wireless'\)/);
+});
+
 test('negative controls: an aliased or indirect call to a declared function fails', () => {
 	const anchor = "\tload: function() {\n";
 	for (const [ add, why ] of [
@@ -391,10 +416,10 @@ test('negative controls: an aliased or indirect call to a declared function fail
 		[ "\t\tvar c = 'wireless'; callUciGet(c);\n", /callUciGet\(c\)/ ]
 	]) {
 		const mutant = mutate(FIREWALL_VIEW, t => { assert.ok(t.includes(anchor)); return t.replace(anchor, anchor + add); });
-		assert.match(callProblems(mutant, vars).join('\n'), why, add.trim());
+		assert.match(callProblems(mutant).join('\n'), why, add.trim());
 	}
 	/* the same in the dashboard */
-	assert.match(callProblems(mutate('view/vantage/overview.js', t => t + "\nvar f = callRead; f('/etc/shadow');\n"), vars).join('\n'), /callRead used other than/);
+	assert.match(callProblems(mutate('view/vantage/overview.js', t => t + "\nvar f = callRead; f('/etc/shadow');\n")).join('\n'), /callRead used other than/);
 });
 
 test('negative controls: requiring a module that loads other configs fails', () => {

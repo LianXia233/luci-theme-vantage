@@ -511,7 +511,7 @@ return view.extend({
 		if (stored.clients && typeof stored.clients === 'object')
 			Object.keys(stored.clients).slice(0, 64).forEach(function(k) {
 				var mac = names.normMac(k);
-				if (mac) clientHist[mac] = series.valid(stored.clients[k], 4, 150, now);
+				if (mac) clientHist[mac] = series.valid(stored.clients[k], 4, 150, now, model.MAX_BPS);
 			});
 		this.board = data.board || {};
 		this.canWrite = data.canWrite;
