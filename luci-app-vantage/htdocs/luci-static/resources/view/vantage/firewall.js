@@ -70,17 +70,40 @@ function hasUpnp(tree) {
 	return !!n;
 }
 
-/* "TCP, UDP 27015-27030", "ICMP echo-request", "all protocols" */
+/* "TCP, UDP 27015-27030", "IPv6 ICMPv6 echo-request", "IPv4 all protocols":
+   the address family when the item has one only */
 function what(item) {
-	var any = item.proto.some(function(p) { return p === 'all' || p === 'any' || p === '*'; });
-	var proto = any ? _('all protocols') : item.proto.map(function(p) { return p.toUpperCase(); }).join(', ');
-	var extra = item.portText || (item.icmp && item.icmp.length ? item.icmp.join(', ') : '');
-	return extra ? proto + ' ' + extra : proto;
+	var fam = item.family ? 'IPv' + item.family + ' ' : '';
+	if (item.proto[0] === 'all') return fam + _('all protocols');
+	var l4 = item.proto.filter(function(p) { return p === 'tcp' || p === 'udp'; });
+	var parts = [];
+	if (l4.length) {
+		var ports = item.portText ? ' ' + item.portText : '';
+		if (item.portsExcept) ports += ' ' + (item.portText ? _('except %s') : _('all ports except %s')).format(item.portsExcept);
+		parts.push(l4.map(function(p) { return p.toUpperCase(); }).join(', ') + ports);
+	}
+	item.proto.forEach(function(p) {
+		if (l4.indexOf(p) < 0) parts.push(p === 'ipv6-icmp' ? 'ICMPv6' : p.toUpperCase());
+	});
+	var icmp = item.icmp && item.icmp.length ? ' ' + item.icmp.join(', ') : '';
+	return fam + parts.join(', ') + icmp;
 }
 
 function from(item) {
-	return item.from.length ? _('from %s').format(item.from.join(', ')) : _('from anywhere');
+	var f = item.from;
+	if (!f.anywhere) return _('from %s').format(f.only.join(', '));
+	return f.except.length ? _('from anywhere except %s').format(f.except.join(', ')) : _('from anywhere');
 }
+
+/* where a port forward sends the traffic: the router's own port, or a host
+   and port ("[2001:db8::10]:443") */
+function target(i) {
+	if (i.local) return (i.hostPort && i.hostPort !== i.portText) ? _('router port %s').format(i.hostPort) : _('this router');
+	var host = (i.hostPort && /:/.test(i.host)) ? '[' + i.host + ']' : (i.host || '');
+	return host + (i.hostPort ? ':' + i.hostPort : '');
+}
+
+function zoneName(z) { return z === '*' ? _('any zone') : z; }
 
 function named(item) {
 	if (item.name) return item.name;
@@ -92,21 +115,40 @@ function polBadge(p, risky) {
 	return E('span', { 'class': 'vt-fg-pol ' + cls }, [ p === 'ACCEPT' ? _('accept') : p === 'DROP' ? _('drop') : _('reject') ]);
 }
 
+/* why fw4 skips a section (fwglance's item.bad) */
+function ignoredWhy(i) {
+	if (i.bad === 'fw4_compatible') return _('ignored: not marked as compatible with firewall4');
+	if (i.bad === 'src-any') return _('ignored: a port forward needs one source zone, not any zone');
+	if (i.bad === 'family') return _('ignored: its address families conflict');
+	if (i.bad === 'src' && !i.src) return _('ignored: no source zone');
+	if ((i.bad === 'src' || i.bad === 'dest') && i[i.bad] && i[i.bad] !== '*')
+		return _('ignored: zone %s does not exist or is switched off').format(i[i.bad]);
+	return _('ignored: option %s has a value firewall4 refuses').format(i.bad);
+}
+
 return view.extend({
 	handleSave: null,
 	handleSaveApply: null,
 	handleReset: null,
 
 	load: function() {
-		return Promise.all([ loadCss(), L.resolveDefault(callUciGet('firewall'), {}), L.resolveDefault(ui.menu.load(), null),
-			L.resolveDefault(callIfDump(), []) ]).then(function(r) {
-			var fw = fwglance.analyse(r[1], fwglance.uplinks(r[3]));
+		/* a failed read is an error, not an empty config (which would read
+		   as an access point); a failed interface dump only hides uplinks */
+		return Promise.all([ loadCss(), L.resolveDefault(callUciGet('firewall'), null), L.resolveDefault(ui.menu.load(), null),
+			L.resolveDefault(callIfDump(), null) ]).then(function(r) {
+			if (!r[1] || typeof r[1] !== 'object') return { error: true };
+			var fw = fwglance.analyse(r[1], r[3]);
 			fw.upnp = hasUpnp(r[2]);
 			return fw;
 		});
 	},
 
 	render: function(fw) {
+		if (fw.error)
+			return E('div', { 'class': 'vt-app vt-fg' }, [ E('div', { 'class': 'vt-body' }, [
+				this.head('err', _('Could not read the firewall configuration'),
+					_('This page cannot tell what is open. Reload it; if that does not help, check the firewall pages.'))
+			]) ]);
 		return E('div', { 'class': 'vt-app vt-fg' }, [
 			E('div', { 'class': 'vt-body' }, [
 				this.renderHead(fw),
@@ -114,32 +156,15 @@ return view.extend({
 				E('div', { 'class': 'vt-fg-grid' }, [
 					fw.routed ? this.renderOpen(fw) : '',
 					this.renderZones(fw),
-					fw.off.length ? this.renderOff(fw) : ''
+					(fw.off.length || fw.ignored.length) ? this.renderOff(fw) : ''
 				])
 			])
 		]);
 	},
 
-	renderHead: function(fw) {
-		var head, sub, n = fw.open.length + fw.forwards.length;
-		if (!fw.routed) {
-			head = _('No internet-facing zone found');
-			sub = _('No zone masquerades, holds the uplink or is called wan, so this page cannot tell which side faces the internet. On an access point that is expected; on a router, check the zones below.');
-		}
-		else if (fw.warnings.length) {
-			head = fw.warnings.length === 1 ? _('1 thing needs attention') : _('%d things need attention').format(fw.warnings.length);
-			sub = _('Internet-facing: %s').format(fw.internet.join(', '));
-		}
-		else if (n) {
-			head = _('Open from the internet: %d').format(n);
-			sub = _('%d on this router, %d into your network').format(fw.open.length, fw.forwards.length);
-		}
-		else {
-			head = _('Nothing is open in your firewall rules');
-			sub = fw.standard.length ? _('Only standard housekeeping (ping, DHCP renewals and the like): %d rules').format(fw.standard.length) : _('Internet-facing: %s').format(fw.internet.join(', '));
-		}
+	head: function(level, head, sub) {
 		return E('header', { 'class': 'vt-head' }, [
-			E('span', { 'class': 'vt-orb vt-orb-' + (fw.level === 'info' ? 'ok' : fw.level) }, [ E('span', { 'class': 'vt-orb-core' }) ]),
+			E('span', { 'class': 'vt-orb vt-orb-' + (level === 'info' ? 'ok' : level) }, [ E('span', { 'class': 'vt-orb-core' }) ]),
 			E('div', { 'class': 'vt-head-text' }, [
 				E('h2', { 'class': 'vt-headline' }, [ head ]),
 				E('p', { 'class': 'vt-subline' }, [ sub ])
@@ -147,22 +172,63 @@ return view.extend({
 		]);
 	},
 
+	renderHead: function(fw) {
+		var head, sub, n = fw.open.length + fw.forwards.length;
+		var facing = fw.internet.concat(fw.outside.map(function(o) { return o.family ? _('%s (IPv%d)').format(o.name, o.family) : o.name; })).join(', ');
+		if (!fw.routed) {
+			head = _('No internet-facing zone found');
+			sub = _('No zone masquerades, holds the uplink or is called wan, so this page cannot tell which side faces the internet. On an access point that is expected; on a router, check the zones below.');
+		}
+		else if (fw.warnings.length) {
+			head = fw.warnings.length === 1 ? _('1 thing needs attention') : _('%d things need attention').format(fw.warnings.length);
+			sub = _('Internet-facing: %s').format(facing);
+		}
+		else if (n) {
+			head = _('Open from the internet: %d').format(n);
+			sub = _('%d on this router, %d into your network').format(fw.open.length, fw.forwards.length);
+		}
+		else {
+			head = _('Nothing is open in your firewall rules');
+			sub = fw.standard.length ? _('Only standard housekeeping (ping, DHCP renewals and the like): %d rules').format(fw.standard.length) : _('Internet-facing: %s').format(facing);
+		}
+		return this.head(fw.level, head, sub);
+	},
+
 	renderWarning: function(w) {
-		var title, reason, tab;
+		var title, reason, tab = 'zones';
 		if (w.code === 'input-accept') {
 			title = _('%s accepts every connection').format(w.zone);
 			reason = _('Anything on the internet can reach the router itself. Set this zone\'s Input to reject.');
-			tab = 'zones';
 		}
 		else if (w.code === 'forward-into') {
-			title = _('%s is forwarded into %s').format(w.zone, w.dest);
+			title = _('%s is forwarded into %s').format(w.zone === '*' ? _('Any zone') : w.zone, zoneName(w.dest));
 			reason = _('Anything on the internet can reach that network. Remove the forwarding unless you mean it.');
-			tab = 'zones';
+		}
+		else if (w.code === 'default-forward') {
+			title = _('Forwarding is accepted by default');
+			reason = _('Traffic from the internet that no forwarding covers still reaches your other networks. Set Forward to reject in General Settings.');
+		}
+		else if (w.code === 'outside-input') {
+			title = _('%s is in no zone and accepts every connection').format(w.family ? _('%s (IPv%d)').format(w.iface, w.family) : w.iface);
+			reason = _('The default Input policy applies there and accepts, so anything on the internet can reach the router itself. Add it to the wan zone or set Input to reject in General Settings.');
+		}
+		else if (w.code === 'uplinks-unknown') {
+			title = _('The uplinks could not be checked');
+			reason = _('The interface list could not be read, and the default Input policy accepts: an uplink in no zone would be open. Set Input to reject in General Settings.');
+		}
+		else if (w.code === 'defaults-invalid') {
+			title = _('The firewall cannot load these settings');
+			reason = _('Option %s in General Settings has a value firewall4 refuses, so it loads no new rules: what is open is unknown.').format(w.option);
+		}
+		else if (w.code === 'rule-into') {
+			title = _('%s lets the internet into %s').format(w.name || _('Unnamed rule'), zoneName(w.dest));
+			reason = _('It accepts every port from any address, like a zone forwarding. Limit it to the ports and addresses you need.');
+			tab = 'rules';
 		}
 		else {
 			title = _('Router admin open: %s').format(w.name || w.ports);
 			reason = _('SSH or the web interface answers any address on the internet. Limit the rule to the addresses you use.');
-			tab = 'rules';
+			tab = w.kind === 'redirect' ? 'forwards' : 'rules';
 		}
 		return E('a', { 'class': 'vt-chip vt-chip-' + w.level, 'role': 'listitem', 'href': page(tab) }, [
 			E('span', { 'class': 'vt-chip-ico' }, [ icon(w.level === 'err' ? 'err' : 'warn') ]),
@@ -198,25 +264,25 @@ return view.extend({
 			body.push(E('h4', { 'class': 'vt-fg-group' }, [ title ]));
 			body.push(E('div', { 'class': 'vt-fg-rows' }, items));
 		};
-		if (fw.open.length)
-			group(_('On this router'), fw.open.map(function(i) {
-				return self.row(page('rules'), named(i), [ what(i), ' · ', E('span', { 'class': i.from.length ? '' : 'vt-fg-anywhere' }, [ from(i) ]) ]);
-			}));
-		if (fw.forwards.length)
-			group(_('Into your network'), fw.forwards.map(function(i) {
-				var to = i.kind === 'redirect'
-					? (i.host ? i.host + (i.hostPort ? ':' + i.hostPort : '') : (i.dest || ''))
-					: (i.dest === '*' ? _('any zone') : i.dest);
-				return self.row(page(i.kind === 'redirect' ? 'forwards' : 'rules'), named(i),
-					[ what(i), ' · ', from(i) ],
-					E('span', { 'class': 'vt-fg-to' }, [ icon('arrow'), E('span', { 'class': 'vt-mono' }, [ to ]) ]));
-			}));
+		var to = function(text) {
+			return E('span', { 'class': 'vt-fg-to' }, [ icon('arrow'), E('span', { 'class': 'vt-mono' }, [ text ]) ]);
+		};
+		var item = function(i) {
+			var redirect = i.kind === 'redirect';
+			return self.row(page(redirect ? 'forwards' : 'rules'), named(i),
+				[ what(i), ' · ', E('span', { 'class': i.from.anywhere ? 'vt-fg-anywhere' : '' }, [ from(i) ]) ],
+				redirect ? to(target(i)) : i.dest ? to(zoneName(i.dest)) : null);
+		};
+		if (fw.open.length) group(_('On this router'), fw.open.map(item));
+		if (fw.forwards.length) group(_('Into your network'), fw.forwards.map(item));
 		if (!fw.open.length && !fw.forwards.length)
-			body.push(E('p', { 'class': 'vt-empty-inline' }, [ _('Nothing is open in your firewall rules.') ]));
+			body.push(E('p', { 'class': 'vt-empty-inline' }, [ fw.warnings.length
+				? _('No rule or port forward opens anything; the warnings above say what does.')
+				: _('Nothing is open in your firewall rules.') ]));
 		if (fw.standard.length)
 			body.push(E('details', { 'class': 'vt-fg-std' }, [
 				E('summary', {}, [ _('Standard housekeeping: %d rules').format(fw.standard.length) ]),
-				E('p', { 'class': 'vt-hint' }, [ _('Ping and other control messages, multicast, IPsec and DHCP renewals: what every router lets in.') ]),
+				E('p', { 'class': 'vt-hint' }, [ _('Ping and other control messages, multicast, DHCP renewals and IPsec passed on to your network: what every router lets in.') ]),
 				E('div', { 'class': 'vt-fg-rows' }, fw.standard.map(function(i) {
 					return self.row(page('rules'), named(i), [ what(i) ]);
 				}))
@@ -227,7 +293,7 @@ return view.extend({
 				E('span', {}, [ _('UPnP is installed: devices on your network can open ports on their own while it runs, and those are not listed here.') ]) ]));
 		if (fw.includes.length)
 			body.push(E('p', { 'class': 'vt-fg-note' }, [ icon('info'),
-				E('span', {}, [ _('Custom rule files are loaded (%s); rules in them are not listed here.').format(fw.includes.map(function(i) { return i.path || '?'; }).join(', ')) ]) ]));
+				E('span', {}, [ _('Custom rule files are configured (%s); rules in them are not listed here.').format(fw.includes.map(function(i) { return i.path || '?'; }).join(', ')) ]) ]));
 		/* otherwise still say what this page cannot see: UPnP without its
 		   LuCI app, and nftables files the firewall picks up on its own */
 		if (!fw.upnp && !fw.includes.length)
@@ -236,37 +302,50 @@ return view.extend({
 	},
 
 	renderZones: function(fw) {
-		var rows = fw.zones.map(function(z) {
-			return E('div', { 'class': 'vt-fg-zone' + (z.internet ? ' is-internet' : '') }, [
+		var fallback = fw.defaults.forward === 'ACCEPT';
+		/* where a zone forwards: its forwardings, and with an accepting
+		   default policy every other zone */
+		var dests = function(to, risky) {
+			var chips = to.map(function(d) { return E('span', { 'class': 'vt-fg-dest' + (risky ? ' is-risk' : '') }, [ zoneName(d) ]); });
+			if (fallback) chips.push(E('span', { 'class': 'vt-fg-dest' + (risky ? ' is-risk' : '') }, [ _('any zone (default policy)') ]));
+			return chips.length ? E('span', { 'class': 'vt-fg-dests' }, chips) : E('span', { 'class': 'vt-hint' }, [ _('forwards nowhere') ]);
+		};
+		var zone = function(name, internet, input, to, hint) {
+			return E('div', { 'class': 'vt-fg-zone' + (internet ? ' is-internet' : '') }, [
 				E('div', { 'class': 'vt-fg-zone-head' }, [
-					E('span', { 'class': 'vt-fg-zone-name' }, [ z.name ]),
-					z.internet ? E('span', { 'class': 'vt-fg-tag' }, [ _('internet') ]) : '',
-					E('span', { 'class': 'vt-fg-zone-in' }, [ _('Input'), ' ', polBadge(z.input, z.internet && z.input === 'ACCEPT') ])
+					E('span', { 'class': 'vt-fg-zone-name' }, [ name ]),
+					internet ? E('span', { 'class': 'vt-fg-tag' }, [ _('internet') ]) : '',
+					E('span', { 'class': 'vt-fg-zone-in' }, [ _('Input'), ' ', polBadge(input, internet && input === 'ACCEPT') ])
 				]),
-				E('div', { 'class': 'vt-fg-zone-to' }, [
-					icon('arrow'),
-					z.to.length
-						? E('span', { 'class': 'vt-fg-dests' }, z.to.map(function(d) {
-							return E('span', { 'class': 'vt-fg-dest' + (z.internet ? ' is-risk' : '') }, [ d ]);
-						}))
-						: E('span', { 'class': 'vt-hint' }, [ _('forwards nowhere') ])
-				]),
-				z.networks.length ? E('div', { 'class': 'vt-hint vt-fg-nets' }, [ _('Networks: %s').format(z.networks.join(', ')) ]) : ''
+				E('div', { 'class': 'vt-fg-zone-to' }, [ icon('arrow'), dests(to, internet) ]),
+				hint ? E('div', { 'class': 'vt-hint vt-fg-nets' }, [ hint ]) : ''
 			]);
-		});
+		};
+		var rows = fw.zones.map(function(z) {
+			return zone(z.name, z.internet, z.input, z.to, z.networks.length ? _('Networks: %s').format(z.networks.join(', ')) : '');
+		}).concat(fw.outside.map(function(o) {
+			return zone(o.family ? _('%s (IPv%d)').format(o.name, o.family) : o.name, true, fw.defaults.input, fw.anyTo,
+				o.family ? _('This address family is in no zone: the default policies apply.') : _('In no zone: the default policies apply.'));
+		}));
 		if (!rows.length) rows = [ E('p', { 'class': 'vt-empty-inline' }, [ _('No zones are configured.') ]) ];
 		return this.tile('zones', _('Zones'), page('zones'), _('General Settings'), [ E('div', { 'class': 'vt-fg-zones' }, rows) ]);
 	},
 
 	renderOff: function(fw) {
 		var self = this;
-		return this.tile('off', _('Switched off'), page('rules'), _('Traffic Rules'), [
-			E('div', { 'class': 'vt-fg-rows' }, fw.off.map(function(i) {
-				if (i.kind === 'forwarding')
-					return self.row(page('zones'), _('Forwarding %s to %s').format(i.src || '?', i.dest || '?'), [ _('zone forwarding') ]);
-				return self.row(page(i.kind === 'redirect' ? 'forwards' : 'rules'), named(i),
-					[ i.kind === 'redirect' ? _('port forward') : _('traffic rule'), ' · ', what(i) ]);
-			}))
+		var rows = fw.off.concat(fw.ignored).map(function(i) {
+			var why = i.bad ? [ ' · ', ignoredWhy(i) ] : [];
+			if (i.kind === 'forwarding')
+				return self.row(page('zones'), _('Forwarding %s to %s').format(i.src || '?', i.dest || '?'), [ _('zone forwarding') ].concat(why));
+			if (i.kind === 'zone')
+				return self.row(page('zones'), _('Zone %s').format(i.name || '?'), [ _('zone') ].concat(why));
+			if (i.kind === 'include')
+				return self.row(page('custom'), i.path || '?', [ _('custom rule file') ].concat(why));
+			return self.row(page(i.kind === 'redirect' ? 'forwards' : 'rules'), named(i),
+				[ i.kind === 'redirect' ? _('port forward') : _('traffic rule'), ' · ', what(i) ].concat(why));
+		});
+		return this.tile('off', fw.ignored.length ? _('Not in effect') : _('Switched off'), page('rules'), _('Traffic Rules'), [
+			E('div', { 'class': 'vt-fg-rows' }, rows)
 		]);
 	}
 });
