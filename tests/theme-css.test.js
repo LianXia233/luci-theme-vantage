@@ -401,3 +401,12 @@ test('touch: short row buttons are at least a touch target wide (Processes Kill 
 	assert.ok(r, 'rule present');
 	assert.match(r.body, /min-width:\s*var\(--ctl-h\)/);
 });
+
+test('Interfaces: an open device tooltip escapes the scrolling table card (last row was clipped by 43 px)', () => {
+	const r = themeRules.find((x) => !x.media && x.sel.includes(':is(.cbi-section, .cbi-tblsection):has(.ifacebox .cbi-tooltip-container:is(:hover, :focus-within))'));
+	assert.ok(r, 'rule present');
+	assert.match(r.body, /overflow:\s*visible/);
+	/* after the generic scroller, which it must beat */
+	const scroller = themeRules.findIndex((x) => !x.media && x.sel.includes('.cbi-tblsection') && /overflow-x:\s*auto/.test(x.body));
+	assert.ok(scroller >= 0 && themeRules.indexOf(r) > scroller);
+});

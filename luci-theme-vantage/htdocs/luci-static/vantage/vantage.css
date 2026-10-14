@@ -2437,6 +2437,9 @@ html:not([data-darkmode="true"]) .vt-login-page {
 	background-attachment: local, local, scroll, scroll;
 }
 .cbi-section:has(.cbi-dropdown[open]), .cbi-tblsection:has(.cbi-dropdown[open]) { overflow: visible; }
+/* Interfaces: an open device tooltip in the last row reaches below the
+   table card; the card's scroller would clip it */
+:is(.cbi-section, .cbi-tblsection):has(.ifacebox .cbi-tooltip-container:is(:hover, :focus-within)) { overflow: visible; }
 @media (720px < width <= 1180px) {
 	.cbi-section { overflow-x: auto; }
 	.cbi-section:has(.cbi-dropdown[open]) { overflow: visible; }
