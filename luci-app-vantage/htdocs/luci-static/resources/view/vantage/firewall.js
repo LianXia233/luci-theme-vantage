@@ -14,12 +14,18 @@
    files are not in it, and the page says so. All DOM is built with E()
    and text nodes. */
 
-var callUciGet = rpc.declare({ object: 'uci', method: 'get', params: [ 'config' ], expect: { values: {} } });
+/* Both reject on a ubus error (permission denied, not found, ...) rather
+   than resolve an `expect` default: an empty config would read as an
+   access point, an empty interface list as a router whose uplinks are all
+   zoned. load() checks the shape of what they return. */
+var callUciGet = rpc.declare({ object: 'uci', method: 'get', params: [ 'config' ], reject: true });
 /* which interface holds the default route, to find an uplink zone that
    does not masquerade: LuCI's luci-base-network-status group grants it
    (also the app's read group); without it the page falls back to
    masquerading and naming */
-var callIfDump = rpc.declare({ object: 'network.interface', method: 'dump', expect: { 'interface': [] } });
+var callIfDump = rpc.declare({ object: 'network.interface', method: 'dump', reject: true });
+
+function isObject(v) { return v != null && typeof v === 'object' && !Array.isArray(v); }
 
 /* the dashboard's sheet, revalidated on every load (see overview.js) */
 var cssPromise = null;
@@ -133,11 +139,14 @@ return view.extend({
 
 	load: function() {
 		/* a failed read is an error, not an empty config (which would read
-		   as an access point); a failed interface dump only hides uplinks */
+		   as an access point); a failed interface dump is no dump (null),
+		   which leaves the uplinks unknown, never an empty list */
 		return Promise.all([ loadCss(), L.resolveDefault(callUciGet('firewall'), null), L.resolveDefault(ui.menu.load(), null),
 			L.resolveDefault(callIfDump(), null) ]).then(function(r) {
-			if (!r[1] || typeof r[1] !== 'object') return { error: true };
-			var fw = fwglance.analyse(r[1], r[3]);
+			var values = isObject(r[1]) && isObject(r[1].values) ? r[1].values : null;
+			var dump = isObject(r[3]) && Array.isArray(r[3]['interface']) ? r[3]['interface'] : null;
+			if (!values) return { error: true };
+			var fw = fwglance.analyse(values, dump);
 			fw.upnp = hasUpnp(r[2]);
 			return fw;
 		});

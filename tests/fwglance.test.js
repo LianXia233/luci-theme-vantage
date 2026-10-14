@@ -565,23 +565,30 @@ test('B21: includes are configured, and fw4 ignores a script without fw4_compati
 	assert.deepEqual(fw.analyse(cfg(STOCK)).includes, []);
 });
 
+/* ---------------------------------------- 1.0.7 final check (Codex) */
+
+const acceptIn = list => withDefaults(list, { input: 'ACCEPT' });
+const zoneOpts = (list, name, opts) => list.map(([ t, o ]) => [ t, t === 'zone' && o.name === name ? Object.assign({}, o, opts) : o ]);
+const LAN_DEV = Object.assign(iface('lan', '192.0.2.1'), { device: 'br-lan', l3_device: 'br-lan' });
+const WAN_DEV = Object.assign(iface('wan', '198.51.100.2'), { device: 'eth1', l3_device: 'eth1' });
+const MASQ = zoneOpts(BASE, 'wan', { masq: '1' });
+
 /* ------------------------------------------------------- the overview */
 
 /* view/vantage/firewall.js with stub LuCI modules; E() builds plain
-   objects and text() reads them back */
-function loadView(replies) {
+   objects and text() reads them back. `replies` stand in for whole rpc
+   calls: 'object method' -> () => Promise of what the call resolves to
+   (the ubus reply data, as a declaration without `expect` returns it).
+   With `rpc` the view gets that module instead (LuCI's own rpc.js). */
+function loadView(replies, rpc) {
 	const src = fs.readFileSync(path.join(RES, 'view/vantage/firewall.js'), 'utf8');
 	global.E = (tag, attrs, children) => ({ tag, attrs: attrs || {}, children: children == null ? [] : [].concat(children) });
 	global.document = { createElementNS: () => ({ setAttribute() {}, appendChild() {} }) };
 	global.fetch = () => Promise.reject(new Error('no fetch'));
-	global.L = {
-		url: (...p) => '/' + p.join('/'),
-		resource: p => '/' + p,
-		resolveDefault: (p, d) => Promise.resolve(p).catch(() => d)
-	};
+	global.L = luciL();
 	const stubs = {
 		view: { extend: p => p },
-		rpc: { declare: o => () => replies[o.object + ' ' + o.method]() },
+		rpc: rpc ? rpc() : { declare: o => () => replies[o.object + ' ' + o.method]() },
 		ui: { menu: { load: () => Promise.resolve({ children: {} }) } },
 		'vantage.fwglance': fw
 	};
@@ -593,6 +600,19 @@ function loadView(replies) {
 	return new Function(...params, src)(...values);
 }
 
+/* the parts of LuCI's L the view and rpc.js use */
+function luciL() {
+	return {
+		env: {},
+		url: (...p) => '/' + p.join('/'),
+		resource: p => '/' + p,
+		resolveDefault: (p, d) => Promise.resolve(p).catch(() => d),
+		isObject: v => v != null && typeof v === 'object' && !Array.isArray(v),
+		bind: (fn, self, ...args) => fn.bind(self, ...args),
+		raise: (type, fmt, ...args) => { const e = new Error(fmt.format(...args)); e.name = type; throw e; }
+	};
+}
+
 function text(n) {
 	if (n == null || n === '') return '';
 	if (typeof n === 'string') return n;
@@ -601,7 +621,8 @@ function text(n) {
 }
 
 async function page(values, dump) {
-	const v = loadView({ 'uci get': () => Promise.resolve(values), 'network.interface dump': () => Promise.resolve(dump === undefined ? null : dump) });
+	const v = loadView({ 'uci get': () => Promise.resolve({ values }),
+		'network.interface dump': () => dump == null ? Promise.reject(new Error('no dump')) : Promise.resolve({ interface: dump }) });
 	return text(v.render(await v.load()));
 }
 
@@ -652,7 +673,7 @@ test('overview: descriptions carry the family, exceptions and configured include
 });
 
 test('B6: a failed read of the firewall config is an error, not the access point text (CS S6)', async () => {
-	const v = loadView({ 'uci get': () => Promise.reject(new Error('Access denied')), 'network.interface dump': () => Promise.resolve([]) });
+	const v = loadView({ 'uci get': () => Promise.reject(new Error('Access denied')), 'network.interface dump': () => Promise.resolve({ interface: [] }) });
 	const fwr = await v.load();
 	assert.deepEqual(fwr, { error: true });
 	const node = v.render(fwr);
@@ -661,12 +682,12 @@ test('B6: a failed read of the firewall config is an error, not the access point
 	assert.doesNotMatch(t, /access point|Nothing is open/);
 	assert.match(JSON.stringify(node), /vt-orb-err/);
 	/* a failed interface dump is not an error: the page still reads the config */
-	const v2 = loadView({ 'uci get': () => Promise.resolve(cfg(STOCK)), 'network.interface dump': () => Promise.reject(new Error('x')) });
+	const v2 = loadView({ 'uci get': () => Promise.resolve({ values: cfg(STOCK) }), 'network.interface dump': () => Promise.reject(new Error('x')) });
 	const r2 = await v2.load();
 	assert.equal(r2.level, 'ok');
 	assert.equal(r2.interfaces, false);
 	/* an access point reads as unknown, with a neutral orb */
-	const ap = loadView({ 'uci get': () => Promise.resolve(cfg([ [ 'zone', { name: 'lan', network: 'lan' } ] ])), 'network.interface dump': () => Promise.resolve([]) });
+	const ap = loadView({ 'uci get': () => Promise.resolve({ values: cfg([ [ 'zone', { name: 'lan', network: 'lan' } ] ]) }), 'network.interface dump': () => Promise.resolve({ interface: [] }) });
 	const apNode = ap.render(await ap.load());
 	assert.match(text(apNode), /No internet-facing zone found/);
 	assert.match(JSON.stringify(apNode), /vt-orb-unknown/);
@@ -786,5 +807,87 @@ test('fw4 itself: the regressions\' openings are in the ruleset it writes', { sk
 		const r = fw.analyse(values, DUMP);
 		if (code) assert.ok(r.warnings.some(w => w.code === code), name + ': model ' + codes(r));
 		else assert.ok(!r.warnings.some(w => w.level === 'err'), name + ': model ' + codes(r));
+	}
+});
+
+/* --------------------------- M1: ubus errors through LuCI's own rpc.js
+
+   LuCI's rpc.js (from the rootfs dump; skipped without it) decodes the
+   JSON-RPC frames a ubus call returns, so a status like [ 6 ] (permission
+   denied) takes the same path as on a router, not a mocked rejection. */
+const RPC_JS = path.join(ROOTFS, 'www/luci-static/resources/rpc.js');
+const NO_RPC = fs.existsSync(RPC_JS) ? false : 'no rpc.js in the rootfs dump (set VANTAGE_ROOTFS)';
+
+/* the view on LuCI's rpc.js; frames: 'object method' -> the reply's
+   `result`, or a function of the request returning the whole frame */
+async function rpcPage(frames) {
+	const src = fs.readFileSync(RPC_JS, 'utf8');
+	const request = {
+		post: (url, msg) => Promise.resolve({ ok: true, status: 200, json: () => {
+			const f = frames[msg.params[1] + ' ' + msg.params[2]];
+			return typeof f === 'function' ? f(msg) : { jsonrpc: '2.0', id: msg.id, result: f };
+		} })
+	};
+	const v = loadView(null, () => new Function('baseclass', 'request', src)({ extend: p => p }, request));
+	const r = await v.load();
+	const node = v.render(r);
+	return { r, node, t: text(node) };
+}
+
+const PERMISSIVE = cfg(acceptIn(MASQ));
+
+test('M1: ubus errors on the firewall config reach the error path, not the access point text (CX M1)', { skip: NO_RPC }, async () => {
+	const okDump = [ 0, { interface: [ LAN_DEV, WAN_DEV ] } ];
+	for (const [ uci, why ] of [
+		[ [ 6 ], 'permission denied' ], [ [ 9 ], 'unspecified error' ], [ [ 4 ], 'not found' ], [ [ 0 ], 'no data' ],
+		[ [ 0, { values: 'bad' } ], 'values not an object' ], [ [ 0, { values: [] } ], 'values a list' ], [ [ 0, {} ], 'no values' ],
+		[ msg => ({ jsonrpc: '2.0', id: msg.id, error: { code: -32002, message: 'Access denied' } }), 'a JSON-RPC error' ]
+	]) {
+		const { r, node, t } = await rpcPage({ 'uci get': uci, 'network.interface dump': okDump });
+		assert.deepEqual(r, { error: true }, why);
+		assert.match(t, /Could not read the firewall configuration/, why);
+		assert.doesNotMatch(t, /No internet-facing zone|access point|Nothing is open/, why);
+		assert.match(JSON.stringify(node), /vt-orb-err/, why);
+	}
+});
+
+test('M1: ubus errors on the interface dump leave the uplinks unknown, never "Nothing is open" (CX M1)', { skip: NO_RPC }, async () => {
+	for (const [ dump, why ] of [
+		[ [ 9 ], 'unspecified error' ], [ [ 6 ], 'permission denied' ], [ [ 0 ], 'no data' ],
+		[ [ 0, { interface: 'x' } ], 'interface not a list' ], [ [ 0, { interface: {} } ], 'interface an object' ], [ [ 0, {} ], 'no interface' ]
+	]) {
+		const { r, t } = await rpcPage({ 'uci get': [ 0, { values: PERMISSIVE } ], 'network.interface dump': dump });
+		assert.equal(r.error, undefined, why);
+		assert.equal(r.interfaces, false, why);
+		assert.deepEqual(codes(r), [ 'uplinks-unknown:' ], why);
+		assert.match(t, /The uplinks could not be checked/, why);
+		assert.doesNotMatch(t, /Nothing is open/, why);
+	}
+});
+
+test('M1: when both reads succeed through rpc.js the data is used as it is (CX M1)', { skip: NO_RPC }, async () => {
+	/* an access point still reads as one */
+	const ap = await rpcPage({ 'uci get': [ 0, { values: cfg([ [ 'defaults', { input: 'ACCEPT' } ], [ 'zone', { name: 'lan', network: 'lan' } ] ]) } ],
+		'network.interface dump': [ 0, { interface: [ LAN_DEV ] } ] });
+	assert.equal(ap.r.interfaces, true);
+	assert.match(ap.t, /No internet-facing zone found/);
+	assert.match(JSON.stringify(ap.node), /vt-orb-unknown/);
+	/* an empty firewall config is a config, not an error */
+	assert.match((await rpcPage({ 'uci get': [ 0, { values: {} } ], 'network.interface dump': [ 0, { interface: [] } ] })).t, /No internet-facing zone found/);
+	/* a router whose uplink is zoned: nothing open is a true statement */
+	const ok = await rpcPage({ 'uci get': [ 0, { values: PERMISSIVE } ],
+		'network.interface dump': [ 0, { interface: [ LAN_DEV, Object.assign({}, WAN_DEV, { route: [ { target: '0.0.0.0', mask: 0 } ], 'ipv4-address': [ { address: PUBLIC, mask: 24 } ] }) ] } ] });
+	assert.equal(ok.r.interfaces, true);
+	assert.deepEqual(ok.r.warnings, []);
+	assert.match(ok.t, /Nothing is open in your firewall rules/);
+});
+
+test('M1: both calls reject on a ubus error and have no `expect` default to fall back on (CX M1)', () => {
+	const src = fs.readFileSync(path.join(RES, 'view/vantage/firewall.js'), 'utf8');
+	const decls = [ ...src.matchAll(/rpc\.declare\(\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\)/g) ].map(m => m[1]);
+	assert.equal(decls.length, 2);
+	for (const d of decls) {
+		assert.match(d, /\breject:\s*true\b/, d);
+		assert.doesNotMatch(d, /\bexpect\b/, d);
 	}
 });

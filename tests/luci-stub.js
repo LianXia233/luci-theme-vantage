@@ -11,6 +11,7 @@ const RES = path.join(__dirname, '..', 'luci-app-vantage', 'htdocs', 'luci-stati
 
 /* LuCI globals the modules use */
 global._ = s => s;
+global.N_ = (n, singular, plural) => n === 1 ? singular : plural;
 if (!String.prototype.format) {
 	Object.defineProperty(String.prototype, 'format', {
 		value: function() {
