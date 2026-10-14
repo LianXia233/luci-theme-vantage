@@ -387,7 +387,7 @@ html[data-darkmode="true"] .vt-brand-tile { fill: #16181b; }
 	cursor: pointer;
 }
 .vt-rail-pin:hover { background: var(--s3); color: var(--text); }
-.vt-rail-pin svg, .vt-icon-btn svg, .vt-search svg, .vt-rail-link svg, .vt-flyout svg, .vt-pal svg {
+.vt-rail-pin svg, .vt-icon-btn svg, .vt-search svg, .vt-rail-link svg, .vt-flyout svg, .vt-pal svg, .vt-crumb-switch svg {
 	fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
 .vt-rail-pin svg { transition: transform .15s; }
@@ -972,6 +972,9 @@ input, select, textarea, button { font: inherit; color: inherit; }
 .vt-main textarea, .cbi-input-textarea, .modal textarea { max-width: calc(2 * var(--field-max)); min-height: 88px; font-family: var(--mono); font-size: var(--fs-sm); resize: vertical; }
 /* read-only text (System and Kernel log) is a viewer, not a field: full width */
 .vt-main textarea[readonly] { max-width: none; }
+/* a short free-text option (System -> Notes: no rows set) is as wide as the
+   fields beside it; editors that set their rows (Scheduled Tasks) stay wide */
+.cbi-value-field textarea.cbi-input-textarea:not([rows]) { max-width: var(--field-max); }
 .vt-main select, .cbi-input-select, .modal select {
 	appearance: none; -webkit-appearance: none;
 	padding-right: 30px;
@@ -1027,12 +1030,22 @@ input[readonly] { cursor: default; }
 .control-group > :not(:last-child) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
 .control-group > :not(:first-child) { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
 .control-group > .btn, .control-group > .cbi-button { flex: none; }
+/* a group on the line under its field (System -> Local Time's Sync buttons) */
+.cbi-value-field > br + .control-group { margin-top: var(--sp-2); }
 /* in LuCI's unclassed field wrapper (a flex row) the group sized to its
    content, 254px for a password with its reveal button: as wide as a field */
 .cbi-value-field > div:not([class]) > .control-group { flex: 1 1 auto; }
 
 /* checkbox */
 .cbi-checkbox { display: inline-flex; align-items: center; min-height: var(--ctl-h); gap: var(--sp-2); }
+/* its help 8px under the box, as under a field: the box (16px) sits
+   centred in a control-high row */
+@media (width > 720px) {
+	.cbi-value-field > .cbi-checkbox + .cbi-value-description { margin-top: calc((16px - var(--ctl-h)) / 2 + 8px); }
+}
+@media (pointer: coarse) and (width > 720px) {
+	.cbi-value-field > .cbi-checkbox + .cbi-value-description { margin-top: calc((20px - var(--ctl-h)) / 2 + 8px); }   /* 20px touch box */
+}
 .cbi-checkbox > label:empty { display: none; }
 input[type="checkbox"], input[type="radio"] {
 	appearance: none; -webkit-appearance: none;
@@ -1228,7 +1241,7 @@ input[type="button"], input[type="reset"], input[type="submit"]) {
 	gap: 0;
 }
 .cbi-dropdown.btn > ul, .cbi-dropdown.cbi-button > ul { padding: 0 var(--sp-3); flex-wrap: nowrap; }
-.cbi-dropdown.btn > ul > li, .cbi-dropdown.cbi-button > ul > li { min-height: 0; }
+.cbi-dropdown.btn > ul > li, .cbi-dropdown.cbi-button > ul > li { min-height: 0; line-height: 1.3; }   /* 1: the label clips "pp" */
 .cbi-dropdown.btn > .more, .cbi-dropdown.cbi-button > .more { display: none !important; }
 .cbi-dropdown.btn > .open, .cbi-dropdown.cbi-button > .open {
 	padding: 0 8px;
@@ -1379,6 +1392,16 @@ table { border-collapse: separate; border-spacing: 0; width: 100%; }
 .th[data-sort-direction="asc"]::after { content: " \2191"; color: var(--accent-text); }
 .th[data-sort-direction="desc"]::after { content: " \2193"; color: var(--accent-text); }
 .tr.placeholder em, tr.placeholder em { font-style: normal; }
+/* a section's only line is a placeholder too (Overview: "No active leases found") */
+.cbi-section > div:not([class]) > em:only-child { font-style: normal; color: var(--text-3); }
+/* a header row short of the body's actions column (Repo Public Keys: two
+   titles over three cells) gets the missing cell, so its fill and line
+   run the table's width */
+.table:has(> tbody > .tr > .td.cbi-section-actions) > thead > .cbi-section-table-titles:not(:has(> .cbi-section-actions))::after {
+	content: ""; display: table-cell;
+	background: var(--s1);
+	border-bottom: 1px solid var(--line-2);
+}
 .tr.placeholder > .td, tr.placeholder > td { height: 64px; text-align: left; font-style: normal; color: var(--text-3); padding: var(--sp-5); }
 
 /* tables in a card run edge to edge; header sticks under the top bar */
@@ -1408,8 +1431,9 @@ table { border-collapse: separate; border-spacing: 0; width: 100%; }
 .td > span:has(> span + br + span) > span { white-space: nowrap; font: var(--fs-sm)/1.5 var(--mono); }
 .td > span:has(> span + br + span) > span:not(:first-child) { color: var(--text-3); font-size: var(--fs-micro); }
 
-/* badges inside cells are content, not pills: icon + text */
-.td .ifacebadge, .td .ifacebadge.large {
+/* badges inside cells are content, not pills: icon + text (a badge that
+   is a tooltip, Interfaces' device details, keeps the tooltip's box) */
+.td .ifacebadge:not(.cbi-tooltip) {
 	gap: 8px; padding: 0;
 	background: none; border: 0; box-shadow: none; border-radius: 0;
 	font-size: inherit; white-space: nowrap;
@@ -1430,7 +1454,7 @@ table { border-collapse: separate; border-spacing: 0; width: 100%; }
 
 .td.cbi-value-field.inactive { visibility: hidden; }
 .td.cbi-section-actions, .th.cbi-section-actions { text-align: right; white-space: nowrap; width: 1%; }
-.td.cbi-section-actions > div { display: inline-flex; gap: 4px; flex-wrap: nowrap; align-items: center; }
+.td.cbi-section-actions > div:not(.btn, .cbi-button) { display: inline-flex; gap: 4px; flex-wrap: nowrap; align-items: center; }
 .td.cbi-section-actions .btn, .td.cbi-section-actions .cbi-button { padding: 0 10px; }
 /* three or more row actions: the main one plus ⋯ (menu-vantage.js
    decorateRowActions); LuCI's other buttons stay in place, hidden, and
@@ -1564,7 +1588,8 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 .ifacebadge.large { padding: 6px 10px; gap: 8px; font-size: var(--fs-base); }
 .ifacebadge.large img { width: 20px; height: 20px; }
 .ifacebadge-active { border-color: var(--accent-line); box-shadow: inset 0 0 0 1px var(--accent-line); }
-.cbi-tooltip.ifacebadge { display: inline-grid; }
+/* the device details tooltip (Interfaces): icon beside the details */
+.cbi-tooltip.ifacebadge { display: inline-grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; }
 
 /* "<strong>Label:</strong> value<br>" dumps (LuCI itemlist) -> aligned
    label/value grid. Each span.nowrap becomes a subgrid row: the <strong>
@@ -1713,6 +1738,14 @@ div:has(> .ifacebox > .ifacebox-head.cbi-tooltip-container) > .ifacebox { width:
 .zonebadge[style*="--zone-color-rgb"] { box-shadow: inset 3px 0 0 rgb(var(--zone-color-rgb)); padding-left: 10px; }
 .ifacebox-head[style*="--zone-color-rgb"] { box-shadow: inset 0 3px 0 rgb(var(--zone-color-rgb)); border-bottom-color: rgba(var(--zone-color-rgb), .4) !important; }
 .ifacebox-head[style*="background-color:#"], .ifacebox-head[style*="background-color: #"] { color: #111 !important; }
+/* no zone: LuCI's light grey (238, 238, 238) was the brightest thing on a
+   dark page; theme neutrals instead, edge in the muted text colour */
+:is(.zonebadge, .ifacebox-head):is([style*="--zone-color-rgb: 238, 238, 238"], [style*="--zone-color-rgb:238, 238, 238"], [style*="--zone-color-rgb:238,238,238"]) {
+	background-color: var(--s3) !important;
+	border-color: var(--line-2) !important;
+}
+.zonebadge:is([style*="--zone-color-rgb: 238, 238, 238"], [style*="--zone-color-rgb:238, 238, 238"], [style*="--zone-color-rgb:238,238,238"]) { box-shadow: inset 3px 0 0 var(--text-3); }
+.ifacebox-head:is([style*="--zone-color-rgb: 238, 238, 238"], [style*="--zone-color-rgb:238, 238, 238"], [style*="--zone-color-rgb:238,238,238"]) { box-shadow: inset 0 3px 0 var(--text-3); }
 /* muted, but on the zone tint: --text-3 fell to 3.1:1 there in dark mode */
 .zonebadge > em { font-style: normal; color: color-mix(in srgb, var(--text) 78%, transparent); }
 .zonebadge .ifacebadge { padding: 0 4px; border: 0; background: transparent; }
@@ -2106,6 +2139,10 @@ body[data-page^="admin-status-realtime"] #view .tr:has(:is(#lb_load15_cur, #nois
 body[data-page^="admin-status-realtime"] #view #settings-row { gap: var(--sp-3); align-items: center; margin: var(--sp-5) 0 var(--sp-3); }
 body[data-page^="admin-status-realtime"] #view #settings-row > .right { flex: none !important; }
 body[data-page^="admin-status-realtime"] #view #settings-row input { max-width: 420px; }
+/* "Enable DNS lookups" switches the view, it saves nothing: not the lime
+   primary LuCI's apply class would make it */
+:is(.btn, .cbi-button).toggle-lookups { background: var(--s3); border-color: var(--line-2); color: var(--text); font-weight: 500; }
+:is(.btn, .cbi-button).toggle-lookups:hover { background: var(--s4); border-color: var(--text-3); color: var(--text); }
 #connections .tr > .td { height: 40px; padding-top: 7px; padding-bottom: 7px; }
 #connections .tr > .td:first-child { padding-left: var(--card-px); }
 #connections .tr > .td:last-child, #connections .tr > .th:last-child { padding-right: var(--card-px); text-align: right; white-space: nowrap; }
@@ -2189,6 +2226,7 @@ body[data-page^="admin-status-channel_analysis"] #view [data-tab-title]:not([dat
 	body[data-page^="admin-status-realtime"] #view .table:has(strong[style*="border-bottom"]) > .tr > .td:nth-child(1) { grid-column: 1 / -1; }
 	body[data-page^="admin-status-realtime"] #view #settings-row { flex-wrap: wrap; }
 	body[data-page^="admin-status-realtime"] #view #settings-row > * { flex: 1 1 100% !important; }
+	body[data-page^="admin-status-realtime"] #view #settings-row > .right > .btn { margin-left: 0; }
 	#connections .tr:not(.table-titles) > .td:last-child { text-align: left; }
 }
 
@@ -2549,6 +2587,17 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 #content_syslog > div > :is(select, input:not([type="checkbox"])) + label { margin-left: var(--sp-3) !important; }
 #content_syslog > div > #logSeveritySelect + label { margin-left: 0 !important; }   /* "and above" ends its own group */
 
+/* Network -> Diagnostics: the three tools in equal columns, top aligned */
+.table:has(.diag-action) { table-layout: fixed; }
+.table:has(.diag-action) .tr > .td { width: calc(100% / 3); vertical-align: top; }
+.table:has(.diag-action) .td > input { max-width: none; }   /* fields fill them: even gaps */
+
+/* System -> Software: the control rows line up with the page (LuCI pads
+   each by .25em), and "Update lists…" is a plain button among plain ones */
+#view > .controls { column-gap: var(--sp-3); }
+#view > .controls > * { padding-left: 0; padding-right: 0; }
+#view > .controls :is(.btn, .cbi-button).cbi-button-positive:not(.important) { color: var(--text); }
+
 /* ----------------------------------------------------- responsive */
 
 @media (max-width: 1100px) {
@@ -2715,7 +2764,9 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 		border: 0;
 		text-align: left !important;
 	}
-	:is(.vt-main, .modal) :is(.cbi-section, .cbi-value) .table .tr > .td:nth-child(n) { padding: 4px var(--card-px); }
+	/* one inset for every cell of a card, in sections and free-standing
+	   tables (Software, Diagnostics) alike */
+	:is(.vt-main, .modal) .table .tr > .td:nth-child(n) { padding: 4px var(--card-px); }
 	:is(.vt-main, .modal) .table .tr > .td[data-title]::before {
 		content: attr(data-title);
 		display: block;
@@ -2735,7 +2786,9 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	:is(.vt-main, .modal) .table .tr > .td.cbi-section-table-titles { flex-basis: 100%; color: var(--text); font-weight: 600; }
 	:is(.vt-main, .modal) .table .tr > .td:is([data-name="_ifacebox"], [data-name="_ifacestat"]) { flex-basis: 100%; }
 	.cbi-section-table .td[data-name="_ifacebox"] .ifacebox { width: 100%; }
-	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions > div { flex-wrap: wrap; }
+	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions > div:not(.btn, .cbi-button) { flex-wrap: wrap; }
+	/* a lone button in the cell (Software's Install…) starts at the card's inset */
+	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions > :is(.btn, .cbi-button) { margin-left: 0; }
 	:is(.vt-main, .modal) .table .tr > .td.cbi-section-actions::before { display: none !important; }
 	:is(.vt-main, .modal) .table .tr:hover > .td { background: none; }
 	/* firewall rules: the on/off switch sits in the card's corner, the
@@ -2759,6 +2812,14 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	[id^="cbi-firewall-"] .table .tr:has(> .td input[data-widget-id$=".enabled"]) > .td:has(small, var[data-tooltip])::before { display: none; }
 	[id^="cbi-firewall-"] .table .td > small:has(> br) { line-height: 1.6; }
 	.cbi-section .table, .cbi-section .cbi-section-table { border: 0; }
+	/* an empty cell says nothing: no label for it (Routing's Protocol) */
+	:is(.vt-main, .modal) .table .tr > .td[data-title]:empty { display: none; }
+	/* LuCI's wide columns (col-7 and up: a package's description, a
+	   connection's addresses) take the card's width */
+	:is(.vt-main, .modal) .table .tr > .td[data-title]:is(.col-7, .col-8, .col-9, .col-10) { flex-basis: 100%; }
+	#connections .tr:not(.table-titles) > .td:is(:nth-child(3), :nth-child(4)) { white-space: normal; overflow-wrap: anywhere; }
+	/* a zone and its forwards read across the card */
+	#cbi-firewall-zone .tr > .td:has(.zone-forwards) { flex-basis: 100%; }
 	/* nftables rule cards: LuCI's !important cell padding, on the card's edge */
 	#view .nft-rules .tr > .td, #view .nft-rules .tr > .td:is(:first-child, :last-child) { padding: 3px var(--card-px) !important; }
 	/* log filters: each field on its own line under its label */
@@ -2799,10 +2860,10 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 
 /* phones: content in cards wraps instead of pushing the card wider */
 @media (max-width: 720px) {
-	.td .ifacebadge, .td .ifacebadge.large, .td.nowrap, .td .nowrap,
+	.td .ifacebadge:not(.cbi-tooltip), .td.nowrap, .td .nowrap,
 	.td > span:has(> span + br + span) > span { white-space: normal; }
 	.td.cbi-section-actions, .td.cbi-section-actions.nowrap { flex-basis: 100% !important; width: auto !important; min-width: 0 !important; white-space: normal; }
-	.td.cbi-section-actions > div { display: flex; flex-wrap: wrap; justify-content: flex-start; }
+	.td.cbi-section-actions > div:not(.btn, .cbi-button) { display: flex; flex-wrap: wrap; justify-content: flex-start; }
 	.cbi-value-field > div[id$="-ifc-description"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
 	.v-meter-rows { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 	.v-meter-row { grid-template-areas: "label" "bar" "val"; row-gap: 6px; }

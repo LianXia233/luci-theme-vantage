@@ -113,6 +113,14 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   never changed: the menu script adds the (i) buttons (after a field
   row's field, or first inside an intro) and sets classes, `data-v-help`
   and (where missing) a description `id` for `aria-controls`.
+- **Stock pages** without form chrome get the same cards: Status →
+  Firewall (nftables) shows each chain as a card with its rules edge to
+  edge and matches as wrapping text; the System and Kernel Log filters
+  are wrapping rows, and the log (a read-only viewer) keeps its own text
+  size on touch and wraps on phones. Phone cards use one inset for every
+  cell, hide empty cells, and give LuCI's wide columns (descriptions,
+  addresses) the card's width. A tooltip is never clipped by the box
+  that holds it and is sized to its text.
 - 404 / CSRF pages render in the theme without leaking anything.
 - Focused fields show a 2 px `--focus` outline (border plus ring, at
   least 3:1 against field and card in both modes); text on coloured

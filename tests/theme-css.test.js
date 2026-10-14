@@ -296,6 +296,19 @@ test('port status: boxes packed, hidden tooltips add no height, port cards may o
 const bodyOf = (pred, media) => themeRules.filter((r) => r.sel.some(pred) && (media === undefined || media.test(r.media))).map((r) => r.body).join(';');
 const phoneOf = (pred) => bodyOf(pred, /max-width: 720px/);
 
+test('VM sweep: the crumb switch caret is stroked, and a device tooltip keeps its box inside a cell', () => {
+	/* a filled caret was black on the dark top bar */
+	const stroke = themeRules.find((r) => r.sel.includes('.vt-pal svg') && /stroke:\s*currentColor/.test(r.body));
+	assert.ok(stroke.sel.includes('.vt-crumb-switch svg'));
+	/* Interfaces' device details are span.cbi-tooltip.ifacebadge in a cell:
+	   the cell's badge reset left them transparent over the next rows */
+	for (const r of themeRules)
+		for (const s of r.sel)
+			if (/^\.td \.ifacebadge(\.large)?$/.test(s) && /background:\s*none/.test(r.body)) assert.fail('badge reset reaches the tooltip: ' + s);
+	assert.match(bodyOf((s) => s === '.td .ifacebadge:not(.cbi-tooltip)'), /background:\s*none/);
+	assert.match(bodyOf((s) => s === '.cbi-tooltip.ifacebadge'), /grid-template-columns/);
+});
+
 test('VM sweep: Status -> Firewall (nftables) chains are cards, cells beat the view\'s !important padding, matches are inline', () => {
 	assert.match(bodyOf((s) => s === '.nft-chain'), /background:\s*var\(--s1\)/);
 	assert.match(bodyOf((s) => s === '.nft-chain > h4'), /border-bottom/);
@@ -313,4 +326,29 @@ test('VM sweep: log viewers keep their size on touch and wrap on phones; the fil
 	assert.match(phoneOf((s) => s === '.vt-main textarea[readonly]'), /white-space:\s*pre-wrap\s*!important/);
 	assert.match(bodyOf((s) => s === '#content_syslog > div:has(> :is(input, select))'), /flex-wrap:\s*wrap/);
 	assert.match(bodyOf((s) => s === '#content_syslog > div:has(> :is(input, select)) > *'), /margin:\s*0\s*!important/);
+});
+
+test('VM sweep: phone cards: one inset, empty cells go, wide columns and zone forwards span the card, lone buttons stay buttons', () => {
+	assert.match(phoneOf((s) => s === ':is(.vt-main, .modal) .table .tr > .td:nth-child(n)'), /padding:\s*4px var\(--card-px\)/);
+	assert.match(phoneOf((s) => s === ':is(.vt-main, .modal) .table .tr > .td[data-title]:empty'), /display:\s*none/);
+	assert.match(phoneOf((s) => /\.td\[data-title\]:is\(\.col-7, \.col-8, \.col-9, \.col-10\)$/.test(s)), /flex-basis:\s*100%/);
+	/* (the rule splitter cuts this selector at its inner comma) */
+	assert.match(phoneOf((s) => s.startsWith('#connections .tr:not(.table-titles) > .td:is(:nth-child(3)')), /overflow-wrap:\s*anywhere/);
+	assert.match(phoneOf((s) => s === '#cbi-firewall-zone .tr > .td:has(.zone-forwards)'), /flex-basis:\s*100%/);
+	/* Software's Install… is a div.btn directly in the actions cell */
+	for (const r of themeRules)
+		for (const s of r.sel)
+			if (/\.td\.cbi-section-actions > div$/.test(s)) assert.fail('actions box rule reaches div.btn: ' + s);
+});
+
+test('VM sweep: unzoned grey, short header rows, placeholders, view toggles and ComboButton labels', () => {
+	/* LuCI writes the colour with and without a space after the colon */
+	const grey = bodyOf((s) => /--zone-color-rgb: 238, 238, 238/.test(s) && /--zone-color-rgb:238, 238, 238/.test(s));
+	assert.match(grey, /background-color:\s*var\(--s3\)\s*!important/);
+	assert.match(bodyOf((s) => /\.cbi-section-table-titles:not\(:has\(> \.cbi-section-actions\)\)::after$/.test(s)), /display:\s*table-cell/);
+	assert.match(bodyOf((s) => s === '.cbi-section > div:not([class]) > em:only-child'), /font-style:\s*normal/);
+	assert.match(bodyOf((s) => s === ':is(.btn, .cbi-button).toggle-lookups'), /background:\s*var\(--s3\)/);
+	assert.match(bodyOf((s) => s === '.cbi-dropdown.btn > ul > li'), /line-height:\s*1\.3/);
+	assert.match(bodyOf((s) => s === '.cbi-value-field > .cbi-checkbox + .cbi-value-description', /width > 720px/), /margin-top:\s*calc\(/);
+	assert.match(bodyOf((s) => s === '.cbi-value-field > br + .control-group'), /margin-top/);
 });
