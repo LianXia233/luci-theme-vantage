@@ -291,3 +291,104 @@ test('port status: boxes packed, hidden tooltips add no height, port cards may o
 	/* the palette takes Escape from a row menu left open */
 	assert.match(menuJs, /openPalette\(\) \{\s*if \(this\.pal\) return;\s*\/\*[^*]*\*\/\s*this\.closeActMenu\(false\);/);
 });
+
+/* rules for the 25.12 VM sweep (1.0.7) */
+const bodyOf = (pred, media) => themeRules.filter((r) => r.sel.some(pred) && (media === undefined || media.test(r.media))).map((r) => r.body).join(';');
+const phoneOf = (pred) => bodyOf(pred, /max-width: 720px/);
+
+test('VM sweep: the crumb switch caret is stroked, and a device tooltip keeps its box inside a cell', () => {
+	/* a filled caret was black on the dark top bar */
+	const stroke = themeRules.find((r) => r.sel.includes('.vt-pal svg') && /stroke:\s*currentColor/.test(r.body));
+	assert.ok(stroke.sel.includes('.vt-crumb-switch svg'));
+	/* Interfaces' device details are span.cbi-tooltip.ifacebadge in a cell:
+	   the cell's badge reset left them transparent over the next rows */
+	for (const r of themeRules)
+		for (const s of r.sel)
+			if (/^\.td \.ifacebadge(\.large)?$/.test(s) && /background:\s*none/.test(r.body)) assert.fail('badge reset reaches the tooltip: ' + s);
+	assert.match(bodyOf((s) => s === '.td .ifacebadge:not(.cbi-tooltip)'), /background:\s*none/);
+	assert.match(bodyOf((s) => s === '.cbi-tooltip.ifacebadge'), /grid-template-columns/);
+});
+
+test('VM sweep: Status -> Firewall (nftables) chains are cards, cells beat the view\'s !important padding, matches are inline', () => {
+	assert.match(bodyOf((s) => s === '.nft-chain'), /background:\s*var\(--s1\)/);
+	assert.match(bodyOf((s) => s === '.nft-chain > h4'), /border-bottom/);
+	/* LuCI: ".nft-rules tr > td { padding: .25em !important }" (0,1,2) */
+	assert.match(bodyOf((s) => s === '#view .nft-rules .tr > .td', /^$/), /padding:[^;]*!important/);
+	assert.match(phoneOf((s) => s.startsWith('#view .nft-rules .tr > .td')), /padding:[^;]*var\(--card-px\)\s*!important/);
+	/* inline-flex made every text run of a match a flex column on phones */
+	assert.match(bodyOf((s) => s === '#view .nft-rules .ifacebadge'), /display:\s*inline;/);
+});
+
+test('VM sweep: log viewers keep their size on touch and wrap on phones; the filter rows wrap', () => {
+	const touch = themeRules.find((r) => /pointer: coarse\), \(max-width: 720px\)/.test(r.media) && /font-size:\s*16px/.test(r.body));
+	assert.ok(touch.sel.includes('.vt-main textarea:not([readonly])') && !touch.sel.includes('.vt-main textarea'));
+	/* LuCI puts wrap="off" and an inline white-space on them */
+	assert.match(phoneOf((s) => s === '.vt-main textarea[readonly]'), /white-space:\s*pre-wrap\s*!important/);
+	assert.match(bodyOf((s) => s === '#content_syslog > div:has(> :is(input, select))'), /flex-wrap:\s*wrap/);
+	assert.match(bodyOf((s) => s === '#content_syslog > div:has(> :is(input, select)) > *'), /margin:\s*0\s*!important/);
+});
+
+test('VM sweep: phone cards: one inset, empty cells go, wide columns and zone forwards span the card, lone buttons stay buttons', () => {
+	assert.match(phoneOf((s) => s === ':is(.vt-main, .modal) .table .tr > .td:nth-child(n)'), /padding:\s*4px var\(--card-px\)/);
+	assert.match(phoneOf((s) => s === ':is(.vt-main, .modal) .table .tr > .td[data-title]:empty'), /display:\s*none/);
+	assert.match(phoneOf((s) => /\.td\[data-title\]:is\(\.col-7, \.col-8, \.col-9, \.col-10\)$/.test(s)), /flex-basis:\s*100%/);
+	/* (the rule splitter cuts this selector at its inner comma) */
+	assert.match(phoneOf((s) => s.startsWith('#connections .tr:not(.table-titles) > .td:is(:nth-child(3)')), /overflow-wrap:\s*anywhere/);
+	assert.match(phoneOf((s) => s === '#cbi-firewall-zone .tr > .td:has(.zone-forwards)'), /flex-basis:\s*100%/);
+	/* Software's Install… is a div.btn directly in the actions cell */
+	for (const r of themeRules)
+		for (const s of r.sel)
+			if (/\.td\.cbi-section-actions > div$/.test(s)) assert.fail('actions box rule reaches div.btn: ' + s);
+});
+
+test('VM sweep: unzoned grey, short header rows, placeholders, view toggles and ComboButton labels', () => {
+	/* LuCI writes the colour with and without a space after the colon */
+	const grey = bodyOf((s) => /--zone-color-rgb: 238, 238, 238/.test(s) && /--zone-color-rgb:238, 238, 238/.test(s));
+	assert.match(grey, /background-color:\s*var\(--s3\)\s*!important/);
+	assert.match(bodyOf((s) => /\.cbi-section-table-titles:not\(:has\(> \.cbi-section-actions\)\)::after$/.test(s)), /display:\s*table-cell/);
+	assert.match(bodyOf((s) => s === '.cbi-section > div:not([class]) > em:only-child'), /font-style:\s*normal/);
+	assert.match(bodyOf((s) => s === ':is(.btn, .cbi-button).toggle-lookups'), /background:\s*var\(--s3\)/);
+	assert.match(bodyOf((s) => s === '.cbi-dropdown.btn > ul > li'), /line-height:\s*1\.3/);
+	assert.match(bodyOf((s) => s === '.cbi-value-field > .cbi-checkbox + .cbi-value-description', /width > 720px/), /margin-top:\s*calc\(/);
+	assert.match(bodyOf((s) => s === '.cbi-value-field > br + .control-group'), /margin-top/);
+});
+
+/* LuCI 24.10 markup, as its form.js and status view render it */
+const M2410 = {
+	titles: '<tr class="tr cbi-section-table-titles named" data-title="Name"><th class="th cbi-section-table-cell">Match</th></tr>',
+	row: '<tr class="tr cbi-section-table-row" data-title="Allow-Ping"><td class="td cbi-value-field" data-title="Match"></td></tr>',
+	overview: '<div id="view"><div class="cbi-section"><h3>Memory</h3><div><table class="table"></table></div></div></div>'
+};
+const M2512 = {
+	titles: '<tr class="tr cbi-section-table-titles named"><th class="th cbi-section-table-cell">Name</th></tr>',
+	row: '<tr class="tr cbi-section-table-row" data-title="Allow-Ping"><td class="td cbi-value-field cbi-section-table-titles">Allow-Ping</td></tr>',
+	overview: '<div id="view"><div><div class="cbi-section"><div class="cbi-title"><h3>Memory<span class="label">Hide</span></h3></div><div></div></div></div></div>'
+};
+
+test('LuCI 24.10: a named row\'s name is drawn from data-title, and only where LuCI drew no name cell', () => {
+	const head = themeRules.find((r) => r.sel.some((s) => /\.cbi-section-table-titles\.named\[data-title\]::before$/.test(s)));
+	const row = themeRules.find((r) => !r.media && r.sel.some((s) => /\.cbi-section-table-row\[data-title\]:not\(:has\(> \.cbi-section-table-titles\)\)::before$/.test(s)));
+	assert.ok(head && row, 'found the rules');
+	for (const r of [ head, row ]) assert.match(r.body, /content:\s*attr\(data-title\);[\s\S]*display:\s*table-cell/);
+	/* the header pseudo needs data-title on the titles row: 24.10 sets it, 25.12 does not */
+	assert.match(M2410.titles, /cbi-section-table-titles named" data-title=/);
+	assert.doesNotMatch(M2512.titles, /data-title/);
+	/* both releases put data-title on rows; only 25.12 adds the name cell, which the row rule excludes */
+	assert.match(M2410.row, /data-title="Allow-Ping"/);
+	assert.doesNotMatch(M2410.row, /td [^>]*cbi-section-table-titles/);
+	assert.match(M2512.row, /td [^>]*cbi-section-table-titles/);
+	/* on phones the drawn name heads the card */
+	assert.match(phoneOf((s) => /\.cbi-section-table-row\[data-title\]:not\(:has\(> \.cbi-section-table-titles\)\)::before$/.test(s)), /display:\s*block[\s\S]*font-weight:\s*600/);
+});
+
+test('LuCI 24.10: Status -> Overview headings keep the card\'s header row', () => {
+	/* "#view > div > h3" (1,0,2) matched 24.10's bare section headings and
+	   pushed the header row down; the fix outweighs it */
+	assert.match(M2410.overview, /<div id="view"><div class="cbi-section"><h3>/);
+	assert.doesNotMatch(M2512.overview, /cbi-section"><h3>/);
+	const fix = bodyOf((s) => s === '#view > .cbi-section > h3:first-child');
+	assert.match(fix, /margin:\s*calc\(-1 \* var\(--card-py\)\) calc\(-1 \* var\(--card-px\)\) var\(--card-py\)/);
+	assert.match(themeCss, /#view > h3, #view > div > h3 \{ margin: var\(--sp-6\) 0 var\(--sp-3\);[^}]*\}[\s\S]*#view > \.cbi-section > h3:first-child \{/);
+	/* the memory / storage enhancers find the bare heading too */
+	assert.match(menuJs, /'#view \.cbi-section > \.cbi-title > h3, #view \.cbi-section > h3:first-child'/);
+});
