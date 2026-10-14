@@ -269,6 +269,7 @@ test('row actions: ⋯ names its menu; items carry LuCI\'s tooltip, and a label-
 	const { boxes } = setup([ [ restart, icon, btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ] ]);
 	const more = moreOf(boxes[0]);
 	assert.equal(more.getAttribute('aria-controls'), 'vt-actmenu');
+	assert.ok(menuEl(), 'the menu it names exists before the first open');
 	more.click();
 	const items = menuEl().children;
 	assert.deepEqual(items.map(i => [ i.textContent, i.getAttribute('title') ]),

@@ -1485,6 +1485,8 @@ return baseclass.extend({
 	},
 
 	moreButton(box) {
+		/* the shared menu exists from the first ⋯ on, so aria-controls names a real element */
+		this.actMenuEl();
 		const btn = E('button', {
 			'type': 'button', 'class': 'cbi-button cbi-button-neutral vt-acts-more',
 			'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'vt-actmenu',

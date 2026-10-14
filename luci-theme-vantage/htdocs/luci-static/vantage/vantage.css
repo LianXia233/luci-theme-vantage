@@ -2554,6 +2554,9 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	box-shadow: var(--v-shadow);
 	overflow: clip;
 }
+/* the clip rounds the corners; an open counter or comment tooltip in the
+   last rows must still escape the card */
+.nft-chain:has(.cbi-tooltip-container:is(:hover, :focus-within)) { overflow: visible; }
 .nft-chain > h4 {
 	display: flex; align-items: center;
 	min-height: 48px; margin: 0;
@@ -2893,6 +2896,8 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 	/* top-bar buttons: a touch control high, at every width */
 	.vt-icon-btn, .vt-search { min-width: var(--ctl-h); height: var(--ctl-h); }
+	/* short row buttons (Processes' Kill) at least as wide as they are high */
+	.td.cbi-section-actions :is(.btn, .cbi-button):not(.drag-handle) { min-width: var(--ctl-h); }
 	/* dropdown choices (Save & Apply's too) are touch targets */
 	.cbi-dropdown[open] > ul.dropdown > li { min-height: var(--ctl-h); }
 	.cbi-value { padding: 8px 0; }

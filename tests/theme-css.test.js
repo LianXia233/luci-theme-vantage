@@ -317,6 +317,9 @@ test('VM sweep: Status -> Firewall (nftables) chains are cards, cells beat the v
 	assert.match(phoneOf((s) => s.startsWith('#view .nft-rules .tr > .td')), /padding:[^;]*var\(--card-px\)\s*!important/);
 	/* inline-flex made every text run of a match a flex column on phones */
 	assert.match(bodyOf((s) => s === '#view .nft-rules .ifacebadge'), /display:\s*inline;/);
+	/* the card clips for its corners; an open tooltip in its last rows escapes */
+	assert.match(bodyOf((s) => s === '.nft-chain'), /overflow:\s*clip/);
+	assert.match(bodyOf((s) => s === '.nft-chain:has(.cbi-tooltip-container:is(:hover, :focus-within))'), /overflow:\s*visible/);
 });
 
 test('VM sweep: log viewers keep their size on touch and wrap on phones; the filter rows wrap', () => {
@@ -391,4 +394,10 @@ test('LuCI 24.10: Status -> Overview headings keep the card\'s header row', () =
 	assert.match(themeCss, /#view > h3, #view > div > h3 \{ margin: var\(--sp-6\) 0 var\(--sp-3\);[^}]*\}[\s\S]*#view > \.cbi-section > h3:first-child \{/);
 	/* the memory / storage enhancers find the bare heading too */
 	assert.match(menuJs, /'#view \.cbi-section > \.cbi-title > h3, #view \.cbi-section > h3:first-child'/);
+});
+
+test('touch: short row buttons are at least a touch target wide (Processes Kill was 39 px)', () => {
+	const r = themeRules.find((x) => x.media === '(pointer: coarse)' && x.sel.includes('.td.cbi-section-actions :is(.btn, .cbi-button):not(.drag-handle)'));
+	assert.ok(r, 'rule present');
+	assert.match(r.body, /min-width:\s*var\(--ctl-h\)/);
 });

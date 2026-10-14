@@ -113,8 +113,8 @@ msgstr ""
 msgid "Memory"
 msgstr ""
 
-#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1491
-#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1508
+#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1493
+#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1510
 msgid "More actions"
 msgstr ""
 
@@ -152,15 +152,15 @@ msgstr ""
 msgid "Session"
 msgstr ""
 
-#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1645
+#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1647
 msgid "Show full description"
 msgstr ""
 
-#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1634
+#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1636
 msgid "Show full help"
 msgstr ""
 
-#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1634
+#: luci-theme-vantage/htdocs/luci-static/resources/menu-vantage.js:1636
 msgid "Show full help: %s"
 msgstr ""
 
