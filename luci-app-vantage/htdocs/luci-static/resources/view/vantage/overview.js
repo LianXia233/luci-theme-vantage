@@ -403,6 +403,23 @@ function writeLayouts(v) {
 	} catch (e) {}
 }
 
+/* The throughput chart style the viewer picked (series.CHART_STYLES),
+   in this browser */
+var CHART_KEY = 'vantage.chart.v1';
+
+function readChartStyle() {
+	var v = null;
+	try { v = window.localStorage.getItem(CHART_KEY); } catch (e) { v = null; }
+	return series.CHART_STYLES.indexOf(v) >= 0 ? v : series.CHART_STYLES[0];
+}
+
+function writeChartStyle(v) {
+	try {
+		if (v === series.CHART_STYLES[0]) window.localStorage.removeItem(CHART_KEY);
+		else window.localStorage.setItem(CHART_KEY, v);
+	} catch (e) {}
+}
+
 /* ================================================================= view */
 
 return view.extend({
@@ -515,6 +532,7 @@ return view.extend({
 		this.foldEls = {};
 		this.foldBtns = {};
 		this.layouts = readLayouts();
+		this.chartStyle = readChartStyle();
 		this.editing = false;
 		this.drag = null;
 		this.applyMdns(data.mdns);
@@ -984,14 +1002,38 @@ return view.extend({
 		else this.el.layoutBtn.focus();
 	},
 
+	/* the throughput chart style, picked under Customize */
+	buildChartPick: function() {
+		var self = this, names = {
+			'overlay': _('Overlaid'),
+			'log': _('Overlaid, log scale'),
+			'mirror': _('Mirrored'),
+			'mirror-split': _('Mirrored, scale per direction'),
+			'lanes': _('Separate lanes')
+		};
+		var pick = E('select', { 'class': 'vt-select', 'id': 'vt-chart-style', 'change': function(ev) { self.setChartStyle(ev.target.value); } },
+			series.CHART_STYLES.map(function(k) { return E('option', { 'value': k }, [ names[k] ]); }));
+		pick.value = this.chartStyle;
+		return E('div', { 'class': 'vt-edit-field' }, [ E('label', { 'for': 'vt-chart-style' }, [ _('Throughput chart') ]), pick ]);
+	},
+
+	setChartStyle: function(v) {
+		if (series.CHART_STYLES.indexOf(v) < 0 || v === this.chartStyle) return;
+		this.chartStyle = v;
+		writeChartStyle(v);
+		this.chartHide();
+		this.paintChart();
+	},
+
 	buildEditBar: function() {
 		var self = this, el = this.el;
 		el.editHint = E('span', { 'class': 'vt-hint' });
 		el.editHidden = E('div', { 'class': 'vt-edit-hidden' });
 		el.editSay = E('span', { 'class': 'vt-sr', 'role': 'status', 'aria-live': 'polite' });
-		el.editBar = E('div', { 'class': 'vt-editbar', 'role': 'region', 'aria-label': _('Arrange the dashboard'), 'hidden': 'hidden' }, [
-			E('div', { 'class': 'vt-editbar-text' }, [ E('strong', {}, [ _('Arrange the dashboard') ]), el.editHint ]),
+		el.editBar = E('div', { 'class': 'vt-editbar', 'role': 'region', 'aria-label': _('Customize the dashboard'), 'hidden': 'hidden' }, [
+			E('div', { 'class': 'vt-editbar-text' }, [ E('strong', {}, [ _('Customize the dashboard') ]), el.editHint ]),
 			el.editHidden,
+			this.buildChartPick(),
 			E('div', { 'class': 'vt-editbar-actions' }, [
 				E('button', { 'type': 'button', 'class': 'vt-btn', 'click': function() {
 					var l = self.lay;
@@ -1177,8 +1219,8 @@ return view.extend({
 				el.liveText = E('span', { 'class': 'vt-live-text' })
 			]),
 			el.layoutBtn = E('button', { 'type': 'button', 'class': 'vt-btn vt-btn-ghost vt-layout-btn', 'aria-pressed': 'false',
-				'title': _('Arrange the dashboard'), 'click': L.bind(function() { this.setEditing(!this.editing); }, this) }, [
-				icon('layout'), E('span', {}, [ _('Layout') ])
+				'title': _('Customize the dashboard'), 'click': L.bind(function() { this.setEditing(!this.editing); }, this) }, [
+				icon('layout'), E('span', {}, [ _('Customize') ])
 			])
 		]);
 	},
@@ -1749,7 +1791,7 @@ return view.extend({
 		el.chartOver = E('div', { 'class': 'vt-mult-over', 'aria-hidden': 'true' }, [ el.chartCursor, el.chartTip ]);
 		el.chartX = E('div', { 'class': 'vt-mult-x', 'aria-hidden': 'true' });
 		var plot = E('div', { 'class': 'vt-mult-wrap', 'tabindex': '0', 'role': 'group',
-			'aria-label': _('Throughput per link, download above the line and upload below; arrow keys read the values over time') }, [ el.chartRows, el.chartOver, el.chartX ]);
+			'aria-label': _('Throughput per link; arrow keys read the values over time') }, [ el.chartRows, el.chartOver, el.chartX ]);
 		plot.addEventListener('pointermove', function(ev) { self.chartPointer(ev); });
 		plot.addEventListener('pointerleave', function() { if (!self.ui.hover || self.ui.hover.x != null) self.chartHide(); });
 		plot.addEventListener('keydown', function(ev) { self.chartKey(ev); });
@@ -1772,12 +1814,11 @@ return view.extend({
 		]));
 	},
 
-	/* one small multiple per link: the uplink, then each radio. Download
-	   (towards the clients) rises above the middle line, upload hangs
-	   below it, each in its direction's colour; each half has its own y
-	   scale (upload is often a hundredth of download, and a busy uplink
-	   would flatten an idle radio), labelled with its unit, on a shared
-	   time axis and crosshair. Columns of a
+	/* one small multiple per link: the uplink, then each radio, each with
+	   its own y scale (a busy uplink would flatten an idle radio), on a
+	   shared time axis and crosshair. Download (towards the clients) and
+	   upload each keep their direction's colour; how they share the plot
+	   is the viewer's chart style (series.chartGeom). Columns of a
 	   history point [ t, rx, tx ]: the uplink receives what clients
 	   download, a radio sends it. */
 	chartSeries: function() {
@@ -1788,7 +1829,7 @@ return view.extend({
 	},
 
 	paintChart: function() {
-		var el = this.el, net = this.st.hist.net, W = 600, H = 100, M = H / 2, now = Date.now();
+		var el = this.el, net = this.st.hist.net, W = 600, H = 100, now = Date.now(), style = this.chartStyle;
 		var list = this.chartSeries();
 		/* sample times follow the device's clock (model.sampleClock) and
 		   can run ahead of the browser's: the axis ends at the newest one */
@@ -1804,35 +1845,47 @@ return view.extend({
 			var d = (net[s.key] || []).filter(function(p) { return p[0] >= dm.t0 - POLL_S * 1000; });
 			var sd = series.stats(d, s.dn, dm.t0), su = series.stats(d, s.up, dm.t0);
 			var last = d.length ? d[d.length - 1] : null, fresh = !!(last && now - last[0] < POLL_S * 3000);
-			var vd = series.niceCeil(Math.max((sd.peak || 0) * 1.05, 1000)), vu = series.niceCeil(Math.max((su.peak || 0) * 1.05, 1000));
+			var g = series.chartGeom(style, sd.peak, su.peak);
 			samples = Math.max(samples, sd.n);
 
 			var svg = svgRoot('vt-mult-svg', '0 0 ' + W + ' ' + H);
 			svg.setAttribute('preserveAspectRatio', 'none');
-			svg.appendChild(svgPath('M0 0.5H' + W + 'M0 ' + (H - 0.5) + 'H' + W, 'vt-chart-grid'));
+			/* lines keep half a unit inside the box, or the edge ones get cut */
+			var yAt = function(f) { return Math.max(0.5, Math.min(H - 0.5, f * H)).toFixed(1); };
+			svg.appendChild(svgPath(g.grid.map(function(f) { return 'M0 ' + yAt(f) + 'H' + W; }).join(''), 'vt-chart-grid'));
 			ticks.forEach(function(k) {
 				var x = (1 - k * 60000 / dm.span) * W;
 				svg.appendChild(svgPath('M' + x.toFixed(1) + ' 0V' + H, 'vt-chart-vgrid'));
 			});
-			/* download: y in [0, M] with 0 at the line; upload mirrored below */
-			var segD = series.segments(d, s.dn, dm.t0, dm.t1, vd, W, M, POLL_S * 3500);
-			var segU = series.segments(d, s.up, dm.t0, dm.t1, vu, W, M, POLL_S * 3500).map(function(seg) {
-				return seg.map(function(pt) { return [ pt[0], H - pt[1] ]; });
-			});
-			[ [ segD, false, '' ], [ segU, true, ' vt-dir-up' ] ].forEach(function(h) {
-				var area = svgPath(series.areaPath(h[0], M), 'vt-series-area' + h[2]);
-				area.setAttribute('fill', fadeFill(svg, h[1], h[2].trim()));
+			var segD = series.trace(d, s.dn, dm.t0, dm.t1, W, H, POLL_S * 3500, g.dn.frac);
+			var segU = series.trace(d, s.up, dm.t0, dm.t1, W, H, POLL_S * 3500, g.up.frac);
+			[ [ segD, g.dn, '' ], [ segU, g.up, ' vt-dir-up' ] ].forEach(function(h) {
+				var area = svgPath(series.curveArea(h[0], h[1].base * H), 'vt-series-area' + h[2]);
+				area.setAttribute('fill', fadeFill(svg, h[1].flip, h[2].trim()));
 				svg.appendChild(area);
-				svg.appendChild(svgPath(series.linePath(h[0]), 'vt-series-line' + h[2]));
+				svg.appendChild(svgPath(series.curvePath(h[0]), 'vt-series-line' + h[2]));
 			});
-			svg.appendChild(svgPath('M0 ' + M + 'H' + W, 'vt-chart-mid'));
+			svg.appendChild(svgPath(g.axis.map(function(f) { return 'M0 ' + yAt(f) + 'H' + W; }).join(''), 'vt-chart-mid'));
 
 			function tailDot(segs, cls) {
 				var tail = segs.length ? segs[segs.length - 1] : null, pt = tail && tail[tail.length - 1];
 				return pt && fresh ? pos(E('span', { 'class': 'vt-sk-dot' + cls }), pt[0] / W * 100, pt[1] / H * 100) : '';
 			}
+			function scaleLabel(l) {
+				var lab = E('span', { 'class': 'vt-mult-max vt-tn' + (l.below ? ' vt-mult-max-below' : '') },
+					(l.dir ? [ dirArrow(l.dir), ' ' ] : []).concat([ bitsLabel(l.v) ]));
+				lab.style.top = (l.at * 100).toFixed(1) + '%';
+				return lab;
+			}
+			/* stretches without samples, so a gap reads as missing data */
+			function gapBand(gp) {
+				var b = E('span', { 'class': 'vt-mult-gap' }, gp[1] - gp[0] > .12 ? [ E('span', {}, [ _('no data') ]) ] : []);
+				b.style.left = (gp[0] * 100).toFixed(2) + '%';
+				b.style.width = ((gp[1] - gp[0]) * 100).toFixed(2) + '%';
+				return b;
+			}
 			var dotD = E('span', { 'class': 'vt-mult-dot', 'hidden': 'hidden' }), dotU = E('span', { 'class': 'vt-mult-dot vt-dir-up', 'hidden': 'hidden' });
-			rows.push({ s: s, d: d, vd: vd, vu: vu, dotD: dotD, dotU: dotU });
+			rows.push({ s: s, d: d, g: g, dotD: dotD, dotU: dotU });
 			return E('div', { 'class': 'vt-mult' }, [
 				E('div', { 'class': 'vt-mult-head' }, [
 					E('span', { 'class': 'vt-mult-name' }, [ s.label ]),
@@ -1844,15 +1897,14 @@ return view.extend({
 						E('span', {}, [ _('peak'), ' ', E('b', {}, [ dirArrow('dn'), ' ' + fmt.bitsShort(sd.peak) ]), ' ', E('b', {}, [ dirArrow('up'), ' ' + fmt.bitsShort(su.peak) ]) ])
 					] : [ E('span', {}, [ _('measuring…') ]) ])
 				]),
-				E('div', { 'class': 'vt-mult-plot' }, [
-					svg,
-					sd.n ? E('span', { 'class': 'vt-mult-max vt-tn' }, [ dirArrow('dn'), ' ' + bitsLabel(vd) ]) : '',
-					sd.n ? E('span', { 'class': 'vt-mult-max vt-mult-max-up vt-tn' }, [ dirArrow('up'), ' ' + bitsLabel(vu) ]) : '',
+				E('div', { 'class': 'vt-mult-plot vt-chart-' + style }, [
+					svg
+				].concat(sd.n ? g.labels.map(scaleLabel) : [], series.gaps(d, dm.t0, dm.t1, POLL_S * 3500).map(gapBand), [
 					sd.n < 2 ? E('span', { 'class': 'vt-sk-note' }, [ _('collecting…') ]) : '',
 					tailDot(segD, ''),
 					tailDot(segU, ' vt-dir-up'),
 					dotD, dotU
-				])
+				]))
 			]);
 		}));
 
@@ -1904,8 +1956,8 @@ return view.extend({
 			var vd = p ? p[r.s.dn] : null, vu = p ? p[r.s.up] : null;
 			r.dotD.hidden = vd == null;
 			r.dotU.hidden = vu == null;
-			if (vd != null) pos(r.dotD, x, (1 - Math.min(1, vd / r.vd)) * 50);
-			if (vu != null) pos(r.dotU, x, 50 + Math.min(1, vu / r.vu) * 50);
+			if (vd != null) pos(r.dotD, x, r.g.dn.frac(vd) * 100);
+			if (vu != null) pos(r.dotU, x, r.g.up.frac(vu) * 100);
 			var bd = vd == null ? fmt.DASH : fmt.bits(vd), bu = vu == null ? fmt.DASH : fmt.bits(vu);
 			said.push(r.s.label + ': ↓ ' + bd + ' ↑ ' + bu);
 			return E('div', { 'class': 'vt-tip-link' }, [

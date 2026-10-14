@@ -9,5 +9,17 @@
 		"depends": {
 			"acl": [ "luci-app-vantage" ]
 		}
+	},
+	"admin/network/firewall/overview": {
+		"title": "Overview",
+		"order": 5,
+		"action": {
+			"type": "view",
+			"path": "vantage/firewall"
+		},
+		"depends": {
+			"acl": [ "luci-app-firewall" ],
+			"uci": { "firewall": true }
+		}
 	}
 }
