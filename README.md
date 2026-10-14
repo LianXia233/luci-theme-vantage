@@ -59,8 +59,9 @@ without the app.
 - Top talkers, wireless networks, system tile (CPU per core, memory,
   storage, firmware)
 - Firewall overview (Network → Firewall → Overview): what is open from the
-  internet, which zone reaches which, what is switched off, and warnings
-  for the risky cases; every item links to the LuCI page that changes it
+  internet, which zone reaches which, what is switched off or ignored, and
+  warnings for the risky cases, read the way firewall4 reads the config;
+  every item links to the LuCI page that changes it
 - Your own layout: drag tiles, change their width or hide them; saved in
   the browser for each screen size, with a reset to the default
 

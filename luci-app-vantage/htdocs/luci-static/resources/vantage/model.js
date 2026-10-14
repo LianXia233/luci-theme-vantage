@@ -22,6 +22,9 @@ function obj(v) { return (v && typeof v === 'object' && !Array.isArray(v)) ? v :
 function arr(v) { return Array.isArray(v) ? v : []; }
 
 return baseclass.extend({
+	/* the highest rate a sample may carry; above it a counter was reset */
+	MAX_BPS: MAX_BPS,
+
 	/* ------------------------------------------------------------- CPU */
 
 	/* /proc/stat -> { all: { idle, total }, cores: [ { idle, total } ] } */

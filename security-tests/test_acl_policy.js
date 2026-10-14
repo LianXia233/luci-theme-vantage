@@ -35,6 +35,13 @@
  *   with uci get, finds the uplink with network.interface dump and
  *   declares nothing else; file.read
  *   calls name a granted path literally; no `fs` module, no fs.exec;
+ * - a declared call is only ever called directly (`callX(...)`): no alias,
+ *   no `.call`/`.apply`, no passing it around, so the literal arguments
+ *   above are all the arguments there are;
+ * - the firewall overview requires exactly its pinned LuCI modules, and no
+ *   app file requires a LuCI module that loads other configs on its own
+ *   (`network` loads `wireless`, `firewall` and `tools.*` load more), or
+ *   loads modules by a computed name;
  * - the view probes exactly the names group (write) and the rdns group
  *   (read);
  * - the dashboard's menu entry is gated by the read group; the firewall
@@ -117,7 +124,8 @@ function analyse() {
 	const problems = [];
 	const DECL = /(?:var|let|const)\s+(\w+)\s*=\s*rpc\.declare\(\{\s*object:\s*'([^']+)',\s*method:\s*'([^']+)'/g;
 	for (const { file, text } of sources) {
-		const total = (text.match(/rpc\.declare\(/g) || []).length;
+		/* also `rpc.declare (`, `var d = rpc.declare` and `rpc['declare']` */
+		const total = (text.match(/\brpc\s*(?:\.\s*declare\b|\[)/g) || []).length;
 		let literal = 0, dynamic = 0;
 		for (const m of text.matchAll(DECL)) {
 			literal++;
@@ -272,20 +280,177 @@ test('every declared call is granted and every grant is used', () => {
 	for (const k of pairs(acl[READ_GROUP].read.ubus)) assert.ok(!/^uci (add|set|delete|commit|rename|order|apply|confirm|revert)$/.test(k), k);
 });
 
-test('uci calls name the vantage config; file.read names a granted path', () => {
-	for (const { file, text } of sources) {
-		for (const [ v, d ] of vars) {
-			for (const m of text.matchAll(new RegExp('\\b' + v + '\\(([^,)]*)', 'g'))) {
-				const arg = m[1].trim();
-				if (d.obj === 'uci') assert.equal(arg, file.endsWith(FIREWALL_VIEW) ? "'firewall'" : "'vantage'", `${file}: ${v}(${arg}) (uci ${d.method})`);
-				if (d.obj === 'file') {
-					assert.match(arg, /^'[^']+'$/, `${file}: ${v}(${arg}) with a non-literal path`);
-					assert.ok(Object.prototype.hasOwnProperty.call(READ_FILES, arg.slice(1, -1)), `${file}: ${v}(${arg}) not granted`);
-				}
+/* Problems with how the declared calls are used, over `srcs` (the real
+   sources, or a mutated copy): each declared function only in direct
+   calls, uci with the literal config the file may read, file.read with a
+   literal granted path, no fs module, no LuCI uci module calls. */
+function callProblems(srcs) {
+	const out = [];
+	for (const { file, text } of srcs) {
+		/* a declared function is local to its file: check each file
+		   against its own declarations, read from its own text, so two
+		   files declaring the same name cannot vouch for each other */
+		const declVars = new Map();
+		for (const m of text.matchAll(/(?:var|let|const)\s+(\w+)\s*=\s*rpc\.declare\(\{\s*object:\s*'([^']+)',\s*method:\s*'([^']+)'/g))
+			declVars.set(m[1], { obj: m[2], method: m[3] });
+		for (const [ v, d ] of declVars) {
+			for (const m of text.matchAll(new RegExp('\\b' + v + '\\b(\\s*\\(([^,)]*))?', 'g'))) {
+				const before = text.slice(Math.max(0, m.index - 80), m.index);
+				if (/(?:var|let|const)\s+$/.test(before) && /^\s*=\s*rpc\.declare\(/.test(text.slice(m.index + v.length))) continue;
+				if (m[1] == null || /[.\w$]$/.test(before)) { out.push(`${file}: ${v} used other than in a direct call at ${m.index}`); continue; }
+				const arg = m[2].trim();
+				if (d.obj === 'uci' && arg !== (file.endsWith(FIREWALL_VIEW) ? "'firewall'" : "'vantage'"))
+					out.push(`${file}: ${v}(${arg}) (uci ${d.method})`);
+				if (d.obj === 'file' && !(/^'[^']+'$/.test(arg) && Object.prototype.hasOwnProperty.call(READ_FILES, arg.slice(1, -1))))
+					out.push(`${file}: ${v}(${arg}) not a literal granted path`);
 			}
 		}
-		assert.doesNotMatch(text, /'require fs'|\bfs\.(exec|exec_direct|write|remove)\(/, `${file}: fs module`);
-		assert.doesNotMatch(text, /\buci\.(load|set|add|remove|save|apply)\(/, `${file}: LuCI uci module`);
+		if (/'require fs'|\bfs\.(exec|exec_direct|write|remove)\(/.test(text)) out.push(`${file}: fs module`);
+		if (/\buci\.(load|set|add|remove|save|apply)\(/.test(text)) out.push(`${file}: LuCI uci module`);
+	}
+	return out;
+}
+
+/* LuCI modules the firewall overview loads, its own and through its
+   vantage.* modules: nothing that reads a config by itself */
+const FIREWALL_REQUIRES = [ 'baseclass', 'rpc', 'ui', 'vantage.fwglance', 'view' ];
+/* LuCI modules that load uci configs when required (network: network,
+   wireless, luci; firewall and tools.*: firewall, network, ...) */
+const CONFIG_LOADERS = /^(network|firewall|tools\..*|form|uci|fs)$/;
+
+/* the modules LuCI loads for a class file: like luci.js, the leading
+   string literals ('...' or "...", comments skipped) that are require
+   directives, up to the first one that is neither that nor 'use strict' */
+function requiresOf(text) {
+	const REQ = /^require[ \t]+(\S+)(?:[ \t]+as[ \t]+([a-zA-Z_]\S*))?$/, STRICT = /^use[ \t]+strict$/;
+	const out = [];
+	for (let i = 0, off = -1, prev = -1, quote = -1, comment = -1, esc = false; i < text.length; i++) {
+		const chr = text.charCodeAt(i);
+		if (esc) esc = false;
+		else if (comment !== -1) {
+			if ((comment === 47 && chr === 10) || (comment === 42 && prev === 42 && chr === 47)) comment = -1;
+		}
+		else if ((chr === 42 || chr === 47) && prev === 47 && quote === -1) comment = chr;
+		else if (chr === 92) esc = true;
+		else if (chr === quote) {
+			const lit = text.substring(off, i), m = REQ.exec(lit);
+			if (m) out.push(m[1]);
+			else if (!STRICT.exec(lit)) break;
+			off = -1;
+			quote = -1;
+		}
+		else if (quote === -1 && (chr === 34 || chr === 39)) { off = i + 1; quote = chr; }
+		prev = chr;
+	}
+	return out;
+}
+
+function requireProblems(srcs) {
+	const out = [];
+	const byModule = new Map(srcs.map(s => [ s.file.replace(/^htdocs\/luci-static\/resources\//, '').replace(/\.js$/, '').replace(/\//g, '.'), s ]));
+	for (const { file, text } of srcs) {
+		for (const r of requiresOf(text)) if (CONFIG_LOADERS.test(r)) out.push(`${file}: 'require ${r}'`);
+		/* L.require only with a literal vantage.* module as its whole
+		   argument: the literal must close the call, so a literal prefix
+		   followed by an expression ('vantage.x' + y) is not one */
+		for (const m of text.matchAll(/\bL\s*\.\s*require\b\s*(\(\s*('[^']*'\s*\)|[^)]*))?/g))
+			if (!m[2] || !/^'vantage\.[\w-]+'\s*\)$/.test(m[2].trim())) out.push(`${file}: L.require(${m[2] || ''})`);
+	}
+	/* the firewall overview's closure */
+	const seen = new Set(), luci = new Set();
+	const walk = mod => {
+		if (seen.has(mod)) return;
+		seen.add(mod);
+		const src = byModule.get(mod);
+		if (!src) { luci.add(mod); return; }
+		for (const r of requiresOf(src.text)) {
+			if (/^vantage\./.test(r)) { luci.add(r); walk(r); }
+			else luci.add(r);
+		}
+	};
+	walk('view.vantage.firewall');
+	const got = [ ...luci ].sort();
+	if (JSON.stringify(got) !== JSON.stringify(FIREWALL_REQUIRES)) out.push(`${FIREWALL_VIEW}: requires ${got.join(', ')}`);
+	return out;
+}
+
+test('uci calls name the vantage config; file.read names a granted path; declared calls are only called directly', () => {
+	assert.deepEqual(callProblems(sources), []);
+});
+
+test('the firewall overview requires only its pinned modules; no app file loads other configs through LuCI', () => {
+	assert.deepEqual(requireProblems(sources), []);
+	const fwv = sources.find(s => s.file.endsWith(FIREWALL_VIEW));
+	assert.deepEqual(requiresOf(fwv.text), [ 'view', 'rpc', 'ui', 'vantage.fwglance' ]);
+});
+
+/* negative controls: each mutation of an in-memory copy must be caught */
+function mutate(file, edit) {
+	return sources.map(s => s.file.endsWith(file) ? { file: s.file, text: edit(s.text) } : s);
+}
+
+test('negative controls: a name declared in another file does not vouch for a call', () => {
+	/* the dashboard declares callUciGet for uci; a second file declaring the
+	   same name for the same object must still be held to its own rules */
+	const extra = { file: 'htdocs/luci-static/resources/view/vantage/extra.js',
+		text: "var callUciGet = rpc.declare({ object: 'uci', method: 'get', params: [ 'config' ] });\ncallUciGet('wireless');\n" };
+	assert.match(callProblems(sources.concat([ extra ])).join('\n'), /extra\.js: callUciGet\('wireless'\)/);
+	/* and a file without the declaration cannot call it at all unnoticed: the
+	   name is undeclared there, so the call is not one of the app's calls */
+	const borrow = { file: 'htdocs/luci-static/resources/view/vantage/borrow.js',
+		text: "var callUciGet = rpc.declare({ object: 'uci', method: 'get', params: [ 'config' ] });\nvar g = callUciGet; g('wireless');\n" };
+	assert.match(callProblems(sources.concat([ borrow ])).join('\n'), /borrow\.js: callUciGet used other than in a direct call/);
+	/* the case a global name map missed: another file declares the same
+	   name for a harmless object, and the dashboard's uci call reads wireless */
+	const shadow = { file: 'htdocs/luci-static/resources/view/vantage/shadow.js',
+		text: "var callUciGet = rpc.declare({ object: 'system', method: 'info' });\ncallUciGet();\n" };
+	const mutant = mutate('view/vantage/overview.js', t => t + "\ncallUciGet('wireless');\n").concat([ shadow ]);
+	assert.match(callProblems(mutant).join('\n'), /overview\.js: callUciGet\('wireless'\)/);
+});
+
+test('negative controls: an aliased or indirect call to a declared function fails', () => {
+	const anchor = "\tload: function() {\n";
+	for (const [ add, why ] of [
+		[ "\t\tvar bypass = callUciGet; bypass('wireless');\n", /callUciGet used other than in a direct call/ ],
+		[ "\t\tcallUciGet.call(null, 'wireless');\n", /callUciGet used other than in a direct call/ ],
+		[ "\t\t[ callUciGet ][0]('wireless');\n", /callUciGet used other than in a direct call/ ],
+		[ "\t\tL.resolveDefault(callUciGet('wireless'), null);\n", /callUciGet\('wireless'\)/ ],
+		[ "\t\tvar c = 'wireless'; callUciGet(c);\n", /callUciGet\(c\)/ ]
+	]) {
+		const mutant = mutate(FIREWALL_VIEW, t => { assert.ok(t.includes(anchor)); return t.replace(anchor, anchor + add); });
+		assert.match(callProblems(mutant).join('\n'), why, add.trim());
+	}
+	/* the same in the dashboard */
+	assert.match(callProblems(mutate('view/vantage/overview.js', t => t + "\nvar f = callRead; f('/etc/shadow');\n")).join('\n'), /callRead used other than/);
+});
+
+test('negative controls: requiring a module that loads other configs fails', () => {
+	const add = line => t => t.replace("'require ui';\n", "'require ui';\n" + line + "\n");
+	for (const [ file, edit, why ] of [
+		[ FIREWALL_VIEW, add("'require network';"), /'require network'/ ],
+		[ FIREWALL_VIEW, add("'require tools.widgets as widgets';"), /'require tools\.widgets'/ ],
+		[ FIREWALL_VIEW, add("\"require  network\";"), /'require network'/ ],
+		[ FIREWALL_VIEW, add("/* x */ 'require\tnetwork as n';"), /'require network'/ ],
+		[ FIREWALL_VIEW, add("'require poll';"), /requires .*poll/ ],
+		[ 'vantage/fwglance.js', t => t.replace("'require baseclass';\n", "'require baseclass';\n'require firewall';\n"), /'require firewall'/ ],
+		[ 'view/vantage/overview.js', t => t + "\nL.require('network');\n", /L\.require\('network'/ ],
+		[ 'view/vantage/overview.js', t => t + "\nvar m = 'network'; L.require(m);\n", /L\.require\(m/ ],
+		/* a literal prefix followed by an expression names any module */
+		[ 'view/vantage/overview.js', t => t + "\nvar y = ''; L.require('vantage.x' + y);\n", /L\.require\('vantage\.x' \+ y/ ],
+		[ 'view/vantage/overview.js', t => t + "\nL.require('vantage.x', 'network');\n", /L\.require\('vantage\.x', 'network'/ ]
+	]) {
+		const mutant = mutate(file, edit);
+		assert.notDeepEqual(mutant, sources, 'the mutation applied');
+		assert.match(requireProblems(mutant).join('\n'), why, file + ' ' + why);
+	}
+});
+
+test('negative controls: a declare spelled to dodge the count is not analysable', () => {
+	for (const add of [ "var x = rpc.declare ({ object: 'uci', method: 'get' });", "var d = rpc.declare; d({ object: 'uci', method: 'set' });", "rpc['declare']({ object: 'uci', method: 'set' });" ]) {
+		const text = sources.find(s => s.file.endsWith(FIREWALL_VIEW)).text + '\n' + add + '\n';
+		const total = (text.match(/\brpc\s*(?:\.\s*declare\b|\[)/g) || []).length;
+		const literal = [ ...text.matchAll(/(?:var|let|const)\s+(\w+)\s*=\s*rpc\.declare\(\{\s*object:\s*'([^']+)',\s*method:\s*'([^']+)'/g) ].length;
+		assert.notEqual(total, literal, add);
 	}
 });
 

@@ -336,6 +336,11 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-editbar-actions { display: flex; gap: 8px; margin-left: auto; }
 .vt-app .vt-edit-field { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .vt-app .vt-edit-field label { font-size: var(--vt-fs-sm); color: var(--vt-text-2); white-space: nowrap; }
+/* narrow: the label above, the select across the bar, so a long choice
+   ("Mirrored, scale per direction") is not cut */
+@container vt (max-width: 699px) {
+	.vt-app .vt-edit-field { flex: 1 1 100%; flex-direction: column; align-items: stretch; gap: 4px; }
+}
 .vt-app .vt-select {
 	appearance: none; -webkit-appearance: none; min-width: 0; max-width: 100%;
 	height: var(--vt-ctl); padding: 0 30px 0 10px; margin: 0;
@@ -385,6 +390,11 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-ov-hide { margin-left: 4px; }
 .vt-app .vt-ov-size { min-width: 26px; text-align: center; font-size: var(--vt-fs-micro); font-weight: 650; color: var(--vt-text-2); }
 .vt-app.vt-edit-1col .vt-ov-col { display: none; }
+/* a narrow tile's bar: two rows at most (the name, then the controls),
+   not three; no ‹ ›, drag and the arrow keys on the grip still move it */
+.vt-app .vt-cell { container: vtcell / inline-size; }
+/* tiles with a container of their own keep the vtcell name too (below) */
+@container vtcell (max-width: 340px) { .vt-app .vt-ov-lr { display: none; } }
 
 .vt-app.vt-editing .vt-cell { transition: top .2s ease, left .2s ease; }
 .vt-app .vt-cell.vt-dragging { z-index: 8; transition: none; opacity: .92; box-shadow: 0 18px 40px rgba(0, 0, 0, .28); }
@@ -552,7 +562,7 @@ html[data-darkmode="true"] .vt-app {
 
 /* -------------------------------------------------- 5. hero: network path */
 
-.vt-app .vt-hero { container: vthero / inline-size; overflow: hidden; display: flex; flex-direction: column; }
+.vt-app .vt-hero { container: vthero vtcell / inline-size; overflow: hidden; display: flex; flex-direction: column; }
 
 .vt-app .vt-kpis {
 	position: relative; z-index: 1;
@@ -625,6 +635,8 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-node-kicker { display: flex; align-items: center; gap: 6px; font-size: var(--vt-fs-micro); font-weight: 600; color: var(--vt-text-3); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
 .vt-app .vt-node-title { font-size: var(--vt-fs-base); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vt-app .vt-node-sub { display: flex; align-items: center; gap: 6px; font-size: var(--vt-fs-sm); color: var(--vt-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* text alone (the gateway's DNS): a block, so the ellipsis can show */
+.vt-app .vt-node-sub:not(:has(> *)) { display: block; }
 .vt-app .vt-node-ico {
 	flex: none; width: 32px; height: 32px; border-radius: 9px;
 	display: inline-flex; align-items: center; justify-content: center;
@@ -693,12 +705,13 @@ html[data-darkmode="true"] .vt-app {
 
 /* ------------------------------------------------------------ 6. system */
 
-.vt-app .vt-sys { container: vtsys / inline-size; display: flex; flex-direction: column; gap: 16px; }
+.vt-app .vt-sys { container: vtsys vtcell / inline-size; display: flex; flex-direction: column; gap: 16px; }
 .vt-app .vt-sys .vt-tile-head { margin-bottom: 0; }
 .vt-app .vt-sys-cpu { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: end; }
 .vt-app .vt-sys-cpu-l { display: flex; flex-direction: column; gap: 3px; }
 /* a narrow System column puts the sparkline under the load figures */
-@container vtsys (max-width: 330px) { .vt-app .vt-sys-cpu { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+/* narrow: the sparkline under the numbers, so the load figures never meet its label */
+@container vtsys (max-width: 420px) { .vt-app .vt-sys-cpu { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
 .vt-app .vt-sys-cpu-r { display: flex; align-items: flex-end; gap: 10px; min-width: 0; }
 .vt-app .vt-spark-box { flex: 1; min-width: 0; padding-top: 12px; }
 .vt-app .vt-spark-box .vt-spark { height: 38px; }
@@ -796,6 +809,9 @@ html[data-darkmode="true"] .vt-app {
 	font-size: var(--vt-fs-micro); line-height: 1; color: var(--vt-chart-axis); white-space: nowrap;
 }
 .vt-app .vt-mult-gap span { padding: 2px 4px; border-radius: 3px; background: var(--vt-surface); }
+/* a band too narrow for its label shows the hatching alone */
+.vt-app .vt-mult-gap { container-type: inline-size; }
+@container (max-width: 60px) { .vt-app .vt-mult-gap span { display: none; } }
 .vt-app .vt-mult-dot {
 	position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; z-index: 2;
 	background: var(--vt-sc); box-shadow: 0 0 0 2px var(--vt-surface); pointer-events: none;
@@ -1124,6 +1140,8 @@ html[data-darkmode="true"] .vt-app {
 /* ------------------------------------------- 11b. firewall overview */
 /* view/vantage/firewall.js: warnings, then tiles for what is open from
    the internet, the zones and what is switched off */
+/* no internet-facing zone: the page cannot tell, neither green nor a warning */
+.vt-app .vt-orb-unknown { --vt-oc: var(--vt-text-3); }
 .vt-app .vt-fg-warns { display: grid; gap: 10px; margin-bottom: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
 /* a warning's title is a sentence, not the dashboard's small caps label */
 .vt-app .vt-fg-warns .vt-chip-title { text-transform: none; letter-spacing: 0; font-size: var(--vt-fs-base); font-weight: 650; color: var(--vt-text); }
@@ -1208,7 +1226,6 @@ html[data-darkmode="true"] .vt-app {
 	.vt-app .vt-chip { padding: 9px 10px; gap: 8px; }
 	.vt-app .vt-chip-ico { width: 22px; height: 22px; }
 	.vt-app .vt-chip-reason { -webkit-line-clamp: 2; font-size: var(--vt-fs-micro); }
-	.vt-app .vt-sys-cpu { grid-template-columns: auto minmax(0, 1fr); }
 	.vt-app .vt-chart { --vt-mh: 108px; --vt-mg: 12px; }
 	.vt-app .vt-mult-now { font-size: var(--vt-fs-md); }
 	.vt-app .vt-mx-odd { display: none; }
@@ -1217,7 +1234,7 @@ html[data-darkmode="true"] .vt-app {
 
 /* clients as cards when the tile is too narrow for the table: one
    column on phones, a two-up grid on tablets */
-.vt-app .vt-clients { container: vtcl / inline-size; }
+.vt-app .vt-clients { container: vtcl vtcell / inline-size; }
 @container vtcl (max-width: 919px) {
 	.vt-app .vt-table-wrap { margin: 0; padding: 0; overflow: visible; }
 	.vt-app .vt-ctable { min-width: 0; }

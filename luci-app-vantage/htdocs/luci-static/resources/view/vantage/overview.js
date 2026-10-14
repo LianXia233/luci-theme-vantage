@@ -335,7 +335,23 @@ function tileHead(ic, title, extra) {
 	]);
 }
 
+/* LuCI's menu tree (loaded with the view): a link to a page this device
+   lacks (Mount Points without block-mount) would only reach a 404. LuCI
+   keeps such pages in the tree with satisfied false and hides them, as
+   ui.menu.getChildren does; so every step of the path must be satisfied */
+var menuTree = null;
+function hasPage(page) {
+	if (!menuTree) return true;
+	var n = menuTree;
+	for (var i = 0; n && i < page.length; i++) {
+		n = n.children ? n.children[page[i]] : null;
+		if (n && !n.satisfied) return false;
+	}
+	return !!n;
+}
+
 function pageLink(page, label) {
+	if (!hasPage(page)) return '';
 	return E('a', { 'class': 'vt-link', 'href': L.url.apply(L, page) }, [ E('span', {}, [ label ]), icon('chevron') ]);
 }
 
@@ -438,8 +454,10 @@ return view.extend({
 			L.resolveDefault(callMdns(), null),
 			this.fetch(),
 			/* reverse DNS is an optional grant: without it, skip it quietly */
-			L.resolveDefault(callAccess('access-group', 'luci-app-vantage-rdns', 'read'), false)
+			L.resolveDefault(callAccess('access-group', 'luci-app-vantage-rdns', 'read'), false),
+			L.resolveDefault(ui.menu.load(), null)
 		]).then(function(r) {
+			menuTree = r[7] || null;
 			return { board: r[1] || {}, canWrite: r[2] === true, mdns: r[4], raw: r[5], canRdns: r[6] === true };
 		});
 	},
@@ -505,13 +523,13 @@ return view.extend({
 		var net = Object.create(null);
 		if (stored.net && typeof stored.net === 'object')
 			Object.keys(stored.net).forEach(function(k) {
-				if (/^[A-Za-z0-9_.:-]{1,40}$/.test(k)) net[k] = series.valid(stored.net[k], 3, HIST_MAX, now);
+				if (/^[A-Za-z0-9_.:-]{1,40}$/.test(k)) net[k] = series.valid(stored.net[k], 3, HIST_MAX, now, model.MAX_BPS);
 			});
 		var clientHist = Object.create(null);
 		if (stored.clients && typeof stored.clients === 'object')
 			Object.keys(stored.clients).slice(0, 64).forEach(function(k) {
 				var mac = names.normMac(k);
-				if (mac) clientHist[mac] = series.valid(stored.clients[k], 4, 150, now);
+				if (mac) clientHist[mac] = series.valid(stored.clients[k], 4, 150, now, model.MAX_BPS);
 			});
 		this.board = data.board || {};
 		this.canWrite = data.canWrite;
@@ -1065,10 +1083,10 @@ return view.extend({
 			ev.preventDefault();
 			if (!act.disabled) act.click();
 		});
-		o.left = btn('vt-ov-col', 'left', _('Move %s left').format(name), function() {
+		o.left = btn('vt-ov-col vt-ov-lr', 'left', _('Move %s left').format(name), function() {
 			self.editTile(id, function(l) { return layout.shift(l, id, -1, self.lay.tier); }, _('%s moved left').format(name));
 		});
-		o.right = btn('vt-ov-col vt-ov-flip', 'left', _('Move %s right').format(name), function() {
+		o.right = btn('vt-ov-col vt-ov-lr vt-ov-flip', 'left', _('Move %s right').format(name), function() {
 			self.editTile(id, function(l) { return layout.shift(l, id, 1, self.lay.tier); }, _('%s moved right').format(name));
 		});
 		o.up = btn('', 'up', _('Move %s up').format(name), function() {
@@ -1265,7 +1283,9 @@ return view.extend({
 			if (c.client)
 				return E('button', { 'type': 'button', 'class': 'vt-chip vt-chip-' + c.level, 'role': 'listitem', 'title': c.detail || c.reason,
 					'click': function() { self.openDrawer('client', c.client); } }, body);
-			return E('a', { 'class': 'vt-chip vt-chip-' + c.level, 'role': 'listitem', 'title': c.detail || c.reason, 'href': L.url.apply(L, c.page) }, body);
+			/* without its page (no block-mount), a check links to the status overview */
+			var to = hasPage(c.page) ? c.page : [ 'admin', 'status', 'overview' ];
+			return E('a', { 'class': 'vt-chip vt-chip-' + c.level, 'role': 'listitem', 'title': c.detail || c.reason, 'href': L.url.apply(L, to) }, body);
 		}));
 	},
 

@@ -113,6 +113,19 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   never changed: the menu script adds the (i) buttons (after a field
   row's field, or first inside an intro) and sets classes, `data-v-help`
   and (where missing) a description `id` for `aria-controls`.
+- **Stock pages** without form chrome get the same cards: Status →
+  Firewall (nftables) shows each chain as a card with its rules edge to
+  edge and matches as wrapping text; the System and Kernel Log filters
+  are wrapping rows, and the log (a read-only viewer) keeps its own text
+  size on touch and wraps on phones. Phone cards use one inset for every
+  cell, hide empty cells, and give LuCI's wide columns (descriptions,
+  addresses) the card's width. A tooltip is never clipped by the box
+  that holds it and is sized to its text.
+- **LuCI 24.10** markup is supported where it differs, detected by
+  markup, never by version: Status → Overview's bare section headings
+  (header row, memory and storage meters) and named table sections whose
+  name is only the row's `data-title` (drawn as the name cell, the card
+  title on phones). These rules match nothing on 25.12.
 - 404 / CSRF pages render in the theme without leaking anything.
 - Focused fields show a 2 px `--focus` outline (border plus ring, at
   least 3:1 against field and card in both modes); text on coloured
@@ -121,23 +134,32 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
 - Add-ons: adblock and banIP pick their status palettes from the OS
   colour scheme; the theme sets their own light or dark palette from
   `html[data-darkmode]` instead, so they follow the theme toggle.
-- **Row actions**: a table row with three or more actions shows its main
-  one (Edit, else LuCI's "important" button) and a ⋯ menu with the rest,
-  at one width so rows line up; LuCI's buttons stay in place, hidden, and
-  a menu item clicks the original (its handler, confirmation, label and
-  disabled state are LuCI's). A menu: arrows, Home/End, Escape back to ⋯;
-  it opens above the button when the screen or the phone bar leaves no
-  room below.
+- **Row actions**: a table row with a main action (Edit, else LuCI's
+  "important" button) and at least two others shows the main one and a ⋯
+  menu with those, at one width so rows line up. Add, "important" and
+  plain action buttons (an app's own, such as Wake on LAN's Wake) stay
+  visible; rows of peer actions with no main one (Startup, Processes)
+  stay as LuCI drew them; no menu holds a single item. LuCI's buttons
+  stay in place, hidden, and a menu item clicks the original (its
+  handler, confirmation, label, tooltip and disabled state are LuCI's,
+  and an open menu follows them); while an original is busy, ⋯ shows
+  the spinner. A menu: arrows, Home/End, Escape back to ⋯ (after a
+  mouse or tap open too), Tab goes on from ⋯; it opens above the button
+  when the screen or the phone bar leaves no room below, and on the
+  roomier side, scrolling, when neither side fits.
 - **Firewall**: a rule's or forward's verdict is a coloured badge (accept
   green, reject and drop red, forward and NAT blue) and zone or default
   policies are coloured in their dropdowns, both keyed on LuCI's raw
-  target values, never on the translated labels. Green means "passes",
-  not "safe": on the masquerading (internet-facing) zone, an accepting
-  input policy and any forwarding into another zone get the warning
-  colour instead. A rule that is switched
-  off is dimmed from the moment it is unticked. The match reads From/To
-  first, the family/protocol line quieter. On phones a rule card carries
-  its on/off switch in the corner and no column labels.
+  target values, never on the translated labels; badge and warning text
+  keeps 4.5:1 on a hovered row too. Green means "passes", not "safe": on
+  the masquerading (internet-facing) zone, an accepting input policy and
+  any forwarding into another zone get the warning colour instead. A
+  rule that is switched off is greyed (not faded, so its name and match
+  keep 4.5:1) from the moment it is unticked. The match reads From/To
+  first, the family/protocol line quieter. The zones table's long
+  headers wrap, and a table wider than its card shows a shade on the
+  side that scrolls. On phones a rule card carries its on/off switch in
+  the corner, with a 44 px tap target, and no column labels.
 
 ### Visual identity
 
@@ -206,26 +228,46 @@ text around it so it looks the same size.
   The pick is saved in `localStorage`, validated on read; the tile's size
   and place don't change with it.
 - **Firewall overview** (Network → Firewall → Overview, first tab):
-  read-only, from uci `firewall`. A zone faces the internet when it
-  masquerades, holds the uplink (an interface with the IPv4 default route
-  and a public address, from `network.interface dump`: routers with
-  public addresses run without NAT; an access point's default route runs
-  over a private address and does not count), or, by OpenWrt's naming,
-  is called wan/wan6 or holds the wan/wan6 network. It lists what is open on the router and what
-  reaches the network (accepting rules from those zones, port forwards
-  with their target), keeps ping, multicast, IPsec and DHCP renewals
-  apart as standard housekeeping, maps each zone's input policy and
-  forwardings, lists what is switched off, and warns when the
-  internet-facing zone accepts input, forwards into another zone, or a
-  rule opens the router's SSH, telnet or web ports to any address. Every
-  item links to the LuCI tab that changes it. When no zone qualifies it
-  says it found none (expected on an access point) and shows the zones
-  only. It covers only
-  what the config says, and says so: with nothing open the headline is
-  "Nothing is open in your firewall rules"; ports UPnP opens at run time
-  get a note when luci-app-upnp is installed (its menu entry exists),
-  custom rule files when the config includes any, and otherwise a
-  footnote names both.
+  read-only, from uci `firewall`, read the way firewall4 (fw4, as 25.12
+  ships it) reads it: its boolean spellings (1/on/true/yes, 0/off/false/
+  no), policies and targets by prefix, sections it skips (a value it
+  refuses, a switched-off zone and the rules naming it, a port forward
+  from `*`) listed as not in effect, zone policies falling back to the
+  `defaults` section and then to DROP. A zone faces the internet when it
+  masquerades (`masq` or `masq6`), holds the uplink (an interface with the
+  IPv4 default route and a public address, from `network.interface dump`,
+  by network, device or the interface's own zone; public means outside
+  the IANA special-purpose blocks that are not globally reachable:
+  routers with public addresses run without NAT; an access point's
+  default route runs over a private address and does not count), or, by
+  OpenWrt's naming, is called wan/wan6 or holds the wan/wan6 network. An
+  uplink in no zone, the networks of a switched-off internet zone and the
+  family an internet zone leaves out meet the `defaults` policies, and
+  are shown as such. It lists what is open on the router (accepting
+  rules, and port forwards without a target address or to the router's
+  own) and what reaches the network (accepting rules into a zone, port
+  forwards with their target and port); protocols, ports and sources as
+  fw4 matches them ('all' ignores ports, numeric and `tcpudp` spellings,
+  `0.0.0.0/0` and negated sources are no restriction), with the address
+  family when the item has only one. Ping, multicast, DHCP renewals and
+  IPsec passed on to the network are kept apart as standard housekeeping;
+  IKE or ESP to the router itself is an opening. It maps each zone's
+  input policy and forwardings (with a forwarding from `*` in every zone,
+  and an accepting default forward policy as "any zone"), and warns when
+  an internet-facing zone or uplink accepts input, the internet is
+  forwarded into another zone (by a forwarding, also from `*`, by an
+  accepting rule for every port and address, or by the default forward
+  policy), or a rule or port forward opens the router's SSH, telnet or
+  web ports to any address. Every item links to the LuCI tab that changes
+  it. When no zone or uplink qualifies it says it found none (expected on
+  an access point), with a neutral marker, and shows the zones only; a
+  config it cannot read is an error, not that. It covers only what the
+  config says, and says so: with nothing open the headline is "Nothing is
+  open in your firewall rules"; ports UPnP opens at run time get a note
+  when luci-app-upnp is installed (its menu entry exists), custom rule
+  files when the config names any (said to be configured: fw4 ignores a
+  script include without `fw4_compatible`, shown as not in effect), and
+  otherwise a footnote names both.
 - **Controls** (buttons, filter, chips, sort headers, icon buttons) take
   the theme's control height through `--v-ctl-h` (36 px, 44 px on
   touch) and the theme's control radius (`--v-r`); under another theme

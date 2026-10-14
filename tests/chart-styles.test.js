@@ -20,7 +20,7 @@ test('chart styles: linear scales never go below 10 kbit/s and round up', () => 
 		const idle = series.chartGeom(style, 413, 0);
 		assert.equal(idle.dn.scale, 1e4, style + ': an idle link keeps a 10 kbit/s scale');
 		assert.equal(idle.up.scale, 1e4, style);
-		assert.ok(idle.dn.frac(413) > (style === 'overlay' ? .95 : .4), style + ': chatter stays near the baseline');
+		assert.ok(Math.abs(idle.dn.frac(413) - idle.dn.base) < .05, style + ': chatter stays near the baseline');
 	}
 	assert.equal(series.chartGeom('overlay', 372e6, 3e6).dn.scale, 400e6);
 	assert.equal(series.chartGeom('overlay', null, undefined).dn.scale, 1e4);
@@ -149,4 +149,32 @@ test('chart style pick: read back, junk ignored, a change repaints and is rememb
 		self.setChartStyle('overlay');
 		assert.ok(!('vantage.chart.v1' in store), 'the default is not stored');
 	});
+});
+
+test('chart styles: the lanes upload label sits at its lane\'s top line', () => {
+	const g = series.chartGeom('lanes', 40e6, .8e6);
+	const up = g.labels.find((l) => l.dir === 'up');
+	near(up.at, .64);
+	assert.ok(g.grid.includes(.64), 'on a grid line');
+	/* at the 72 px minimum plot: the label (10.5 px text, 3 px above its
+	   line) stays clear of a zero download's line and its end dot
+	   (4.5 px radius below the line) */
+	const h = 72, labelTop = up.at * h - 3 - 10.5, dotBottom = g.dn.base * h + 4.5;
+	assert.ok(labelTop - dotBottom >= 1.5, `label top ${labelTop} vs download dot ${dotBottom}`);
+});
+
+test('chart history: restored values above the rate ceiling are dropped; scales stay finite', () => {
+	const t = Date.now();
+	const stored = [ [ t - 2000, 5e6, 1e6 ], [ t - 1000, Number.MAX_VALUE, Number.MAX_VALUE ], [ t, 5e11, 1 ] ];
+	assert.deepEqual(series.valid(stored, 3, 90, t, 400e9).map((p) => p[0]), [ t - 2000 ], 'MAX_VALUE and 5e11 dropped');
+	assert.equal(series.valid(stored, 3, 90, t).length, 3, 'without a ceiling nothing changes');
+	for (const style of series.CHART_STYLES)
+		for (const peak of [ Number.MAX_VALUE, 1e300, Infinity ]) {
+			const g = series.chartGeom(style, peak, peak);
+			for (const d of [ g.dn, g.up ]) {
+				assert.ok(Number.isFinite(d.scale), `${style} ${peak}: scale ${d.scale}`);
+				const f = d.frac(peak);
+				assert.ok(f >= 0 && f <= 1, `${style}: ${f}`);
+			}
+		}
 });
