@@ -350,9 +350,11 @@ function requireProblems(srcs) {
 	const byModule = new Map(srcs.map(s => [ s.file.replace(/^htdocs\/luci-static\/resources\//, '').replace(/\.js$/, '').replace(/\//g, '.'), s ]));
 	for (const { file, text } of srcs) {
 		for (const r of requiresOf(text)) if (CONFIG_LOADERS.test(r)) out.push(`${file}: 'require ${r}'`);
-		/* L.require only with a literal vantage.* module */
-		for (const m of text.matchAll(/\bL\s*\.\s*require\b\s*(\(\s*('[^']*'|[^)]*))?/g))
-			if (!m[2] || !/^'vantage\.[\w-]+'$/.test(m[2].trim())) out.push(`${file}: L.require(${m[2] || ''})`);
+		/* L.require only with a literal vantage.* module as its whole
+		   argument: the literal must close the call, so a literal prefix
+		   followed by an expression ('vantage.x' + y) is not one */
+		for (const m of text.matchAll(/\bL\s*\.\s*require\b\s*(\(\s*('[^']*'\s*\)|[^)]*))?/g))
+			if (!m[2] || !/^'vantage\.[\w-]+'\s*\)$/.test(m[2].trim())) out.push(`${file}: L.require(${m[2] || ''})`);
 	}
 	/* the firewall overview's closure */
 	const seen = new Set(), luci = new Set();
@@ -432,7 +434,10 @@ test('negative controls: requiring a module that loads other configs fails', () 
 		[ FIREWALL_VIEW, add("'require poll';"), /requires .*poll/ ],
 		[ 'vantage/fwglance.js', t => t.replace("'require baseclass';\n", "'require baseclass';\n'require firewall';\n"), /'require firewall'/ ],
 		[ 'view/vantage/overview.js', t => t + "\nL.require('network');\n", /L\.require\('network'/ ],
-		[ 'view/vantage/overview.js', t => t + "\nvar m = 'network'; L.require(m);\n", /L\.require\(m/ ]
+		[ 'view/vantage/overview.js', t => t + "\nvar m = 'network'; L.require(m);\n", /L\.require\(m/ ],
+		/* a literal prefix followed by an expression names any module */
+		[ 'view/vantage/overview.js', t => t + "\nvar y = ''; L.require('vantage.x' + y);\n", /L\.require\('vantage\.x' \+ y/ ],
+		[ 'view/vantage/overview.js', t => t + "\nL.require('vantage.x', 'network');\n", /L\.require\('vantage\.x', 'network'/ ]
 	]) {
 		const mutant = mutate(file, edit);
 		assert.notDeepEqual(mutant, sources, 'the mutation applied');
