@@ -141,3 +141,22 @@ test('wired-only: decided by an answered empty wireless status, never by a faile
 	self.markWired(x = m([]), null);
 	assert.equal(x.wired, false, 'a rebuild keeps the decision');
 });
+
+test('page links: a page LuCI keeps but marks unsatisfied (no block-mount) counts as absent', () => {
+	const src = fs.readFileSync(path.join(RES, 'view/vantage/overview.js'), 'utf8');
+	const block = src.match(/var menuTree = null;\nfunction hasPage\(page\) \{[\s\S]*?\n\}\n/)[0];
+	const hasPage = new Function('tree', block + 'menuTree = tree; return hasPage;');
+	const node = (satisfied, children) => Object.assign({ satisfied }, children ? { children } : {});
+	/* as LuCI's dispatcher serves it: every node carries satisfied */
+	const tree = { children: { admin: node(true, {
+		system: node(true, { system: node(true), mounts: node(false) }),
+		network: node(false, { wireless: node(true) })
+	}) } };
+	const has = hasPage(tree);
+	assert.equal(has([ 'admin', 'system', 'system' ]), true);
+	assert.equal(has([ 'admin', 'system', 'mounts' ]), false, 'kept in the tree, but unsatisfied');
+	assert.equal(has([ 'admin', 'network', 'wireless' ]), false, 'an unsatisfied parent hides its children');
+	assert.equal(has([ 'admin', 'status', 'nowhere' ]), false, 'missing');
+	/* no menu (the load failed): links stay */
+	assert.equal(hasPage(null)([ 'admin', 'system', 'mounts' ]), true);
+});

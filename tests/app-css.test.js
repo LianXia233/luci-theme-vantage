@@ -49,8 +49,15 @@ test('found on a real router: links to absent pages, a wrapping handle bar, clip
 	/* Mount Points without block-mount: no link to a 404 */
 	assert.match(view, /function pageLink\(page, label\) \{\s*if \(!hasPage\(page\)\) return '';/);
 	assert.match(view, /var to = hasPage\(c\.page\) \? c\.page : \[ 'admin', 'status', 'overview' \];/);
-	/* a quarter-wide tile's handle bar stays one row */
+	/* a quarter-wide tile's handle bar: two rows, not three (no ‹ ›) */
 	assert.ok(rules.some((r) => r.sel === '.vt-app .vt-cell' && /container:\s*vtcell \/ inline-size/.test(r.body)));
+	/* a tile with a container of its own must not drop the vtcell name */
+	for (const sel of [ '.vt-app .vt-hero', '.vt-app .vt-sys', '.vt-app .vt-clients' ]) {
+		const r = rules.find((x) => x.sel === sel && /container:/.test(x.body));
+		assert.match(r.body, /container:\s*[\w ]*\bvtcell\b[\w ]*\/ inline-size/, sel);
+	}
+	for (const r of rules.filter((x) => /container:/.test(x.body) && /\.vt-(hero|sys|clients|cell)$/.test(x.sel)))
+		assert.match(r.body, /\bvtcell\b/, r.sel);
 	assert.match(css, /@container vtcell \(max-width: 340px\) \{ \.vt-app \.vt-ov-lr \{ display: none; \} \}/);
 	/* text-only node sub-lines are blocks, so their ellipsis shows */
 	assert.ok(rules.some((r) => r.sel === '.vt-app .vt-node-sub:not(:has(> *))' && /display:\s*block/.test(r.body)));

@@ -336,12 +336,17 @@ function tileHead(ic, title, extra) {
 }
 
 /* LuCI's menu tree (loaded with the view): a link to a page this device
-   lacks (Mount Points without block-mount) would only reach a 404 */
+   lacks (Mount Points without block-mount) would only reach a 404. LuCI
+   keeps such pages in the tree with satisfied false and hides them, as
+   ui.menu.getChildren does; so every step of the path must be satisfied */
 var menuTree = null;
 function hasPage(page) {
 	if (!menuTree) return true;
 	var n = menuTree;
-	for (var i = 0; n && i < page.length; i++) n = n.children ? n.children[page[i]] : null;
+	for (var i = 0; n && i < page.length; i++) {
+		n = n.children ? n.children[page[i]] : null;
+		if (n && !n.satisfied) return false;
+	}
 	return !!n;
 }
 

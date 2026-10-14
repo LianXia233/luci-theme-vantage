@@ -390,9 +390,10 @@ html[data-darkmode="true"] .vt-app {
 .vt-app .vt-ov-hide { margin-left: 4px; }
 .vt-app .vt-ov-size { min-width: 26px; text-align: center; font-size: var(--vt-fs-micro); font-weight: 650; color: var(--vt-text-2); }
 .vt-app.vt-edit-1col .vt-ov-col { display: none; }
-/* a narrow tile's bar keeps one row: no ‹ ›, drag and the arrow keys
-   on the grip still move it */
+/* a narrow tile's bar: two rows at most (the name, then the controls),
+   not three; no ‹ ›, drag and the arrow keys on the grip still move it */
 .vt-app .vt-cell { container: vtcell / inline-size; }
+/* tiles with a container of their own keep the vtcell name too (below) */
 @container vtcell (max-width: 340px) { .vt-app .vt-ov-lr { display: none; } }
 
 .vt-app.vt-editing .vt-cell { transition: top .2s ease, left .2s ease; }
@@ -561,7 +562,7 @@ html[data-darkmode="true"] .vt-app {
 
 /* -------------------------------------------------- 5. hero: network path */
 
-.vt-app .vt-hero { container: vthero / inline-size; overflow: hidden; display: flex; flex-direction: column; }
+.vt-app .vt-hero { container: vthero vtcell / inline-size; overflow: hidden; display: flex; flex-direction: column; }
 
 .vt-app .vt-kpis {
 	position: relative; z-index: 1;
@@ -704,7 +705,7 @@ html[data-darkmode="true"] .vt-app {
 
 /* ------------------------------------------------------------ 6. system */
 
-.vt-app .vt-sys { container: vtsys / inline-size; display: flex; flex-direction: column; gap: 16px; }
+.vt-app .vt-sys { container: vtsys vtcell / inline-size; display: flex; flex-direction: column; gap: 16px; }
 .vt-app .vt-sys .vt-tile-head { margin-bottom: 0; }
 .vt-app .vt-sys-cpu { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: end; }
 .vt-app .vt-sys-cpu-l { display: flex; flex-direction: column; gap: 3px; }
@@ -1233,7 +1234,7 @@ html[data-darkmode="true"] .vt-app {
 
 /* clients as cards when the tile is too narrow for the table: one
    column on phones, a two-up grid on tablets */
-.vt-app .vt-clients { container: vtcl / inline-size; }
+.vt-app .vt-clients { container: vtcl vtcell / inline-size; }
 @container vtcl (max-width: 919px) {
 	.vt-app .vt-table-wrap { margin: 0; padding: 0; overflow: visible; }
 	.vt-app .vt-ctable { min-width: 0; }

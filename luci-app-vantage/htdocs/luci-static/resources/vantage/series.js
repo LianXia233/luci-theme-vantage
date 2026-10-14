@@ -164,10 +164,11 @@ return baseclass.extend({
 			return { dn: lin(sd, 0, .5), up: lin(su, 1, .5), grid: [ 0, 1 ], axis: [ .5 ],
 				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: 1, v: su, dir: 'up', below: true } ] };
 		case 'lanes':
-			return { dn: lin(sd, 0, .44), up: lin(su, .6, 1), grid: [ 0, .6 ], axis: [ .44, 1 ],
+			return { dn: lin(sd, 0, .36), up: lin(su, .64, 1), grid: [ 0, .64 ], axis: [ .36, 1 ],
 				/* each lane's scale on its own top line, the upload's in the gap
-				   between the lanes, clear of both curves */
-				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: .6, v: su, dir: 'up' } ] };
+				   between the lanes, clear of both curves: at the 72 px minimum
+				   the gap (20 px) holds the label and the download's end dot */
+				labels: [ { at: 0, v: sd, dir: 'dn' }, { at: .64, v: su, dir: 'up' } ] };
 		default:
 			return { dn: lin(shared, 0, 1), up: lin(shared, 0, 1), grid: [ 0, .5 ], axis: [ 1 ],
 				labels: [ { at: 0, v: shared } ] };

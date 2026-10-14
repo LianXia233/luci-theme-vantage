@@ -20,7 +20,7 @@ test('chart styles: linear scales never go below 10 kbit/s and round up', () => 
 		const idle = series.chartGeom(style, 413, 0);
 		assert.equal(idle.dn.scale, 1e4, style + ': an idle link keeps a 10 kbit/s scale');
 		assert.equal(idle.up.scale, 1e4, style);
-		assert.ok(idle.dn.frac(413) > (style === 'overlay' ? .95 : .4), style + ': chatter stays near the baseline');
+		assert.ok(Math.abs(idle.dn.frac(413) - idle.dn.base) < .05, style + ': chatter stays near the baseline');
 	}
 	assert.equal(series.chartGeom('overlay', 372e6, 3e6).dn.scale, 400e6);
 	assert.equal(series.chartGeom('overlay', null, undefined).dn.scale, 1e4);
@@ -154,8 +154,13 @@ test('chart style pick: read back, junk ignored, a change repaints and is rememb
 test('chart styles: the lanes upload label sits at its lane\'s top line', () => {
 	const g = series.chartGeom('lanes', 40e6, .8e6);
 	const up = g.labels.find((l) => l.dir === 'up');
-	near(up.at, .6);
-	assert.ok(g.grid.includes(.6), 'on a grid line');
+	near(up.at, .64);
+	assert.ok(g.grid.includes(.64), 'on a grid line');
+	/* at the 72 px minimum plot: the label (10.5 px text, 3 px above its
+	   line) stays clear of a zero download's line and its end dot
+	   (4.5 px radius below the line) */
+	const h = 72, labelTop = up.at * h - 3 - 10.5, dotBottom = g.dn.base * h + 4.5;
+	assert.ok(labelTop - dotBottom >= 1.5, `label top ${labelTop} vs download dot ${dotBottom}`);
 });
 
 test('chart history: restored values above the rate ceiling are dropped; scales stay finite', () => {
