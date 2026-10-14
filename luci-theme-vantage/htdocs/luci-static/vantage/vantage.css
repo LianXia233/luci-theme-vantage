@@ -1618,6 +1618,12 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 	font-size: var(--fs-sm);
 	text-align: center;
 }
+/* a box holding a tooltip (Status -> Port status: networks, counters) must
+   let it out, so its rounded corners come from the first and last child
+   instead of from clipping */
+.ifacebox:has(.cbi-tooltip-container) { overflow: visible; }
+.ifacebox:has(.cbi-tooltip-container) > :first-child { border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0; }
+.ifacebox:has(.cbi-tooltip-container) > :last-child { border-radius: 0 0 calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px); }
 .ifacebox-head.active { background: var(--accent-soft); color: var(--accent-text); }
 .ifacebox-body { padding: 8px 10px; font-size: var(--fs-sm); color: var(--text-2); }
 .ifacebox-body img { width: 18px; height: 18px; }
@@ -1785,8 +1791,9 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 .cbi-tooltip.warning { background: var(--warn); border-color: var(--warn); color: #1a1200; }
 .cbi-tooltip.info { background: var(--info); border-color: var(--info); color: var(--info-ink); }
 .cbi-tooltip-container { position: relative; cursor: help; }
-.cbi-tooltip-container > .cbi-tooltip { left: -10000px; top: auto; margin-top: 6px; white-space: normal; }
-.cbi-tooltip-container:hover > .cbi-tooltip { left: 0; top: 100%; opacity: 1; }
+/* sized to its text, not to a narrow container such as a 100 px port box */
+.cbi-tooltip-container > .cbi-tooltip { left: -10000px; top: auto; margin-top: 6px; white-space: normal; width: max-content; max-width: min(360px, calc(100vw - 32px)); }
+.cbi-tooltip-container:hover > .cbi-tooltip { left: 0; top: 100%; opacity: 1; translate: var(--vt-tip-dx, 0px) 0; }
 .cbi-tooltip-container > .cbi-tooltip.left { right: 0; }
 .cbi-tooltip-container:hover > .cbi-tooltip.left { left: auto; right: 0; }
 

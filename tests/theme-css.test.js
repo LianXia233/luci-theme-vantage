@@ -189,3 +189,16 @@ test('firewall: verdicts and policies are coloured by their raw value, off rules
 		for (const s of r.sel)
 			if (/small:has\(> br\)/.test(s)) assert.match(s, /\[id\^="cbi-firewall-"\]/, s);
 });
+
+test('tooltips are not clipped by the box that holds them (issue #26: Status -> Port status)', () => {
+	/* a box with overflow: hidden cut LuCI's port tooltip ("Part of networks:") off */
+	const free = themeRules.find((r) => r.sel.some((s) => s === '.ifacebox:has(.cbi-tooltip-container)'));
+	assert.ok(free && /overflow:\s*visible/.test(free.body));
+	/* sized to the text, not to the 100 px port box */
+	const tip = themeRules.find((r) => r.sel.includes('.cbi-tooltip-container > .cbi-tooltip'));
+	assert.match(tip.body, /width:\s*max-content/);
+	/* the script's nudge back on screen is applied where the tooltip shows */
+	const shown = themeRules.find((r) => r.sel.includes('.cbi-tooltip-container:hover > .cbi-tooltip'));
+	assert.match(shown.body, /translate:\s*var\(--vt-tip-dx/);
+	assert.match(menuJs, /setupTooltips\(\)\s*\{/);
+});

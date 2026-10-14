@@ -602,6 +602,7 @@ return baseclass.extend({
 		this.setupIndicators();
 		this.setupNumerals();
 		this.setupForms();
+		this.setupTooltips();
 		setupStockEnhancers();
 		setupCharts();
 		this.setupKeys();
@@ -1363,6 +1364,28 @@ return baseclass.extend({
 			window.requestAnimationFrame(scan);
 		}).observe(main, { childList: true, subtree: true, characterData: true });
 		scan();
+	},
+
+	/* --------------------------------------------------------- tooltips */
+
+	/* LuCI places hover tooltips with CSS only, beside their container: one
+	   that would leave the screen (a port box at the edge of Status ->
+	   Port status) is moved back in, once per container entered */
+	setupTooltips() {
+		const fit = ev => {
+			const box = ev.target && ev.target.closest ? ev.target.closest('.cbi-tooltip-container') : null;
+			if (box === this.tipBox) return;
+			this.tipBox = box;
+			const tip = box && box.querySelector(':scope > .cbi-tooltip');
+			if (!tip) return;
+			tip.style.removeProperty('--vt-tip-dx');
+			const r = tip.getBoundingClientRect(), pad = 8, w = document.documentElement.clientWidth;
+			/* still parked off-screen (not shown yet): nothing to measure */
+			if (r.right < -1000) { this.tipBox = null; return; }
+			const dx = r.left < pad ? pad - r.left : r.right > w - pad ? w - pad - r.right : 0;
+			if (dx) tip.style.setProperty('--vt-tip-dx', dx.toFixed(0) + 'px');
+		};
+		document.addEventListener('mouseover', fit, true);
 	},
 
 	/* ---------------------------------------------------- form chrome */
