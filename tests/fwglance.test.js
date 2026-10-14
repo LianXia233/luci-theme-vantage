@@ -636,6 +636,44 @@ test('S4: device wildcards and exclusions still decide (CX S4)', () => {
 	assert.deepEqual(codes(zone({ device: 'ww+an' })), [ 'outside-input:wan_4' ], 'fw4 skips a wildcard not at the end');
 });
 
+const withSet = (set, rule) => fw.analyse(cfg(BASE.concat(set ? [ [ 'ipset', Object.assign({ name: 'mine', family: 'ipv4', entry: [ '203.0.113.5' ] }, set) ] ] : [],
+	[ [ 'rule', Object.assign({ name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' }, rule) ] ])));
+
+test('S5: a set limits who connects only when it matches the source address (CX S5)', () => {
+	/* fw4: tcp dport 22 ip daddr @mine accept: anyone may connect */
+	const dst = withSet({ match: 'dest_ip' });
+	assert.deepEqual(dst.open[0].from, { anywhere: true, only: [], except: [] });
+	assert.deepEqual(codes(dst), [ 'admin-open:SSH' ]);
+	for (const [ set, rule, why ] of [
+		[ { match: 'dst_net' }, {}, 'a destination net set' ],
+		[ { match: 'src_ip' }, { ipset: 'mine dst' }, 'a source set matched on the destination' ],
+		[ { match: 'src_ip' }, { ipset: '!mine' }, 'a negated set' ],
+		[ { match: 'src_mac' }, {}, 'a MAC set: the upstream router\'s' ],
+		[ { match: 'dest_port' }, {}, 'a port set' ],
+		[ null, {}, 'a set this config does not define' ],
+		[ { match: 'src_ip', enabled: '0' }, {}, 'a set that is switched off' ],
+		[ { match: 'src_ip', family: 'any' }, {}, 'an address set fw4 refuses' ],
+		[ { match: 'src_ip', maxelem: 'lots' }, {}, 'a set with a value fw4 refuses' ],
+		[ {}, {}, 'a set without match types' ]
+	]) {
+		const r = withSet(set, rule);
+		assert.equal(r.open[0].from.anywhere, true, why);
+		assert.deepEqual(codes(r), [ 'admin-open:SSH' ], why);
+	}
+	for (const [ set, rule, why ] of [
+		[ { match: 'src_ip' }, {}, 'a source address set' ],
+		[ { match: 'ip' }, {}, 'unprefixed is the source' ],
+		[ { match: 'dest_ip' }, { ipset: 'mine src' }, 'a destination set matched on the source' ],
+		[ { match: [ 'src_net', 'dest_port' ] }, {}, 'a source and port set' ]
+	]) {
+		const r = withSet(set, rule);
+		assert.deepEqual(r.open[0].from, { anywhere: false, only: [ '@mine' ], except: [] }, why);
+		assert.deepEqual(r.warnings, [], why);
+	}
+	/* the set's family is the rule's, as fw4 infers it */
+	assert.equal(withSet({ match: 'src_ip', family: 'ipv6', entry: [ '2001:db8::5' ] }).open[0].family, 6);
+});
+
 const ROUTER = [ Object.assign({}, LAN_DEV, { 'ipv6-address': [ { address: '2001:db8::1', mask: 64 } ],
 	'ipv6-prefix-assignment': [ { address: '2001:db8:1::', mask: 48, 'local-address': { address: '2001:db8:1::1', mask: 64 } } ] }), WAN_DEV ];
 
@@ -953,7 +991,7 @@ test('fw4 itself: the regressions\' openings are in the ruleset it writes', { sk
 	}
 });
 
-test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6, N1)', { skip: NO_FW4 }, () => {
+test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S5, S6, N1)', { skip: NO_FW4 }, () => {
 	const LAN = LAN_DEV, WAN = WAN_DEV;
 	const modem = [ LAN, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
 		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
@@ -963,6 +1001,8 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6, N1)', { skip: NO_FW
 		[ 'zone', { name: 'lan', network: 'lan', input: 'ACCEPT' } ],
 		[ 'zone', { name: 'wan', network: 'wan', family: 'ipv4', input: 'REJECT', masq: '1' } ],
 		[ 'zone', { name: 'wan6', network: 'wan6', family: 'ipv6', input: 'REJECT' } ] ];
+	const set = (match, ref) => MASQ.concat([ [ 'ipset', { name: 'mine', match, family: 'ipv4', entry: [ '203.0.113.5' ] } ],
+		[ 'rule', { name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: ref || 'mine', target: 'ACCEPT' } ] ]);
 	const redirect = dest_ip => MASQ.concat([ [ 'redirect', { name: 'P', src: 'wan', proto: 'tcp', src_dport: '2222', dest_ip, dest_port: '22' } ] ]);
 	const skipped = opts => [ acceptIn(zoneOpts(MASQ, 'wan', opts)), [ LAN, WAN ], 'outside-input',
 		rs => /policy accept;/.test(chain(rs, 'input')) && !/input_wan/.test(rs) && /skipped due to invalid options/.test(rs) ];
@@ -972,6 +1012,9 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6, N1)', { skip: NO_FW
 			rs => /meta nfproto ipv4 iifname "eth1" jump input_wan /.test(chain(rs, 'input')) && /meta nfproto ipv6 iifname "eth1" jump input_wan6/.test(chain(rs, 'input')) ],
 		[ 'S4 excluded alias', [ [ 'defaults', { input: 'ACCEPT', forward: 'REJECT' } ], [ 'zone', { name: 'wan', device: 'wwan+', network: '!wan_4', input: 'REJECT' } ] ], modem, 'outside-input',
 			rs => /iifname "wwan\*" iifname != "wwan0" jump input_wan/.test(chain(rs, 'input')) && /policy accept;/.test(chain(rs, 'input')) ],
+		[ 'S5 destination set', set('dest_ip'), [ LAN, WAN ], 'admin-open', rs => /tcp dport 22 ip daddr @mine counter accept/.test(chain(rs, 'input_wan')) ],
+		[ 'S5 source set as dst', set('src_ip', 'mine dst'), [ LAN, WAN ], 'admin-open', rs => /tcp dport 22 ip daddr @mine counter accept/.test(chain(rs, 'input_wan')) ],
+		[ 'S5 source set', set('src_ip'), [ LAN, WAN ], null, rs => /tcp dport 22 ip saddr @mine counter accept/.test(chain(rs, 'input_wan')) ],
 		[ 'S6 masked router address', redirect('192.0.2.1/32'), [ LAN, WAN ], 'admin-open',
 			rs => /dnat 192\.0\.2\.1:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) && /ct status dnat accept/.test(chain(rs, 'input_wan')) ],
 		[ 'S6 prefix is the subnet base', redirect('192.0.2.1/24'), [ LAN, WAN ], null, rs => /dnat 192\.0\.2\.0:22 comment "!fw4: P"/.test(chain(rs, 'dstnat_wan')) ],
@@ -997,12 +1040,17 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S6, N1)', { skip: NO_FW
 	}
 });
 
-test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S6, N1)', async () => {
+test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S5, S6, N1)', async () => {
 	const modem = [ LAN_DEV, Object.assign(iface('wan', null), { device: 'wwan0', l3_device: 'wwan0' }),
 		Object.assign(iface('wan_4', PUBLIC, { uplink: true }), { device: '@wan', l3_device: 'wwan0' }) ];
 	const alias = await page(cfg(acceptIn(MASQ)), modem);
 	assert.match(alias, /Nothing is open in your firewall rules/);
 	assert.doesNotMatch(alias, /in no zone/);
+	const dst = await page(cfg(MASQ.concat([ [ 'ipset', { name: 'mine', match: 'dest_ip', family: 'ipv4', entry: [ '198.51.100.2' ] } ],
+		[ 'rule', { name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' } ] ])), [ LAN_DEV, WAN_DEV ]);
+	assert.match(dst, /Router admin open: SSH/);
+	assert.match(dst, /SSH\nIPv4 TCP 22 · from anywhere/);
+	assert.doesNotMatch(dst, /@mine/);
 	const masked = cfg(MASQ.concat([ [ 'redirect', { name: 'Router masked', src: 'wan', proto: 'tcp', src_dport: '2222', dest_ip: '192.0.2.1/32', dest_port: '22' } ] ]));
 	const local = await page(masked, [ LAN_DEV, WAN_DEV ]);
 	assert.match(local, /On this router\nRouter masked\nIPv4 TCP 2222 · from anywhere\nrouter port 22/);

@@ -24,6 +24,8 @@
    - protocols: unset is tcp and udp; 'tcpudp', 6, 17, 1 and 58 are
      spelled out; 'all' matches everything; fw4 drops a leading '!'; ports
      only apply to tcp and udp;
+   - an ipset limits who connects only when it matches the source
+     address;
    - a rule without a target does nothing; a redirect whose target is not
      snat is a DNAT, to the router itself without dest_ip or to one of its
      addresses (masked to the prefix given), and is skipped from '*' or
@@ -164,9 +166,23 @@ function mac(v) {
 	return m && /^[0-9a-f]{1,2}([:-][0-9a-f]{1,2}){5}$/i.test(m.val) ? m : null;
 }
 
+/* a set reference: its name, then the direction of each of its fields
+   ('src', 'dst' or null: the set's own) */
 function setmatch(v) {
 	var m = invert(v);
-	return m && /^[a-zA-Z_.][a-zA-Z0-9\/_.-]*/.test(m.val) ? m : null;
+	if (!m) return null;
+	var name = /^[^ \t]+/.exec(m.val)[0];
+	var dir = m.val.slice(name.length).trim().split(/[ \t,]/).slice(0, 3).map(function(d) {
+		return (d === 'dst' || d === 'dest') ? 'dst' : d === 'src' ? 'src' : null;
+	});
+	return { invert: m.invert, val: name, dir: dir };
+}
+
+/* an ipset's match entry -> { dir, type } */
+function ipsettype(v) {
+	var m = /^(src|dst|dest)_(.+)$/.exec(v);
+	var t = oneOf([ 'ip', 'port', 'mac', 'net', 'set' ])(m ? m[2] : v);
+	return t ? { dir: (!m || m[1] === 'src') ? 'src' : 'dst', type: t } : null;
 }
 
 /* ucode's +val: a number, NaN refused */
@@ -456,6 +472,7 @@ return baseclass.extend({
 			if (!ifs) return { invert: n.invert, text: n.val, addrs: null };
 			return ifs[n.val] ? { invert: n.invert, text: n.val, addrs: ifs[n.val].addrs } : null;
 		};
+
 		/* zones; a network or device entry is { net | dev, neg }. With the
 		   dump a network stands for its device, as fw4 matches it, and a
 		   network the dump puts in a zone (data.zone) joins that zone; a
@@ -581,6 +598,32 @@ return baseclass.extend({
 			});
 		};
 
+		/* ipsets fw4 loads from this config: { name: { family, match } }. A
+		   set it does not define may come from a service at run time, or
+		   not exist: either way it says nothing this page can rely on */
+		var ipsets = Object.create(null);
+		of('ipset').forEach(function(s) {
+			var p = parse(s, {
+				enabled: [ bool, '1' ], reload_set: [ bool ], counters: [ bool ], comment: [ str ],
+				name: [ identifier ], family: [ family, '4' ], storage: [ str ], match: [ ipsettype, null, true ],
+				iprange: [ str ], portrange: [ str ], netmask: [ int ], maxelem: [ int ], hashsize: [ int ],
+				timeout: [ int, '-1' ], external: [ str ], entry: [ str, null, true ], loadfile: [ str ]
+			});
+			if (p.bad || !p.enabled || !p.name || !p.match) return;
+			var types = p.match.map(function(m) { return m.type; });
+			if (types.indexOf('set') >= 0 || (p.family === 0 && (types.indexOf('ip') >= 0 || types.indexOf('net') >= 0))) return;
+			if (!ipsets[p.name]) ipsets[p.name] = { family: p.family, match: p.match };
+		});
+		/* a set limits the source when it matches the source address in
+		   one of its fields: the reference's direction, else the set's.
+		   A negated, unknown, destination or MAC/port-only set does not */
+		var sourceSet = function(x) {
+			var set = !x.invert && ipsets[x.val];
+			return !!set && set.match.some(function(m, i) {
+				return (m.type === 'ip' || m.type === 'net') && (x.dir[i] || m.dir) === 'src';
+			});
+		};
+
 		/* what a rule or redirect matches, read leniently so that a section
 		   fw4 skips can still be described */
 		var describe = function(kind, s) {
@@ -590,14 +633,19 @@ return baseclass.extend({
 			proto = any ? [ 'all' ] : proto.filter(function(p, i) { return proto.indexOf(p) === i; });
 			var l4 = !any && proto.some(function(p) { return p === 'tcp' || p === 'udp'; });
 			var ports = l4 ? portRanges(lenient(port, redirect ? s.src_dport : s.dest_port)) : null;
-			var ips = lenient(network, s.src_ip), sets = lenient(setmatch, s.ipset);
+			/* ipset is one option, not a list: 'name dst' is one set */
+			var ips = lenient(network, s.src_ip);
+			var sets = (Array.isArray(s.ipset) ? s.ipset : s.ipset != null ? [ s.ipset ] : [])
+				.map(function(v) { return setmatch(String(v)); }).filter(Boolean);
+			var srcSets = sets.filter(sourceSet);
 			var pos = ips.filter(function(a) { return !a.invert; }), neg = ips.filter(function(a) { return a.invert; });
 			var addrs = ips.reduce(function(a, x) { return a.concat(x.addrs || []); }, []);
 			var dips = lenient(network, s.dest_ip).reduce(function(a, x) { return a.concat(x.addrs || []); }, []);
 			var sdips = redirect ? lenient(network, s.src_dip).reduce(function(a, x) { return a.concat(x.addrs || []); }, []) : [];
 			var fam = s.family != null ? family(String(s.family)) : null;
 			var src = s.src != null ? String(s.src) : null, dest = s.dest != null ? String(s.dest) : null;
-			var refs = [ famOf(addrs), famOf(dips), famOf(sdips), byName[src] ? byName[src].family : null, byName[dest] ? byName[dest].family : null ];
+			var refs = [ sets.length && ipsets[sets[0].val] ? ipsets[sets[0].val].family : null,
+				famOf(addrs), famOf(dips), famOf(sdips), byName[src] ? byName[src].family : null, byName[dest] ? byName[dest].family : null ];
 			var has = function(f) { return addrs.concat(dips, sdips).some(function(a) { return a.family === f; }); };
 			var fams = [];
 			var add = function(f) {
@@ -607,15 +655,16 @@ return baseclass.extend({
 			if (proto.some(function(p) { return p !== 'ipv6-icmp'; })) add(fam);
 			if (proto.indexOf('ipv6-icmp') >= 0) add(6);
 			/* restricted when every family the section applies to has a
-			   positive source list that is not the whole address space; a
-			   negated address admits everyone else, and a MAC address on
-			   internet traffic is the upstream router's */
-			var restricted = fams.length > 0 && (sets.some(function(x) { return !x.invert; }) || fams.every(function(f) {
+			   positive source list that is not the whole address space, or
+			   a set matches the source address; a negated address admits
+			   everyone else, and a MAC address on internet traffic is the
+			   upstream router's */
+			var restricted = fams.length > 0 && (srcSets.length > 0 || fams.every(function(f) {
 				var mine = pos.filter(function(a) { return !a.addrs || a.addrs.some(function(x) { return x.family === f; }); });
 				return mine.length > 0 && !mine.some(function(a) { return a.addrs && a.addrs.some(function(x) { return x.family === f && x.all; }); });
 			}));
 			var only = pos.filter(function(a) { return !(a.addrs && a.addrs.length && a.addrs.every(function(x) { return x.all; })); }).map(function(a) { return a.text; })
-				.concat(sets.filter(function(x) { return !x.invert; }).map(function(x) { return '@' + x.val; }));
+				.concat(srcSets.map(function(x) { return '@' + x.val; }));
 			return {
 				kind: kind, name: s.name != null ? String(s.name) : null, src: src, dest: dest,
 				proto: proto, ports: ports, portText: ports ? rangeText(ports.pos) : '',
