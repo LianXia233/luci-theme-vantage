@@ -1,9 +1,10 @@
 'use strict';
-/* Row action menus (menu-vantage.js decorateRowActions): a row with three
-   or more actions keeps its main one and a ⋯ button; LuCI's other buttons
-   stay in place, hidden, and a menu item clicks the original, so LuCI's
-   handler, label and disabled state are the ones that count. Run against
-   a fake DOM just big enough for these calls. */
+/* Row action menus (menu-vantage.js decorateRowActions): a row with a main
+   action (Edit, else LuCI's "important" one) and at least two others keeps
+   the main one and a ⋯ button; LuCI's other buttons stay in place, hidden,
+   and a menu item clicks the original, so LuCI's handler, label and
+   disabled state are the ones that count. Run against a fake DOM just big
+   enough for these calls. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -97,17 +98,49 @@ function setup(rows) {
 const btn = (cls, label) => new El('button', { 'class': 'cbi-button ' + cls }, [ label ]);
 const shown = box => box.children.filter(c => !c.cls.has('vt-acts-hidden')).map(c => c.cls.has('vt-acts-more') ? '⋯' : c.textContent);
 
-test('row actions: three or more keep the main one and a ⋯; fewer stay as they are', () => {
-	const { boxes } = setup([
-		[ btn('cbi-button-neutral', 'Restart'), btn('cbi-button-action important', 'Scan'), btn('cbi-button-add', 'Add') ],
-		[ btn('drag-handle', '☰'), btn('cbi-button-edit', 'Edit'), btn('cbi-button-neutral', 'Clone'), btn('cbi-button-remove', 'Delete') ],
-		[ btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ]
-	]);
-	assert.deepEqual(shown(boxes[0]), [ 'Scan', '⋯' ], 'the "important" action stays');
-	assert.deepEqual(shown(boxes[1]), [ '☰', 'Edit', '⋯' ], 'Edit stays, and so does the drag handle');
-	assert.deepEqual(shown(boxes[2]), [ 'Edit', 'Delete' ], 'two actions need no menu');
-	assert.equal(boxes[0].children.length, 4, "LuCI's buttons are kept, in their place, plus the ⋯");
+test('row actions: rows with a main action and two others fold; the rows LuCI and apps built around their buttons do not', () => {
+	/* classes as LuCI 25.12 and the add-ons render them */
+	const rows = {
+		interfaces: [ btn('cbi-button-neutral reconnect', 'Restart'), btn('cbi-button-neutral down', 'Stop'), btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ],
+		wifiNet: [ btn('cbi-button-neutral enable-disable', 'Disable'), btn('cbi-button-action important', 'Edit'), btn('cbi-button-negative remove', 'Remove') ],
+		rule: [ btn('drag-handle', '☰'), btn('cbi-button-edit', 'Edit'), btn('cbi-button-neutral', 'Clone'), btn('cbi-button-remove', 'Delete') ],
+		ddns: [ btn('cbi-button-neutral reload', 'Reload'), btn('cbi-button-neutral stop', 'Stop'), btn('drag-handle', '☰'), btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ],
+		/* Wireless radio: Add is how a radio gets a network */
+		radio: [ btn('cbi-button-neutral', 'Restart'), btn('cbi-button-action important', 'Scan'), btn('cbi-button-add', 'Add') ],
+		/* Wake on LAN puts its own action in front of LuCI's buttons */
+		wol: [ btn('cbi-button-action', 'Wake'), btn('drag-handle', '☰'), btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ],
+		/* System -> Startup and Status -> Processes: peers, no main one */
+		startup: [ btn('cbi-button-positive', 'Enabled'), btn('cbi-button-action', 'Start'), btn('cbi-button-action', 'Restart'), btn('cbi-button-action', 'Reload'), btn('cbi-button-action', 'Stop') ],
+		processes: [ btn('cbi-button-action', 'Hang Up'), btn('cbi-button-negative', 'Terminate'), btn('cbi-button-negative', 'Kill') ],
+		two: [ btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ]
+	};
+	const names = Object.keys(rows);
+	const { boxes } = setup(names.map(n => rows[n]));
+	const got = Object.fromEntries(names.map((n, i) => [ n, shown(boxes[i]) ]));
+	assert.deepEqual(got, {
+		interfaces: [ 'Edit', '⋯' ],
+		wifiNet: [ 'Edit', '⋯' ],
+		rule: [ '☰', 'Edit', '⋯' ],
+		ddns: [ '☰', 'Edit', '⋯' ],
+		radio: [ 'Restart', 'Scan', 'Add' ],
+		wol: [ 'Wake', '☰', 'Edit', 'Delete' ],
+		startup: [ 'Enabled', 'Start', 'Restart', 'Reload', 'Stop' ],
+		processes: [ 'Hang Up', 'Terminate', 'Kill' ],
+		two: [ 'Edit', 'Delete' ]
+	});
+	assert.equal(boxes[0].children.length, 5, "LuCI's buttons are kept, in their place, plus the ⋯");
 	assert.equal(boxes[0].children[0].textContent, 'Restart');
+	for (const i of [ 4, 5, 6, 7 ]) assert.ok(!boxes[i].cls.has('vt-acts'), names[i] + ' is left as LuCI drew it');
+});
+
+test('row actions: never a menu of one', () => {
+	const { boxes } = setup([
+		/* Wake and Add stay out, which leaves one button to fold */
+		[ btn('cbi-button-action', 'Wake'), btn('cbi-button-edit', 'Edit'), btn('cbi-button-neutral', 'Clone') ],
+		[ btn('cbi-button-add', 'Add'), btn('cbi-button-action important', 'Scan'), btn('cbi-button-remove', 'Delete') ]
+	]);
+	assert.deepEqual(shown(boxes[0]), [ 'Wake', 'Edit', 'Clone' ]);
+	assert.deepEqual(shown(boxes[1]), [ 'Add', 'Scan', 'Delete' ]);
 });
 
 test('row actions: a second pass changes nothing; a button LuCI hides is not counted', () => {

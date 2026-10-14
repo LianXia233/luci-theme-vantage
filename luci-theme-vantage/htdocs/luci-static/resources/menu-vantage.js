@@ -1423,11 +1423,15 @@ return baseclass.extend({
 
 	/* ---------------------------------------------- row action menus */
 
-	/* A table row with three or more actions keeps its main one (Edit, else
-	   LuCI's "important" button) and gets a ⋯ button listing the rest.
-	   LuCI's buttons stay where LuCI put them, only hidden: a menu item
-	   clicks the original, so the handler, any confirmation and the current
-	   label (Enable or Disable) are LuCI's own. The drag handle stays. */
+	/* A table row folds when it has a main action (Edit, else LuCI's
+	   "important" button) and at least two others to put in a ⋯ menu.
+	   Add, "important" and plain action buttons stay out of the menu: they
+	   are what the row is for (Wireless's Add, Wake on LAN's Wake). Rows
+	   of peer actions (Startup, Processes) have no main one and stay as
+	   LuCI drew them. LuCI's buttons stay where LuCI put them, only
+	   hidden: a menu item clicks the original, so the handler, any
+	   confirmation and the current label (Enable or Disable) are LuCI's
+	   own. The drag handle stays. */
 	decorateRowActions() {
 		document.querySelectorAll('.cbi-section-actions > div').forEach(box => {
 			if (box.closest('.vt-app')) return;
@@ -1435,14 +1439,15 @@ return baseclass.extend({
 				n.matches('button, .btn, .cbi-button, input[type="button"], input[type="submit"]') &&
 				!n.matches('.drag-handle, .vt-acts-more') && !n.hidden && n.style.display !== 'none');
 			const more = box.querySelector(':scope > .vt-acts-more');
-			if (btns.length < 3) {
+			const main = btns.find(b => b.matches('.cbi-button-edit')) || btns.find(b => b.matches('.important'));
+			const fold = main ? btns.filter(b => b !== main && !b.matches('.important, .cbi-button-add, .cbi-button-action')) : [];
+			if (fold.length < 2) {
 				if (more) more.remove();
 				box.classList.remove('vt-acts');
 				btns.forEach(b => b.classList.remove('vt-acts-hidden'));
 				return;
 			}
-			const main = btns.find(b => b.matches('.cbi-button-edit')) || btns.find(b => b.matches('.important')) || btns[0];
-			btns.forEach(b => b.classList.toggle('vt-acts-hidden', b !== main));
+			btns.forEach(b => b.classList.toggle('vt-acts-hidden', fold.includes(b)));
 			box.classList.add('vt-acts');
 			if (!more) box.appendChild(this.moreButton(box));
 		});
