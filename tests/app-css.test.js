@@ -43,3 +43,15 @@ test('reduced motion: no moving flow dots, the static dotted wire instead', () =
 	assert.match(rm[1], /\.vt-flows\s*\{\s*display:\s*none/);
 	assert.match(rm[1], /\.vt-flow-on\s*\{\s*opacity:/);
 });
+
+test('found on a real router: links to absent pages, a wrapping handle bar, clipped node text', () => {
+	const view = fs.readFileSync(path.join(__dirname, '..', 'luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js'), 'utf8');
+	/* Mount Points without block-mount: no link to a 404 */
+	assert.match(view, /function pageLink\(page, label\) \{\s*if \(!hasPage\(page\)\) return '';/);
+	assert.match(view, /var to = hasPage\(c\.page\) \? c\.page : \[ 'admin', 'status', 'overview' \];/);
+	/* a quarter-wide tile's handle bar stays one row */
+	assert.ok(rules.some((r) => r.sel === '.vt-app .vt-cell' && /container:\s*vtcell \/ inline-size/.test(r.body)));
+	assert.match(css, /@container vtcell \(max-width: 340px\) \{ \.vt-app \.vt-ov-lr \{ display: none; \} \}/);
+	/* text-only node sub-lines are blocks, so their ellipsis shows */
+	assert.ok(rules.some((r) => r.sel === '.vt-app .vt-node-sub:not(:has(> *))' && /display:\s*block/.test(r.body)));
+});
