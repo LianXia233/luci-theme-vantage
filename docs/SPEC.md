@@ -137,11 +137,12 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
 - **Firewall**: a rule's or forward's verdict is a coloured badge (accept
   green, reject and drop red, forward and NAT blue) and zone or default
   policies are coloured in their dropdowns, both keyed on LuCI's raw
-  target values, never on the translated labels. Green means "passes",
-  not "safe": on the masquerading (internet-facing) zone, an accepting
-  input policy and any forwarding into another zone get the warning
-  colour instead. A rule that is switched
-  off is dimmed from the moment it is unticked. The match reads From/To
+  target values, never on the translated labels; badge and warning text
+  keeps 4.5:1 on a hovered row too. Green means "passes", not "safe": on
+  the masquerading (internet-facing) zone, an accepting input policy and
+  any forwarding into another zone get the warning colour instead. A
+  rule that is switched off is greyed (not faded, so its name and match
+  keep 4.5:1) from the moment it is unticked. The match reads From/To
   first, the family/protocol line quieter. On phones a rule card carries
   its on/off switch in the corner and no column labels.
 

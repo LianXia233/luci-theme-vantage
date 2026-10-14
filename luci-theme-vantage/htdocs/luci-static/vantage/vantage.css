@@ -73,6 +73,11 @@
 	--info: #1c64c4;
 	--info-ink: #ffffff;
 	--ok-text: #0a7262;         /* --ok as text on control fills (s3, s4) */
+	/* red, blue and amber as text on their own soft fill, which a hovered
+	   row darkens: >= 4.5:1 there too (--err itself was 4.4:1) */
+	--err-text: #b02525;
+	--info-text: #1a5cb5;
+	--warn-text: #875000;
 	--info-soft: rgba(28, 100, 196, .1);
 	--scrim: rgba(20, 23, 26, .38);
 	--shadow-pop: 0 12px 32px rgba(20, 23, 26, .16), 0 2px 6px rgba(20, 23, 26, .08);
@@ -114,6 +119,9 @@ html[data-darkmode="true"] {
 	--info: #6cb4ff;
 	--info-ink: #0d0e10;
 	--ok-text: var(--ok);
+	--err-text: var(--err);
+	--info-text: var(--info);
+	--warn-text: var(--warn);
 	--info-soft: rgba(108, 180, 255, .12);
 	--scrim: rgba(0, 0, 0, .58);
 	--shadow-pop: 0 16px 40px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .02);
@@ -1282,7 +1290,7 @@ input[type="button"], input[type="reset"], input[type="submit"]) {
 	color: var(--err);
 	border-color: color-mix(in srgb, var(--err) 40%, var(--line-2));
 }
-:is(.btn, .cbi-button, .cbi-dropdown):is(.cbi-button-negative, .cbi-button-remove):hover { background: var(--err-soft); border-color: var(--err); }
+:is(.btn, .cbi-button, .cbi-dropdown):is(.cbi-button-negative, .cbi-button-remove):hover { background: var(--err-soft); border-color: var(--err); color: var(--err-text); }
 :is(.btn, .cbi-button, .cbi-dropdown).cbi-button-negative.important { background: var(--err); border-color: var(--err); color: var(--err-ink); }
 :is(.btn, .cbi-button, .cbi-dropdown).cbi-button-negative.important:hover { background: color-mix(in srgb, var(--err) 88%, var(--err-ink)); color: var(--err-ink); }
 :is(.btn, .cbi-button).cbi-button-reset { background: transparent; color: var(--text-2); }
@@ -2414,8 +2422,8 @@ html[data-darkmode="true"] :is(#ban-status, #ban-report) { --ban-ok: #63c79b; --
 	font: 600 var(--fs-sm)/1.65 var(--font);
 }
 .cbi-section-table .td var[data-tooltip="ACCEPT"] { background: var(--ok-soft); color: var(--ok-text); }
-.cbi-section-table .td var:is([data-tooltip="REJECT"], [data-tooltip="DROP"]) { background: var(--err-soft); color: var(--err); }
-.cbi-section-table .td var:is([data-tooltip="DNAT"], [data-tooltip="SNAT"], [data-tooltip="MASQUERADE"]) { background: var(--info-soft); color: var(--info); }
+.cbi-section-table .td var:is([data-tooltip="REJECT"], [data-tooltip="DROP"]) { background: var(--err-soft); color: var(--err-text); }
+.cbi-section-table .td var:is([data-tooltip="DNAT"], [data-tooltip="SNAT"], [data-tooltip="MASQUERADE"]) { background: var(--info-soft); color: var(--info-text); }
 /* the match: values upright, the family/protocol line quieter than
    where the traffic comes from and goes to */
 [id^="cbi-firewall-"] .cbi-section-table .td > small:has(> br) { display: block; font-size: var(--fs-base); line-height: 1.8; }
@@ -2441,7 +2449,7 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
    zone accepting input, or forwarding into another zone. Green says
    "passes", not "safe"; these two get the warning colour instead. */
 #cbi-firewall-zone .tr:has(input[data-widget-id$=".masq"]:checked) > .td[data-name="input"] select:has(> option:checked[value="ACCEPT"]) {
-	color: var(--warn); border-color: var(--warn); background-color: var(--warn-soft);
+	color: var(--warn-text); border-color: var(--warn); background-color: var(--warn-soft);
 }
 #cbi-firewall-zone .tr:has(input[data-widget-id$=".masq"]:checked) .zone-dest > .zonebadge:not(.zonebadge-empty) {
 	outline: 2px solid var(--warn); outline-offset: 1px;
@@ -2449,8 +2457,11 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 /* the zones table squeezed its policy selects to 42 px at 721-900 px; a
    wider table scrolls inside its card instead */
 #cbi-firewall-zone .td select { min-width: 7.5em; }
-/* a rule that is switched off looks off, from the moment it is unticked */
-[id^="cbi-firewall-"] .tr:has(input[data-widget-id$=".enabled"]:not(:checked)) > .td:not(.cbi-section-actions):not(:has(input[data-widget-id$=".enabled"])) { opacity: .45; }
+/* a rule that is switched off looks off, from the moment it is unticked:
+   greyed rather than faded, so its name and match still read (4.5:1 and
+   up) and the row's separator stays whole */
+[id^="cbi-firewall-"] .tr:has(input[data-widget-id$=".enabled"]:not(:checked)) > .td:not(.cbi-section-actions):not(:has(input[data-widget-id$=".enabled"])) { color: var(--text-3); }
+[id^="cbi-firewall-"] .tr:has(input[data-widget-id$=".enabled"]:not(:checked)) > .td:not(.cbi-section-actions) :is(var[data-tooltip], .zonebadge) { filter: grayscale(1); }
 
 /* ----------------------------------------------------- responsive */
 

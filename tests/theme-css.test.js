@@ -176,9 +176,9 @@ test('firewall: verdicts and policies are coloured by their raw value, off rules
 	/* policies: by the selected option's value, live */
 	assert.match(body((s) => /select\[id\^="widget\.cbid\.firewall\."\]:has\(> option:checked:is\(\[value="REJECT"\], \[value="DROP"\]\)\)/.test(s)), /--err/);
 	assert.match(body((s) => /select\[id\^="widget\.cbid\.firewall\."\]:has\(> option:checked\[value="ACCEPT"\]\)/.test(s)), /--ok/);
-	/* a rule unticked looks off, but its switch and buttons stay fully visible */
-	const off = themeRules.find((r) => r.sel.some((s) => /enabled"\]:not\(:checked\)/.test(s)));
-	assert.ok(off && /opacity/.test(off.body));
+	/* a rule unticked looks off, but its switch and buttons stay as they are */
+	const off = themeRules.find((r) => r.sel.some((s) => /enabled"\]:not\(:checked\)\) > \.td:not\(\.cbi-section-actions\):not\(:has/.test(s)));
+	assert.ok(off && /color:\s*var\(--text-3\)/.test(off.body));
 	assert.ok(off.sel.every((s) => /:not\(\.cbi-section-actions\)/.test(s) && /:not\(:has\(input\[data-widget-id\$="\.enabled"\]\)\)/.test(s)));
 	/* accept is the risk on the masquerading (internet-facing) zone: input accept and its forwardings warn */
 	const risk = themeRules.filter((r) => r.sel.some((s) => /input\[data-widget-id\$="\.masq"\]:checked/.test(s)));
@@ -210,4 +210,50 @@ test('row menus: a busy ⋯ swaps its dots for the spinner and stays clickable; 
 	assert.match(own('.vt-acts-more.spinning svg'), /display:\s*none/);
 	assert.match(own('.vt-actmenu'), /overflow-y:\s*auto/);
 	assert.match(menuJs, /menu\.style\.maxHeight = /);
+});
+
+/* light and dark token blocks, var() references resolved */
+function tokens(block) {
+	const m = new RegExp(block.replace(/[[\]"]/g, '\\$&') + ' \\{([^}]*)\\}').exec(themeCss);
+	const t = {};
+	for (const d of m[1].matchAll(/(--[\w-]+):\s*([^;]+);/g)) t[d[1]] = d[2].trim();
+	return t;
+}
+const light = tokens(':root'), dark = Object.assign({}, light, tokens('html[data-darkmode="true"]'));
+function rgba(t, v) {
+	for (let i = 0; i < 5; i++) { const m = /^var\((--[\w-]+)\)$/.exec(v); if (!m) break; v = t[m[1]]; }
+	let m = /^#([0-9a-f]{6})$/i.exec(v);
+	if (m) return [ 0, 2, 4 ].map((i) => parseInt(m[1].slice(i, i + 2), 16)).concat(1);
+	m = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(v);
+	assert.ok(m, 'colour ' + v);
+	return [ +m[1], +m[2], +m[3], +m[4] ];
+}
+const over = (f, b) => [ 0, 1, 2 ].map((i) => f[i] * f[3] + b[i] * (1 - f[3])).concat(1);
+const lum = (c) => c.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+	.reduce((a, v, i) => a + v * [ 0.2126, 0.7152, 0.0722 ][i], 0);
+const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+
+test('firewall colours keep 4.5:1 on a hovered row, light and dark (badges, the amber input policy)', () => {
+	const body = (pred) => themeRules.filter((r) => r.sel.some(pred)).map((r) => r.body).join(';');
+	assert.match(body((s) => /\[data-tooltip="REJECT"\]/.test(s) && /\[data-tooltip="DROP"\]/.test(s) && !/ACCEPT/.test(s)), /color:\s*var\(--err-text\)/);
+	assert.match(body((s) => /\[data-tooltip="DNAT"\]/.test(s) && !/ACCEPT/.test(s)), /color:\s*var\(--info-text\)/);
+	assert.match(body((s) => /\.td\[data-name="input"\] select:has/.test(s)), /color:\s*var\(--warn-text\)/);
+	/* the row hover: --s3 at 55% over the card (--s1), as in the .tr:hover rule */
+	assert.match(themeCss, /:hover > \.td \{ background: color-mix\(in srgb, var\(--s3\) 55%, transparent\); \}/);
+	for (const [ scheme, t ] of [ [ 'light', light ], [ 'dark', dark ] ]) {
+		const card = rgba(t, 'var(--s1)');
+		const hover = over(rgba(t, 'var(--s3)').slice(0, 3).concat(0.55), card);
+		for (const [ fg, bg ] of [ [ '--err-text', '--err-soft' ], [ '--info-text', '--info-soft' ], [ '--warn-text', '--warn-soft' ], [ '--ok-text', '--ok-soft' ] ])
+			for (const [ where, under ] of [ [ 'at rest', card ], [ 'hovered', hover ] ]) {
+				const r = ratio(over(rgba(t, 'var(' + fg + ')'), over(rgba(t, 'var(' + bg + ')'), under)), over(rgba(t, 'var(' + bg + ')'), under));
+				assert.ok(r >= 4.5, scheme + ' ' + fg + ' on ' + bg + ' ' + where + ': ' + r.toFixed(2));
+			}
+	}
+});
+
+test('switched-off rules are greyed, not faded: the name and match keep 4.5:1', () => {
+	assert.doesNotMatch(themeRules.filter((r) => r.sel.some((s) => /enabled"\]:not\(:checked\)/.test(s))).map((r) => r.body).join(';'), /opacity/);
+	const badges = themeRules.find((r) => r.sel.some((s) => /enabled"\]:not\(:checked\)/.test(s) && /var\[data-tooltip\], \.zonebadge/.test(s)));
+	assert.match(badges.body, /filter:\s*grayscale\(1\)/);
+	for (const t of [ light, dark ]) assert.ok(ratio(rgba(t, 'var(--text-3)'), rgba(t, 'var(--s1)')) >= 4.5);
 });
