@@ -202,3 +202,12 @@ test('tooltips are not clipped by the box that holds them (issue #26: Status -> 
 	assert.match(shown.body, /translate:\s*var\(--vt-tip-dx/);
 	assert.match(menuJs, /setupTooltips\(\)\s*\{/);
 });
+
+test('row menus: a busy ⋯ swaps its dots for the spinner and stays clickable; a menu too tall for the room scrolls', () => {
+	const own = (sel) => themeRules.filter((r) => r.sel.includes(sel) && !r.media).map((r) => r.body).join(';');
+	/* .cbi-button.spinning has pointer-events: none: ⋯ must outweigh it */
+	assert.match(own('.td.cbi-section-actions .vt-acts-more.spinning'), /pointer-events:\s*auto/);
+	assert.match(own('.vt-acts-more.spinning svg'), /display:\s*none/);
+	assert.match(own('.vt-actmenu'), /overflow-y:\s*auto/);
+	assert.match(menuJs, /menu\.style\.maxHeight = /);
+});

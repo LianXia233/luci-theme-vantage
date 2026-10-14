@@ -128,9 +128,12 @@ for Vantage. Names used everywhere: theme dir `vantage`, media URL
   visible; rows of peer actions with no main one (Startup, Processes)
   stay as LuCI drew them; no menu holds a single item. LuCI's buttons
   stay in place, hidden, and a menu item clicks the original (its
-  handler, confirmation, label and disabled state are LuCI's). A menu:
-  arrows, Home/End, Escape back to ⋯; it opens above the button when the
-  screen or the phone bar leaves no room below.
+  handler, confirmation, label, tooltip and disabled state are LuCI's,
+  and an open menu follows them); while an original is busy, ⋯ shows
+  the spinner. A menu: arrows, Home/End, Escape back to ⋯ (after a
+  mouse or tap open too), Tab goes on from ⋯; it opens above the button
+  when the screen or the phone bar leaves no room below, and on the
+  roomier side, scrolling, when neither side fits.
 - **Firewall**: a rule's or forward's verdict is a coloured badge (accept
   green, reject and drop red, forward and NAT blue) and zone or default
   policies are coloured in their dropdowns, both keyed on LuCI's raw

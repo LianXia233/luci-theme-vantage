@@ -49,6 +49,7 @@ class El {
 		else this.attrs[k] = String(v);
 	}
 	getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+	removeAttribute(k) { delete this.attrs[k]; }
 	appendChild(c) { if (c.parentNode) c.parentNode.children.splice(c.parentNode.children.indexOf(c), 1); c.parentNode = this; this.children.push(c); return c; }
 	remove() { if (this.parentNode) this.parentNode.children.splice(this.parentNode.children.indexOf(this), 1); this.parentNode = null; }
 	set textContent(v) { this.children = []; if (v) this.appendChild({ nodeType: 3, text: v }); }
@@ -74,15 +75,30 @@ class El {
 }
 
 const doc = { activeElement: null, listeners: {}, createElementNS: (ns, tag) => new El(tag), addEventListener(t, fn) { (this.listeners[t] = this.listeners[t] || []).push(fn); } };
+/* a key pressed with focus outside the menu reaches the document listeners */
+const docKey = (key, extra) => { const ev = Object.assign({ key, target: doc.activeElement, preventDefault() {}, stopPropagation() {} }, extra); (doc.listeners.keydown || []).forEach(fn => fn(ev)); };
 
-function setup(rows) {
+/* MutationObserver stand-in: the test calls notify() where the browser
+   would deliver records for an attribute LuCI changed */
+let observers = [];
+class FakeObserver {
+	constructor(cb) { this.cb = cb; observers.push(this); }
+	observe(target) { this.target = target; }
+	disconnect() {}
+}
+const notify = el => observers.filter(o => o.target.contains(el)).forEach(o => o.cb([ { type: 'attributes', target: el } ]));
+
+function setup(rows, win) {
+	observers = [];
+	doc.listeners = {};
+	doc.activeElement = null;
 	doc.body = new El('body');
 	doc.querySelectorAll = sel => {
 		if (sel === '.cbi-section-actions > div') return doc.body.walk([]).filter(n => n.parentNode && n.parentNode.cls.has('cbi-section-actions') && n.tagName === 'DIV');
 		return doc.body.querySelectorAll(sel);
 	};
 	doc.querySelector = sel => doc.querySelectorAll(sel)[0] || null;
-	const window = { innerWidth: 1280, innerHeight: 900, addEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }) };
+	const window = Object.assign({ innerWidth: 1280, innerHeight: 900, addEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }), MutationObserver: FakeObserver }, win);
 	const E = (tag, attrs, kids) => new El(tag, attrs, kids);
 	const proto = new Function('baseclass', 'ui', 'rpc', 'host', 'E', 'L', '_', 'document', 'window', SRC)(
 		{ extend: p => p }, {}, { declare: () => () => Promise.resolve({}) }, {}, E, {}, s => s, doc, window);
@@ -97,6 +113,8 @@ function setup(rows) {
 }
 const btn = (cls, label) => new El('button', { 'class': 'cbi-button ' + cls }, [ label ]);
 const shown = box => box.children.filter(c => !c.cls.has('vt-acts-hidden')).map(c => c.cls.has('vt-acts-more') ? '⋯' : c.textContent);
+const moreOf = box => box.children.find(c => c.cls.has('vt-acts-more'));
+const menuEl = () => doc.body.children.find(c => c.attrs.id === 'vt-actmenu');
 
 test('row actions: rows with a main action and two others fold; the rows LuCI and apps built around their buttons do not', () => {
 	/* classes as LuCI 25.12 and the add-ons render them */
@@ -195,4 +213,112 @@ test('row actions: keys open the menu at either end, walk it, and Escape returns
 	menu().dispatch('keydown', { key: 'Escape' });
 	assert.ok(menu().hidden);
 	assert.equal(doc.activeElement, more);
+});
+
+test('row actions: ⋯ shows the busy state of a hidden original until it settles', () => {
+	const restart = btn('cbi-button-neutral reconnect', 'Restart');
+	/* what ui.createHandlerFn does around a handler's promise */
+	restart.addEventListener('click', () => { restart.classList.add('spinning'); restart.disabled = true; notify(restart); });
+	const { boxes } = setup([ [ restart, btn('cbi-button-neutral down', 'Stop'), btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ] ]);
+	const more = moreOf(boxes[0]);
+	more.click();
+	menuEl().children[0].click();
+	assert.equal(restart.clicks, 1);
+	assert.ok(more.cls.has('spinning'), '⋯ spins while the hidden Restart does');
+	assert.equal(more.getAttribute('aria-busy'), 'true');
+	assert.ok(!more.disabled, '⋯ stays usable for the other actions');
+	more.click();
+	assert.ok(menuEl().children[0].disabled, 'the busy action itself is disabled in the menu');
+	more.click();
+
+	restart.classList.remove('spinning'); restart.disabled = false; notify(restart);
+	assert.ok(!more.cls.has('spinning'));
+	assert.equal(more.getAttribute('aria-busy'), null);
+});
+
+test('row actions: Escape and Tab close a menu opened with the mouse; Tab from inside goes on from ⋯', () => {
+	const { boxes } = setup([ [ btn('a', 'Restart'), btn('cbi-button-edit', 'Edit'), btn('b', 'Stop'), btn('cbi-button-remove', 'Delete') ] ]);
+	const more = moreOf(boxes[0]);
+	more.click();                       /* a pointer open: focus stays on ⋯ */
+	more.focus();
+	assert.ok(!menuEl().hidden);
+	docKey('Escape');
+	assert.ok(menuEl().hidden, 'Escape closes it');
+	assert.equal(more.getAttribute('aria-expanded'), 'false');
+	assert.equal(doc.activeElement, more);
+
+	more.click();
+	docKey('Tab');
+	assert.ok(menuEl().hidden, 'Tab from ⋯ closes it and moves on natively');
+	assert.equal(doc.activeElement, more);
+
+	more.dispatch('keydown', { key: 'ArrowDown' });
+	assert.equal(doc.activeElement.textContent, 'Restart');
+	let defaultPrevented = false;
+	menuEl().dispatch('keydown', { key: 'Tab', preventDefault() { defaultPrevented = true; } });
+	assert.ok(menuEl().hidden);
+	assert.equal(doc.activeElement, more, 'focus is back on ⋯ before the browser moves it');
+	assert.ok(!defaultPrevented, 'the browser still moves focus, from the row');
+});
+
+test('row actions: ⋯ names its menu; items carry LuCI\'s tooltip, and a label-less button its title', () => {
+	const restart = btn('cbi-button-neutral reconnect', 'Restart');
+	restart.setAttribute('title', 'Reconnect this interface');
+	const icon = btn('cbi-button-neutral', '');
+	icon.setAttribute('title', 'Stop this service');
+	const { boxes } = setup([ [ restart, icon, btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ] ]);
+	const more = moreOf(boxes[0]);
+	assert.equal(more.getAttribute('aria-controls'), 'vt-actmenu');
+	more.click();
+	const items = menuEl().children;
+	assert.deepEqual(items.map(i => [ i.textContent, i.getAttribute('title') ]),
+		[ [ 'Restart', 'Reconnect this interface' ], [ 'Stop this service', 'Stop this service' ], [ 'Delete', null ] ]);
+});
+
+test('row actions: an open menu follows LuCI disabling or hiding an original', () => {
+	const stop = btn('cbi-button-neutral stop', 'Stop');
+	const reload = btn('cbi-button-neutral reload', 'Reload');
+	const { boxes } = setup([ [ reload, stop, btn('cbi-button-edit', 'Edit'), btn('cbi-button-remove', 'Delete') ] ]);
+	const more = moreOf(boxes[0]);
+	more.dispatch('keydown', { key: 'ArrowDown' });
+	const first = menuEl().children[0];
+	notify(stop);                       /* a poll that changes nothing */
+	assert.equal(menuEl().children[0], first, 'no change, no refill');
+
+	stop.disabled = true; notify(stop);  /* DDNS's poll: the service stopped */
+	assert.deepEqual(menuEl().children.map(i => i.textContent + (i.disabled ? ' (off)' : '')), [ 'Reload', 'Stop (off)', 'Delete' ]);
+	assert.equal(doc.activeElement.textContent, 'Reload', 'focus stays on the same action');
+
+	/* hidden by LuCI: no longer an action of this row */
+	reload.style.display = 'none'; notify(reload);
+	assert.deepEqual(menuEl().children.map(i => i.textContent), [ 'Stop', 'Delete' ]);
+	assert.equal(doc.activeElement.textContent, 'Delete', 'focus moves on to an enabled item');
+	/* one left to fold: the row unfolds and the menu closes */
+	stop.hidden = true; notify(stop);
+	assert.ok(menuEl().hidden);
+	assert.deepEqual(shown(boxes[0]), [ 'Reload', 'Stop', 'Edit', 'Delete' ], 'LuCI hides those two itself');
+	assert.ok(!moreOf(boxes[0]));
+	assert.equal(doc.activeElement.textContent, 'Edit', 'focus moves to the row\'s first action');
+});
+
+test('row actions: with no room on either side the menu takes the roomier one and scrolls, clear of ⋯', () => {
+	/* a landscape phone: 360 px high, the ⋯ in the middle */
+	const { boxes } = setup([ [ btn('a', 'Start'), btn('cbi-button-edit', 'Edit'), btn('b', 'Reload'), btn('c', 'Stop'), btn('cbi-button-remove', 'Delete') ] ], { innerHeight: 360 });
+	const more = moreOf(boxes[0]);
+	more.getBoundingClientRect = () => ({ left: 560, right: 600, top: 150, bottom: 186 });
+	more.click();
+	more.click();
+	Object.defineProperty(menuEl(), 'offsetHeight', { value: 190 });
+	more.click();
+	const m = menuEl();
+	/* below: 360 - 8 - 192 = 160, above: 150 - 14 = 136 */
+	assert.equal(m.style.top, '192px');
+	assert.equal(m.style.maxHeight, '160px');
+	more.click();
+	more.getBoundingClientRect = () => ({ left: 560, right: 600, top: 200, bottom: 236 });
+	more.click();
+	/* below: 110, above: 186 */
+	assert.equal(m.style.maxHeight, '186px');
+	assert.equal(m.style.top, '8px');
+	assert.ok(parseInt(m.style.top, 10) + 186 <= 200 - 6, 'ends above the button');
 });
