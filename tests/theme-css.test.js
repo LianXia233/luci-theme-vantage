@@ -166,3 +166,26 @@ test('phone table cards: in pages and modals, header rows only, no fixed row hei
 	const cell = phone.find(r => r.sel.includes(':is(.vt-main, .modal) .table .tr > .td'));
 	assert.match(cell.body, /height:\s*auto/);
 });
+
+test('firewall: verdicts and policies are coloured by their raw value, off rules dim, match styling stays on firewall pages', () => {
+	const body = (pred) => themeRules.filter((r) => r.sel.some(pred)).map((r) => r.body).join(';');
+	/* LuCI puts the untranslated target in data-tooltip; colour must not depend on the label */
+	assert.match(body((s) => /var\[data-tooltip="ACCEPT"\]/.test(s)), /--ok/);
+	assert.match(body((s) => /\[data-tooltip="REJECT"\]/.test(s) && /\[data-tooltip="DROP"\]/.test(s) && !/ACCEPT/.test(s)), /--err/);
+	assert.match(body((s) => /\[data-tooltip="DNAT"\]/.test(s) && !/ACCEPT/.test(s)), /--info/);
+	/* policies: by the selected option's value, live */
+	assert.match(body((s) => /select\[id\^="widget\.cbid\.firewall\."\]:has\(> option:checked:is\(\[value="REJECT"\], \[value="DROP"\]\)\)/.test(s)), /--err/);
+	assert.match(body((s) => /select\[id\^="widget\.cbid\.firewall\."\]:has\(> option:checked\[value="ACCEPT"\]\)/.test(s)), /--ok/);
+	/* a rule unticked looks off, but its switch and buttons stay fully visible */
+	const off = themeRules.find((r) => r.sel.some((s) => /enabled"\]:not\(:checked\)/.test(s)));
+	assert.ok(off && /opacity/.test(off.body));
+	assert.ok(off.sel.every((s) => /:not\(\.cbi-section-actions\)/.test(s) && /:not\(:has\(input\[data-widget-id\$="\.enabled"\]\)\)/.test(s)));
+	/* accept is the risk on the masquerading (internet-facing) zone: input accept and its forwardings warn */
+	const risk = themeRules.filter((r) => r.sel.some((s) => /input\[data-widget-id\$="\.masq"\]:checked/.test(s)));
+	assert.ok(risk.some((r) => r.sel.some((s) => /data-name="input"\] select:has\(> option:checked\[value="ACCEPT"\]\)/.test(s)) && /--warn/.test(r.body)));
+	assert.ok(risk.some((r) => r.sel.some((s) => /\.zone-dest > \.zonebadge:not\(\.zonebadge-empty\)/.test(s)) && /--warn/.test(r.body)));
+	/* the muted first line of a match only on firewall pages: other tables use <small><br> too */
+	for (const r of themeRules)
+		for (const s of r.sel)
+			if (/small:has\(> br\)/.test(s)) assert.match(s, /\[id\^="cbi-firewall-"\]/, s);
+});
