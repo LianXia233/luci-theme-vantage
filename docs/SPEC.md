@@ -197,7 +197,10 @@ text around it so it looks the same size.
   and DHCP and only when uncontested: an address claimed by two names, or
   a name that would land on two stations, is not used), WPS device name,
   vendor from a small built-in OUI table, or "Private Wi-Fi address" for
-  randomised MACs. Never "?". The source is shown.
+  randomised MACs. Never "?". The source is shown. DHCP, mDNS and WPS
+  names are what devices say about themselves: a device on the network can
+  give another a misleading name when that one has no better name, and the
+  source tag is the only hint. An alias always wins.
 - **Insight over decoration**: per-client experience score with a reason,
   Wi-Fi generation badges and legacy-client flags, top talkers by live
   throughput, new/recently-gone clients, busiest radio; each insight links
@@ -352,8 +355,9 @@ text around it so it looks the same size.
   `rpc.declare` in the app is covered, nothing unused is granted
   (`security-tests/test_acl_policy.js`, also run by `node --test tests/`).
   The one object glob is `hostapd.*` (hostapd's ubus objects are named per
-  interface), limited to `get_clients`/`get_status`. No group grants a uci
-  write or reads Wi-Fi keys; the only write is the plugin's `set_alias`,
+  interface), limited to `get_clients`/`get_status`. No group of the app
+  grants a uci write or reads Wi-Fi keys (LuCI's own groups can, such as
+  `luci-base-network-status`); the only write is the plugin's `set_alias`,
   whose validation `tests/plugin.test.js` checks against the view's.
 - No private addresses or MACs in committed files
   (`security-tests/check_private_addresses.js`, which also looks for the

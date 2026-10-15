@@ -296,8 +296,12 @@ function set_alias(args) {
 		op = 'add';
 	}
 
-	if (!uci.commit(CONFIG))
+	if (!uci.commit(CONFIG)) {
+		// a failed commit leaves the change in libuci's delta, where the
+		// next commit of this config would apply it: drop it
+		uci.revert(CONFIG);
 		return { ok: false, error: 'failed' };
+	}
 
 	return { ok: true, op, mac };
 }

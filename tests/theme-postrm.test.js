@@ -25,25 +25,26 @@ case "$1 $2" in
 esac
 `;
 
-const run = (...args) => {
+const run = (args, extra = {}) => {
 	const dir = mkTmp('vantage-postrm-');
 	fs.mkdirSync(path.join(dir, 'bin'));
 	fs.writeFileSync(path.join(dir, 'bin', 'uci'), UCI, { mode: 0o755 });
 	fs.writeFileSync(path.join(dir, 'postrm'), POSTRM + '\n', { mode: 0o755 });
 	const log = path.join(dir, 'uci.log');
 	const r = spawnSync('sh', [ path.join(dir, 'postrm'), ...args ], {
-		env: { PATH: path.join(dir, 'bin') + ':' + process.env.PATH, UCI_LOG: log }, encoding: 'utf8' });
+		env: Object.assign({ PATH: path.join(dir, 'bin') + ':' + process.env.PATH, UCI_LOG: log }, extra), encoding: 'utf8' });
 	assert.equal(r.status, 0, r.stderr);
 	return fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : [];
 };
 
 test('theme postrm: an opkg upgrade keeps the theme LuCI uses', () => {
-	assert.deepEqual(run('upgrade', '1.0.9-r1'), []);
+	assert.deepEqual(run([ 'upgrade', '1.0.9-r1' ]), []);
+	assert.deepEqual(run([ '1.0.8-r1' ], { PKG_UPGRADE: '1' }), []);
 });
 
 test('theme postrm: removal falls back to Bootstrap and drops the theme entry', () => {
 	const want = [ 'set luci.main.mediaurlbase=/luci-static/bootstrap', 'delete luci.themes.Vantage', 'commit luci' ];
 	/* opkg passes "remove"; apk's post-deinstall gets the old version */
-	assert.deepEqual(run('remove'), want);
-	assert.deepEqual(run('1.0.8-r1'), want);
+	assert.deepEqual(run([ 'remove' ], { PKG_UPGRADE: '0' }), want);
+	assert.deepEqual(run([ '1.0.8-r1' ]), want);
 });

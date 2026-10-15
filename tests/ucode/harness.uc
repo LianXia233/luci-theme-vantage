@@ -6,8 +6,8 @@
 // uci and ubus are the test doubles in stubs/. Arguments are checked the
 // way rpcd-mod-ucode does before a method runs (unknown name or wrong type:
 // UBUS_STATUS_INVALID_ARGUMENT). Prints one JSON array with
-// { status, reply, sections } per case; sections are the committed config
-// (unchanged when nothing was committed).
+// { status, reply, sections, reverted } per case; sections are the
+// committed config (unchanged when nothing was committed).
 'use strict';
 
 import { readfile } from 'fs';
@@ -25,7 +25,7 @@ if (type(obj) != 'object')
 for (let c in cases) {
 	let orig = json(sprintf('%J', c.sections ?? []));
 
-	global.STUB = { sections: json(sprintf('%J', orig)), seq: 0, committed: false, fail_commit: !!c.fail_commit, ubus: c.ubus ?? {} };
+	global.STUB = { sections: json(sprintf('%J', orig)), seq: 0, committed: false, reverted: false, fail_commit: !!c.fail_commit, ubus: c.ubus ?? {} };
 
 	let m = obj[c.method], status = 0, reply = null;
 
@@ -44,7 +44,7 @@ for (let c in cases) {
 			reply = m.call({ args: c.args ?? {} });
 	}
 
-	push(out, { status, reply, sections: global.STUB.committed ? global.STUB.sections : orig });
+	push(out, { status, reply, sections: global.STUB.committed ? global.STUB.sections : orig, reverted: global.STUB.reverted });
 }
 
 print(sprintf('%J', out), '\n');
