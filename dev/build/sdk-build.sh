@@ -162,6 +162,7 @@ j=$(find staging_dir -path "*/bin/jsmin" -type f 2>/dev/null | head -n 1)
 [ -z "$j" ] || cp "$j" /artifacts/tools/jsmin
 p=$(find staging_dir -path "*/bin/po2lmo" -type f 2>/dev/null | head -n 1)
 [ -z "$p" ] || cp "$p" /artifacts/tools/po2lmo
+[ ! -f staging_dir/host/bin/usign ] || cp staging_dir/host/bin/usign /artifacts/tools/usign
 exit "$rc"
 '
 
@@ -264,6 +265,7 @@ verify=(--src "$work/feed" --require-tools --luci-mk "$tools/luci.mk")
 [ ! -x "$tools/jsmin" ] || verify+=(--jsmin "$tools/jsmin")
 [ ! -x "$tools/po2lmo" ] || verify+=(--po2lmo "$tools/po2lmo")
 [ ! -f "$tools/luci.config" ] || verify+=(--luci-config "$tools/luci.config")
+[ "$sign" != usign ] || [ -x "$tools/usign" ] || die "the SDK's usign was not handed out; log: $work/build.log"
 if [ "$sign" = apk ]; then
 	mkdir "$work/keys"
 	cp -- "$tools/public-key.pem" "$work/keys/vantage.pem"
@@ -288,6 +290,7 @@ fi
 		echo "signing_public_key_sha256=$(sha256sum < "$tools/public-key.pem" | cut -d' ' -f1)"
 	elif [ "$sign" = usign ]; then
 		echo "signed_index=Packages.sig"
+		echo "signing_key_fingerprint=$("$tools/usign" -F -x "$work/out/Packages.sig")"
 	else
 		echo "signed_index=none"
 	fi
@@ -312,7 +315,7 @@ extra=$(find "$out" -mindepth 1 -maxdepth 1 ! -name 'luci-*-vantage[-_]*' ! -nam
 # re-check dist/ later without an SDK (dist/ is not committed)
 tcache="$repo/dist/.tools/$release"
 mkdir -p "$tcache"
-for t in apk jsmin po2lmo luci.config luci.mk; do
+for t in apk jsmin po2lmo usign luci.config luci.mk; do
 	[ ! -f "$tools/$t" ] || install -m "$(case $t in *.*) echo 0644 ;; *) echo 0755 ;; esac)" -- "$tools/$t" "$tcache/$t"
 done
 
