@@ -155,14 +155,14 @@ rm -f private-key.pem public-key.pem key-build
 cp feeds.conf /artifacts/tools/feeds.conf 2>/dev/null
 cp feeds/luci/luci.mk /artifacts/tools/luci.mk 2>/dev/null
 grep -E "^(# )?CONFIG_LUCI_(JSMIN|CSSTIDY|SRCDIET)[ =]" .config > /artifacts/tools/luci.config 2>/dev/null
-# host/bin/apk is a wrapper around the relocated binary; the binary itself
-# only needs the host C library
+# host/bin/apk and host/bin/usign are wrappers around the relocated
+# binaries; the binaries themselves only need the host C library
 [ ! -f staging_dir/host/bin/.apk.bin ] || cp staging_dir/host/bin/.apk.bin /artifacts/tools/apk
 j=$(find staging_dir -path "*/bin/jsmin" -type f 2>/dev/null | head -n 1)
 [ -z "$j" ] || cp "$j" /artifacts/tools/jsmin
 p=$(find staging_dir -path "*/bin/po2lmo" -type f 2>/dev/null | head -n 1)
 [ -z "$p" ] || cp "$p" /artifacts/tools/po2lmo
-[ ! -f staging_dir/host/bin/usign ] || cp staging_dir/host/bin/usign /artifacts/tools/usign
+[ ! -f staging_dir/host/bin/.usign.bin ] || cp staging_dir/host/bin/.usign.bin /artifacts/tools/usign
 exit "$rc"
 '
 
