@@ -60,7 +60,7 @@ page you see after login. Every step is explained below.
 | OpenWrt | Package manager | Status |
 |---|---|---|
 | 25.12.x | apk (`.apk`) | Supported. Built with the 25.12 SDK and tested. |
-| 24.10.x | opkg (`.ipk`) | Checked on a test router; no prebuilt packages yet. See [OpenWrt 24.10](#openwrt-2410). |
+| 24.10.x | opkg (`.ipk`) | Supported since 1.0.8: signed packages, built with the 24.10 SDK and tested on a 24.10.8 router without Wi-Fi. See [OpenWrt 24.10](#openwrt-2410). |
 | 23.05.x | opkg (`.ipk`) | Untested. `dev/build/sdk-build.sh` can build `.ipk` files for it, but the LuCI differences have not been checked and nothing is guaranteed. |
 | Snapshots | apk | Untested. |
 
@@ -70,30 +70,41 @@ Check what your router runs:
 ssh root@192.0.2.1 'cat /etc/openwrt_release'
 ```
 
-`DISTRIB_RELEASE` must start with `25.12` for the release files and the
+`DISTRIB_RELEASE` must start with `25.12` for the `.apk` files and the
+25.12 repository, or with `24.10` for the `.ipk` files and the 24.10
 repository. Both packages are architecture-independent (`noarch`), so the
 same two files install on every target: MIPS, ARM, x86 and the rest.
 
 ### OpenWrt 24.10
 
-I checked the 34 pages a 24.10.8 test router (x86, without Wi-Fi or
-add-ons) has, with Vantage 1.0.6 installed. The three differences found
-there are fixed in 1.0.7, and I verified the fixes by loading 1.0.7's
-theme files into those pages. Some differences come from 24.10's own
-LuCI: Status → Overview has no Hide button per card and shows the local
-time unformatted, and DHCP and DNS is one page. Not tested yet: a full
-1.0.7 install, the Wi-Fi pages and the dashboard's radio and client
-tiles, pages for add-ons, LEDs and mount points, upgrading from one
-Vantage version to the next with opkg, and removal.
-
-Releases and the repository carry 25.12 (apk) packages only. Build the
-`.ipk` files with the 24.10 SDK, as described under **Other SDK releases** in
-[Build from source](#build-from-source), and install them:
+Releases since 1.0.8 also carry `.ipk` packages built with the 24.10.8
+SDK, and a signed 24.10 repository. That repository uses its own usign
+key, fingerprint `297430484082d03d`. One-time setup on the router:
 
 ```sh
-scp -O luci-theme-vantage_*.ipk luci-app-vantage_*.ipk root@192.0.2.1:/tmp/
-ssh root@192.0.2.1 'opkg install /tmp/luci-theme-vantage_*.ipk /tmp/luci-app-vantage_*.ipk'
+wget -O /tmp/vantage-24.10.usign.pub https://anothadev.github.io/luci-theme-vantage/vantage-24.10.usign.pub
+usign -F -p /tmp/vantage-24.10.usign.pub
+# must print 297430484082d03d
+opkg-key add /tmp/vantage-24.10.usign.pub
+echo 'src/gz vantage https://anothadev.github.io/luci-theme-vantage/24.10' >> /etc/opkg/customfeeds.conf
+opkg update
+opkg install luci-theme-vantage luci-app-vantage
 ```
+
+Upgrade with `opkg update && opkg upgrade luci-theme-vantage
+luci-app-vantage`. opkg checks `Packages.sig` against `/etc/opkg/keys`
+and each package against the hash in the index. Remove a language package
+before the app (`opkg remove luci-i18n-vantage-zh-cn luci-app-vantage
+luci-theme-vantage`); opkg leaves the empty directories behind, which is
+harmless.
+
+Tested on a 24.10.8 router (x86, without Wi-Fi or add-ons): an upgrade
+from 1.0.6, removal, a fresh install with the Chinese translation, and the
+main pages in light and dark mode. A tampered index is refused. Some
+differences come from 24.10's own LuCI: Status → Overview has no Hide
+button per card and shows the local time unformatted, and DHCP and DNS is
+one page. Not tested yet: the Wi-Fi pages and the dashboard's radio and
+client tiles, and pages for add-ons.
 
 ### Packages on the router
 
@@ -294,7 +305,7 @@ need the log. It also leaves the SDK's `apk`, `jsmin`, `po2lmo` and
 node security-tests/verify_built_apk.js dist/25.12.4
 ```
 
-**Other SDK releases.** Only 25.12.4 is pinned. For another release, add
+**Other SDK releases.** 25.12.4 and 24.10.8 are pinned. For another release, add
 its digest and SDK tarball line to the table in `sdk-build.sh` (the comment
 above the table shows how to get and cross-check both), or pass them for
 one build:
@@ -360,8 +371,9 @@ VANTAGE_SIGN_KEY=~/.config/vantage-signing/vantage.key.pem dev/build/sdk-build.s
 ```
 
 For 23.05/24.10 (opkg) use a usign key (`usign -G -s key-build -p
-key-build.pub`); the index is then `Packages` with `Packages.sig`. That
-path is untested.
+key-build.pub`); the index is then `Packages` with `Packages.sig`, and
+`BUILDINFO` records the key's fingerprint. The 24.10 repository is signed
+this way, with the fingerprint given under [OpenWrt 24.10](#openwrt-2410).
 
 On the router, once: install the public key after checking its SHA-256
 against the published value:

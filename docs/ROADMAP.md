@@ -58,10 +58,9 @@ present) and results must be built as text nodes like everything else.
   neighbour tables, not just the local path.
 - **luci-app-statistics integration:** show collectd history in the
   dashboard when it is installed.
-- **OpenWrt 24.10 packages:** 1.0.7 fixes the differences found so far
-  (`docs/luci-contract.md` §9). Still to do: `.ipk` files in each release, a
-  signed 24.10 repository, a full install with opkg upgrades and removal,
-  and a check of the Wi-Fi pages on 24.10.
+- **OpenWrt 24.10 Wi-Fi pages:** 1.0.8 ships signed 24.10 packages,
+  tested on a router without Wi-Fi. Still to check: the Wi-Fi pages and the
+  dashboard's radio and client tiles on a 24.10 router with a radio.
 - **Firewall overview from the live ruleset:** read what fw4 actually
   loaded (`nft -j list ruleset`, through a read-only rpcd call) instead of
   predicting it from the config. It ends the "can't tell" cases and the
