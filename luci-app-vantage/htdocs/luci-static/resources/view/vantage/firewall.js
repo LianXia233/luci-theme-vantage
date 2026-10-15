@@ -121,6 +121,13 @@ function polBadge(p, risky) {
 	return E('span', { 'class': 'vt-fg-pol ' + cls }, [ p === 'ACCEPT' ? _('accept') : p === 'DROP' ? _('drop') : _('reject') ]);
 }
 
+/* a setup fwglance does not follow (its complex) */
+function complexWhy(c) {
+	if (c.why === 'subnet') return _('the covered subnets of zone %s').format(c.name);
+	if (c.why === 'shared') return _('zones %s and %s if they share a device').format(c.name, c.other);
+	return _('the set in %s').format(c.name || _('an unnamed rule'));
+}
+
 /* why fw4 skips a section (fwglance's item.bad) */
 function ignoredWhy(i) {
 	if (i.bad === 'fw4_compatible') return _('ignored: not marked as compatible with firewall4');
@@ -162,8 +169,16 @@ return view.extend({
 			E('div', { 'class': 'vt-body' }, [
 				this.renderHead(fw),
 				fw.warnings.length ? E('div', { 'class': 'vt-fg-warns', 'role': 'list', 'aria-label': _('Warnings') }, fw.warnings.map(this.renderWarning)) : '',
+				/* a setup it does not follow: what it would warn about, as
+				   cautions to check */
+				fw.unconfirmed.length ? E('div', { 'class': 'vt-fg-warns', 'role': 'list', 'aria-label': _('Settings to check') }, fw.unconfirmed.map(function(w) {
+					var c = {};
+					for (var k in w) c[k] = w[k];
+					c.level = 'warn';
+					return this.renderWarning(c);
+				}, this)) : '',
 				E('div', { 'class': 'vt-fg-grid' }, [
-					fw.routed ? this.renderOpen(fw) : '',
+					(fw.routed && !fw.complex.length) ? this.renderOpen(fw) : '',
 					this.renderZones(fw),
 					(fw.off.length || fw.ignored.length) ? this.renderOff(fw) : ''
 				])
@@ -184,7 +199,13 @@ return view.extend({
 	renderHead: function(fw) {
 		var head, sub, n = fw.open.length + fw.forwards.length;
 		var facing = fw.internet.concat(fw.outside.map(function(o) { return o.family ? _('%s (IPv%d)').format(o.name, o.family) : o.name; })).join(', ');
-		if (!fw.routed) {
+		if (fw.complex.length) {
+			head = _('This setup is beyond what this overview checks');
+			sub = _('What is open depends on how firewall4 handles %s, which this page does not follow. Check the firewall pages.').format(fw.complex.map(complexWhy).filter(function(t, i, a) { return a.indexOf(t) === i; }).join('; '));
+			if (fw.unconfirmed.length)
+				sub += ' ' + _('The settings below apply if traffic reaches them as configured.');
+		}
+		else if (!fw.routed) {
 			head = _('No internet-facing zone found');
 			sub = _('No zone masquerades, holds the uplink or is called wan, so this page cannot tell which side faces the internet. On an access point that is expected; on a router, check the zones below.');
 		}
@@ -220,10 +241,6 @@ return view.extend({
 		else if (w.code === 'outside-input') {
 			title = _('%s is in no zone and accepts every connection').format(w.family ? _('%s (IPv%d)').format(w.iface, w.family) : w.iface);
 			reason = _('The default Input policy applies there and accepts, so anything on the internet can reach the router itself. Add it to the wan zone or set Input to reject in General Settings.');
-		}
-		else if (w.code === 'zone-subnet') {
-			title = _('%s covers only some addresses').format(w.zone);
-			reason = _('Its Covered subnets setting leaves other internet traffic to the default Input policy, which accepts, so it can reach the router itself. Set Input to reject in General Settings.');
 		}
 		else if (w.code === 'uplinks-unknown') {
 			title = _('The uplinks could not be checked');

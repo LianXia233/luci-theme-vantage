@@ -27,21 +27,30 @@
    - an ipset limits who connects only when it matches the source
      address;
    - a rule without a target does nothing; a redirect whose target is not
-     snat is a DNAT, to the router itself without dest_ip or to one of its
-     addresses (masked to the prefix given), and is skipped from '*' or
-     without a source zone;
+     snat is a DNAT, to the router itself without dest_ip, else for each
+     family to the first dest_ip address of that family (masked to the
+     prefix given), and is skipped from '*' or without a source zone;
    - a script include needs fw4_compatible (default on, except for
      /etc/firewall.user).
    A zone faces the internet when it masquerades (masq or masq6), holds an
    uplink (an interface with the default route and a public IPv4 address:
    a router with public addresses routes without NAT), or by OpenWrt's
-   naming is called wan or wan6 or holds the wan or wan6 network. A zone's
-   covered subnets leave every other address to the default policies; a
-   zone matching by `subnet` alone is not followed. */
+   naming is called wan or wan6 or holds the wan or wan6 network.
+   Some setups depend on what fw4 does at run time in ways this does not
+   follow: a zone with covered subnets (it takes some source addresses,
+   on any device when it names none), several zones that can take
+   traffic on an internet device (the first in config order wins; device
+   names compare as patterns, and a device need not be in the dump), and
+   internet rules or port forwards that use a set this config does not
+   define and enable (its definition may come from a service this cannot
+   see). For those it gives no verdict (complex lists why), and the
+   warnings it would give are only settings to check (unconfirmed). */
 
 /* ports whose exposure from the internet deserves a warning: the router's
    own SSH, telnet and web admin */
 var ADMIN_PORTS = [ 22, 23, 80, 443 ];
+/* the device fw4 puts in place of an excluded '+': none has that name */
+var NEVER = '/never/';
 /* control messages and multicast membership: open nothing a scanner
    could talk to */
 var QUIET_PROTO = /^(icmp|ipv6-icmp|igmp)$/;
@@ -405,10 +414,12 @@ return baseclass.extend({
 	/* values: { section: { '.type', '.name', '.index', option: value } },
 	   dump: network.interface dump, or null when it could not be read ->
 	   { routed, internet: [ zone ], outside: [...], anyTo, defaults, zones, open,
-	     forwards, standard, off, ignored, warnings, includes, level }.
+	     forwards, standard, off, ignored, warnings, complex, includes, level }.
 	   level is err, warn, info (open, nothing risky), ok, or unknown (no
-	   internet-facing zone or uplink: this cannot tell what the internet
-	   reaches). Only what this config says: ports UPnP opens at run time
+	   internet-facing zone or uplink, or a setup this does not follow:
+	   complex says why, and unconfirmed holds the warnings that apply if
+	   traffic reaches them as configured; either way this cannot tell
+	   what the internet reaches, and there are no warnings). Only what this config says: ports UPnP opens at run time
 	   and rules in included files are not in it (includes lists those). */
 	analyse: function(values, dump) {
 		var secs = Object.keys(values || {}).map(function(k) { return values[k]; })
@@ -512,7 +523,9 @@ return baseclass.extend({
 				.map(resolve)
 				.concat((z.device || []).map(function(e) { return { dev: e.val, neg: e.invert }; }))
 				/* fw4 skips a wildcard that is not at the end */
-				.filter(function(e) { return e && !(e.dev != null && /\+./.test(e.dev)); });
+				.filter(function(e) { return e && !(e.dev != null && /\+./.test(e.dev)); })
+				/* and makes an excluded '+' a device that never matches */
+				.map(function(e) { return (e.neg && e.dev === '+') ? { dev: NEVER, neg: false } : e; });
 			zones.push({
 				name: z.name, family: z.family || null,
 				input: z.input.toUpperCase(), output: z.output.toUpperCase(), forward: z.forward.toUpperCase(),
@@ -523,9 +536,7 @@ return baseclass.extend({
 				anyDev: ents.some(function(e) { return !e.neg && e.dev === '+'; }),
 				/* covered subnets: fw4 takes only those addresses into the
 				   zone (of a family without one, none) */
-				limited: !!z.subnet && !(z.subnet.every(function(e) { return !e.invert; }) && [ 4, 6 ].every(function(f) {
-					return z.subnet.some(function(e) { return e.addrs && e.addrs.some(function(a) { return a.family === f && a.all; }); });
-				})),
+				subnet: !!z.subnet,
 				to: [], internet: false
 			});
 		});
@@ -567,14 +578,18 @@ return baseclass.extend({
 			if (ifs && !(ifs[n] && ifs[n].up)) return;
 			if (!zoned(n)) addOut(n, null);
 		});
+		/* what a zone takes: with the dump the interfaces that are up on its
+		   devices, else the networks and devices it names */
+		var reach = function(z) {
+			return ifs ? Object.keys(ifs).filter(function(n) { return ifs[n].up && covers(z, n); }).map(via)
+				: z.pos.map(function(e) { return { net: e.net != null ? e.net : null, dev: e.dev != null ? e.dev : null }; });
+		};
 		/* a zone limited to one family leaves the other family of what it
-		   takes (with the dump: the interfaces that are up on its devices)
-		   to another zone, or to the default policies */
+		   takes to another zone, or to the default policies */
 		internet.forEach(function(z) {
 			if (!z.family) return;
 			var other = z.family === 4 ? 6 : 4;
-			var what = ifs ? Object.keys(ifs).filter(function(n) { return ifs[n].up && covers(z, n); }).map(via)
-				: z.pos.map(function(e) { return { net: e.net != null ? e.net : null, dev: e.dev != null ? e.dev : null }; });
+			var what = reach(z);
 			var taken = what.length > 0 && what.every(function(t) {
 				return zones.some(function(y) { return y !== z && y.family !== z.family && takes(y, t); });
 			});
@@ -586,6 +601,80 @@ return baseclass.extend({
 		var intoInternet = function(dest) { return dest !== '*' && !!(byName[dest] && byName[dest].internet); };
 		var zoneRef = function(v) { return (v === '*' || byName[v]) ? v : null; };
 		var zoneFam = function(ref) { return (ref && ref !== '*') ? byName[ref].family : null; };
+
+		/* setups this does not follow (see the top), as { why, name, other }:
+		   it gives no verdict for them */
+		var complex = [];
+		var addComplex = function(why, name, other) {
+			if (!complex.some(function(c) { return c.why === why && ((c.name === name && c.other === (other || null)) || (c.name === other && c.other === name)); }))
+				complex.push({ why: why, name: name, other: other || null });
+		};
+		/* covered subnets on an internet zone, or on a zone that names no
+		   device and so takes those addresses on every one */
+		zones.forEach(function(z) { if (z.subnet && (z.internet || !z.pos.length)) addComplex('subnet', z.name); });
+		/* another zone that does or may take traffic on an internet zone's
+		   devices (in a family both have); without the dump a network and a
+		   device do not compare, so that may. Device names compare as
+		   patterns (a '+' at the end matches any rest): do a and b share a
+		   device, and does a take every device b does? */
+		var stem = function(d) { return /\+$/.test(d) ? d.slice(0, -1) : null; };
+		var overlaps = function(a, b) {
+			var p = stem(a), q = stem(b);
+			return p != null ? (q != null ? p.indexOf(q) === 0 || q.indexOf(p) === 0 : b.indexOf(p) === 0)
+				: q != null ? a.indexOf(q) === 0 : a === b;
+		};
+		var covering = function(a, b) {
+			var p = stem(a), q = stem(b);
+			return p != null ? (q != null ? q : b).indexOf(p) === 0 : q == null && a === b;
+		};
+		/* the devices both a and b take, as a pattern (null for none) */
+		var both = function(a, b) {
+			if (!overlaps(a, b)) return null;
+			var p = stem(a), q = stem(b);
+			return p == null ? a : q == null ? b : p.length >= q.length ? a : b;
+		};
+		/* t is a network or device an internet zone takes, less those it
+		   excludes (t.not), or { any, not }: every device but those. Does e,
+		   an entry of another zone that excludes not, take some of it (as an
+		   exclusion, all of it)? */
+		var hit3 = function(e, t, neg, not) {
+			var gone = function(d, n) {
+				return (t.not || []).concat(not || []).some(function(x) { return x.dev != null ? d != null && covering(x.dev, d) : n != null && x.net === n; });
+			};
+			if (e.dev === NEVER || t.dev === NEVER) return false;
+			if (t.any) return neg ? false : !gone(e.dev, e.net);
+			if (e.dev == null ? t.net != null : t.dev != null) {
+				if (e.dev == null) return e.net === t.net && (neg || !gone(null, e.net));
+				if (neg) return covering(e.dev, t.dev);
+				var d = both(e.dev, t.dev);
+				return d != null && !gone(d, null);
+			}
+			return ifs ? false : null;
+		};
+		var takes3 = function(z, t) {
+			var out = z.neg.map(function(e) { return hit3(e, t, true); });
+			if (out.indexOf(true) >= 0) return false;
+			var into = z.pos.length ? z.pos.map(function(e) { return hit3(e, t, false, z.neg); }) : [ z.neg.length > 0 || z.anyDev ];
+			var r = into.indexOf(true) >= 0 ? true : into.indexOf(null) >= 0 ? null : false;
+			return (r && out.indexOf(null) >= 0) ? null : r;
+		};
+		/* what an internet zone takes: its interfaces, the devices it names
+		   (one may exist outside the dump, a VPN's say), and with no device
+		   named, every one it does not exclude */
+		var points = function(z) {
+			var pts = reach(z);
+			if (ifs) pts = pts.concat(z.pos.filter(function(e) { return e.net == null; }).map(function(e) { return { net: null, dev: e.dev }; }));
+			if (!z.pos.length && (z.anyDev || z.neg.length)) pts.push({ any: true });
+			return pts.map(function(t) { t.not = z.neg; return t; });
+		};
+		internet.forEach(function(z) {
+			points(z).forEach(function(t) {
+				zones.forEach(function(y) {
+					if (y === z || (y.family && z.family && y.family !== z.family)) return;
+					if (takes3(y, t) !== false) addComplex('shared', z.name, y.name);
+				});
+			});
+		});
 
 		/* the router's own addresses: none known without the dump */
 		var own = ifs ? Object.keys(ifs).reduce(function(a, n) { return a.concat(ifs[n].ips); }, []) : null;
@@ -622,6 +711,24 @@ return baseclass.extend({
 			return !!set && set.match.some(function(m, i) {
 				return (m.type === 'ip' || m.type === 'net') && (x.dir[i] || m.dir) === 'src';
 			});
+		};
+		/* a rule or port forward from the internet that uses a set this
+		   config does not define and enable, read from the config as it
+		   is: the set may come from a service this cannot see, and whether
+		   fw4 keeps the section depends on it */
+		var setless = Object.create(null), hidden = [];
+		of('rule').concat(of('redirect')).forEach(function(s) {
+			if (bool(s.enabled) === false || s.ipset == null || s.src == null || !fromInternet(String(s.src))) return;
+			var ref = Array.isArray(s.ipset) ? null : setmatch(String(s.ipset));
+			if (!ref || !ipsets[ref.val]) {
+				addComplex('set', s.name != null ? String(s.name) : null);
+				setless[s['.name']] = true;
+			}
+		});
+		/* a warning about such a section is not even a setting to check */
+		var warnFor = function(s, w) {
+			warnings.push(w);
+			if (setless[s['.name']]) hidden.push(w);
 		};
 
 		/* what a rule or redirect matches, read leniently so that a section
@@ -715,11 +822,6 @@ return baseclass.extend({
 		outside.forEach(function(o) {
 			if (defs.input === 'accept') warnings.push({ level: 'err', code: 'outside-input', iface: o.name, family: o.family });
 		});
-		/* the addresses an internet zone's subnets leave out meet the
-		   default policy too */
-		internet.forEach(function(z) {
-			if (z.limited && defs.input === 'accept') warnings.push({ level: 'err', code: 'zone-subnet', zone: z.name });
-		});
 		/* without the dump an uplink outside every zone cannot be seen */
 		if (!ifs && routed && defs.input === 'accept' && !outside.length) warnings.push({ level: 'warn', code: 'uplinks-unknown' });
 
@@ -742,12 +844,12 @@ return baseclass.extend({
 				   as a forwarding */
 				if (!intoInternet(r.dest) && item.from.anywhere && !r.dest_ip &&
 					(item.proto[0] === 'all' || (item.proto.some(function(p) { return p === 'tcp' || p === 'udp'; }) && !(item.ports && item.ports.pos.length))))
-					warnings.push({ level: 'err', code: 'rule-into', name: item.name, dest: r.dest });
+					warnFor(s, { level: 'err', code: 'rule-into', name: item.name, dest: r.dest });
 				return;
 			}
 			open.push(item);
 			if (admin(item, item.ports))
-				warnings.push({ level: 'warn', code: 'admin-open', kind: 'rule', name: item.name, ports: item.portText });
+				warnFor(s, { level: 'warn', code: 'admin-open', kind: 'rule', name: item.name, ports: item.portText });
 		});
 
 		of('redirect').forEach(function(s) {
@@ -772,20 +874,23 @@ return baseclass.extend({
 			var l4 = item.proto.some(function(p) { return p === 'tcp' || p === 'udp'; });
 			var inner = !l4 ? null : r.dest_port ? portRanges([ r.dest_port ]) : item.ports;
 			item.hostPort = inner ? rangeText(inner.pos) : '';
-			/* local: to the router itself (no dest_ip, or one of its own
-			   addresses however it is spelled); null when that cannot be
-			   told without the dump */
-			item.local = !r.dest_ip ? true : (!own || !r.dest_ip.addrs) ? null : r.dest_ip.addrs.some(isOwn);
+			/* local: to the router itself (no dest_ip, or in a family it
+			   applies to the first dest_ip address of that family, which is
+			   the one fw4 DNATs to, is one of the router's own however it is
+			   spelled); null when that cannot be told without the dump */
+			var first = function(f) { return r.dest_ip.addrs.filter(function(a) { return a.family === f; })[0]; };
+			item.local = !r.dest_ip ? true : (!own || !r.dest_ip.addrs) ? null
+				: item.families.some(function(f) { var a = first(f); return !a || isOwn(a); });
 			if (item.local === null) {
 				fwd.push(item);
 				if (admin(item, inner))
-					warnings.push({ level: 'warn', code: 'admin-unsure', kind: 'redirect', name: item.name, host: item.host, ports: item.portText });
+					warnFor(s, { level: 'warn', code: 'admin-unsure', kind: 'redirect', name: item.name, host: item.host, ports: item.portText });
 				return;
 			}
 			if (!item.local) { fwd.push(item); return; }
 			open.push(item);
 			if (admin(item, inner))
-				warnings.push({ level: 'warn', code: 'admin-open', kind: 'redirect', name: item.name, ports: item.portText });
+				warnFor(s, { level: 'warn', code: 'admin-open', kind: 'redirect', name: item.name, ports: item.portText });
 		});
 
 		/* custom rules: files the firewall config names, whose rules this
@@ -808,14 +913,17 @@ return baseclass.extend({
 
 		/* errors first */
 		warnings = warnings.filter(function(w) { return w.level === 'err'; }).concat(warnings.filter(function(w) { return w.level !== 'err'; }));
-		var level = !routed ? 'unknown'
+		var level = (complex.length || !routed) ? 'unknown'
 			: warnings.some(function(w) { return w.level === 'err'; }) ? 'err'
 			: warnings.length ? 'warn' : (open.length || fwd.length) ? 'info' : 'ok';
 		return {
 			routed: routed, internet: internet.map(function(z) { return z.name; }), outside: outside, anyTo: anyTo,
 			defaults: { input: defs.input.toUpperCase(), output: defs.output.toUpperCase(), forward: defs.forward.toUpperCase() },
 			zones: zones, open: open, forwards: fwd, standard: standard, off: off, ignored: ignored,
-			warnings: routed ? warnings : [], includes: includes, level: level, interfaces: !!ifs
+			warnings: (routed && !complex.length) ? warnings : [], complex: complex,
+			/* what a rule with a set it cannot find opens is unknown too */
+			unconfirmed: (routed && complex.length) ? warnings.filter(function(w) { return hidden.indexOf(w) < 0; }) : [],
+			includes: includes, level: level, interfaces: !!ifs
 		};
 	}
 });

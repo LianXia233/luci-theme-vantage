@@ -162,7 +162,7 @@ test('fwglance: wan faces the internet without NAT too (public addresses, routed
 	const noNat = [
 		[ 'defaults', { input: 'REJECT', output: 'ACCEPT', forward: 'REJECT' } ],
 		[ 'zone', { name: 'lan', network: 'lan', input: 'ACCEPT', forward: 'ACCEPT' } ],
-		[ 'zone', { name: 'wan', network: [ 'wan', 'wan6' ], input: 'ACCEPT' } ],
+		[ 'zone', { name: 'wan', network: [ 'wan' ], input: 'ACCEPT' } ],
 		[ 'zone', { name: 'upstream', network: [ 'wan6' ], input: 'REJECT' } ],
 		[ 'zone', { name: 'dmz', network: 'dmz', input: 'REJECT' } ]
 	];
@@ -639,6 +639,11 @@ test('S4: device wildcards and exclusions still decide (CX S4)', () => {
 const withSet = (set, rule) => fw.analyse(cfg(BASE.concat(set ? [ [ 'ipset', Object.assign({ name: 'mine', family: 'ipv4', entry: [ '203.0.113.5' ] }, set) ] ] : [],
 	[ [ 'rule', Object.assign({ name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' }, rule) ] ])));
 
+const noVerdict = (r, why) => {
+	assert.deepEqual(r.warnings, [], why);
+	assert.equal(r.level, 'unknown', why);
+};
+
 test('S5: a set limits who connects only when it matches the source address (CX S5)', () => {
 	/* fw4: tcp dport 22 ip daddr @mine accept: anyone may connect */
 	const dst = withSet({ match: 'dest_ip' });
@@ -649,16 +654,12 @@ test('S5: a set limits who connects only when it matches the source address (CX 
 		[ { match: 'src_ip' }, { ipset: 'mine dst' }, 'a source set matched on the destination' ],
 		[ { match: 'src_ip' }, { ipset: '!mine' }, 'a negated set' ],
 		[ { match: 'src_mac' }, {}, 'a MAC set: the upstream router\'s' ],
-		[ { match: 'dest_port' }, {}, 'a port set' ],
-		[ null, {}, 'a set this config does not define' ],
-		[ { match: 'src_ip', enabled: '0' }, {}, 'a set that is switched off' ],
-		[ { match: 'src_ip', family: 'any' }, {}, 'an address set fw4 refuses' ],
-		[ { match: 'src_ip', maxelem: 'lots' }, {}, 'a set with a value fw4 refuses' ],
-		[ {}, {}, 'a set without match types' ]
+		[ { match: 'dest_port' }, {}, 'a port set' ]
 	]) {
 		const r = withSet(set, rule);
 		assert.equal(r.open[0].from.anywhere, true, why);
 		assert.deepEqual(codes(r), [ 'admin-open:SSH' ], why);
+		assert.deepEqual(r.complex, [], why);
 	}
 	for (const [ set, rule, why ] of [
 		[ { match: 'src_ip' }, {}, 'a source address set' ],
@@ -669,9 +670,25 @@ test('S5: a set limits who connects only when it matches the source address (CX 
 		const r = withSet(set, rule);
 		assert.deepEqual(r.open[0].from, { anywhere: false, only: [ '@mine' ], except: [] }, why);
 		assert.deepEqual(r.warnings, [], why);
+		assert.deepEqual(r.complex, [], why);
 	}
 	/* the set's family is the rule's, as fw4 infers it */
 	assert.equal(withSet({ match: 'src_ip', family: 'ipv6', entry: [ '2001:db8::5' ] }).open[0].family, 6);
+});
+
+test('G2: a set this config does not define and enable may come from a service: no verdict, nothing unconfirmed about it (CX D3, F2, G2)', () => {
+	for (const [ set, why ] of [
+		[ null, 'a set this config does not define' ],
+		[ { match: 'src_ip', enabled: '0' }, 'a set that is switched off' ],
+		[ { match: 'src_ip', family: 'any' }, 'an address set fw4 refuses' ],
+		[ { match: 'src_ip', maxelem: 'lots' }, 'a set with a value fw4 refuses' ],
+		[ {}, 'a set without match types' ]
+	]) {
+		const r = withSet(set);
+		assert.deepEqual(r.complex, [ { why: 'set', name: 'SSH', other: null } ], why);
+		noVerdict(r, why);
+		assert.deepEqual(r.unconfirmed, [], why + ': what it opens is unknown');
+	}
 });
 
 const ROUTER = [ Object.assign({}, LAN_DEV, { 'ipv6-address': [ { address: '2001:db8::1', mask: 64 } ],
@@ -736,22 +753,142 @@ test('N1: a zone option fw4 refuses skips the zone; its networks meet the accept
 	assert.deepEqual(fw.analyse(cfg(withDefaults(STOCK, { synflood_rate: '50/s', any_reject_code: 'admin' }))).warnings, []);
 });
 
-test('N1: an internet zone\'s covered subnets leave every other address to the default policy', () => {
+test('N1: an internet zone with covered subnets gets no verdict (CX N1, D1)', () => {
 	const dump = [ LAN_DEV, WAN_DEV ];
-	/* fw4: meta nfproto ipv4 iifname "eth1" ip saddr 203.0.113.0/24 jump input_wan; the rest meets policy accept */
-	for (const subnet of [ '203.0.113.0/24', 'wan', '!203.0.113.0/24', [ '0.0.0.0/0' ] ]) {
-		const r = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet }))), dump);
-		assert.deepEqual(codes(r), [ 'zone-subnet:wan>' ], JSON.stringify(subnet));
-		assert.equal(r.level, 'err');
+	/* fw4: meta nfproto ipv4 iifname "eth1" ip saddr 203.0.113.0/24 jump input_wan; where the rest goes
+	   depends on the other zones and the order: this page does not follow it */
+	for (const subnet of [ '203.0.113.0/24', 'wan', '!203.0.113.0/24', [ '0.0.0.0/0' ], [ '0.0.0.0/0', '::/0' ] ]) {
+		for (const list of [ acceptIn(zoneOpts(MASQ, 'wan', { subnet })), zoneOpts(MASQ, 'wan', { subnet }) ]) {
+			const r = fw.analyse(cfg(list), dump);
+			assert.deepEqual(r.complex, [ { why: 'subnet', name: 'wan', other: null } ], JSON.stringify(subnet));
+			noVerdict(r, JSON.stringify(subnet));
+		}
 	}
-	assert.deepEqual(fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet: [ '0.0.0.0/0', '::/0' ] }))), dump).warnings, [], 'both whole families');
-	assert.deepEqual(fw.analyse(cfg(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' })), dump).warnings, [], 'a rejecting default closes the rest');
 	/* a network name cannot be checked without the dump: the zone stays,
 	   and the accepting default with unknown interfaces is a caution */
 	const blind = fw.analyse(cfg(acceptIn(zoneOpts(MASQ, 'wan', { masq_src: 'office' }))));
 	assert.deepEqual(blind.ignored, []);
 	assert.deepEqual(codes(blind), [ 'uplinks-unknown:' ]);
 	assert.notEqual(blind.level, 'ok');
+});
+
+/* ------------------------------------- 1.0.7 delta checks (Codex) */
+
+const WAN6_DEV = { interface: 'wan6', up: true, device: 'eth1', l3_device: 'eth1', 'ipv6-address': [ { address: '2001:db8:5::2', mask: 64 } ] };
+const zones = (defaults, ...list) => [ [ 'defaults', Object.assign({ output: 'ACCEPT', forward: 'REJECT' }, defaults) ] ].concat(list.map(z => [ 'zone', z ]));
+const LANZ = { name: 'lan', network: 'lan', input: 'ACCEPT', output: 'ACCEPT', forward: 'ACCEPT' };
+
+test('D2: a redirect goes to the first dest_ip address of its family, as fw4 DNATs it (CX D2)', () => {
+	for (const [ extra, why ] of [
+		[ { 'ipv4-address': [ { address: '192.0.2.1', mask: 24 }, { address: '192.0.2.2', mask: 32 } ] }, 'a later own address' ],
+		[ { 'ipv6-address': [ { address: '2001:db8::1', mask: 128 } ] }, 'an own address of the other family' ]
+	]) {
+		const r = wanRedirect({ name: 'P', src_dport: '2222', dest_ip: 'lan', dest_port: '22', family: 'ipv4' }, [ Object.assign({}, LAN_DEV, extra), WAN_DEV ]);
+		assert.deepEqual(r.forwards.map(i => [ i.name, i.local ]), [ [ 'P', false ] ], why);
+		assert.deepEqual(r.warnings, [], why);
+	}
+	const own = Object.assign({}, LAN_DEV, { 'ipv4-address': [ { address: '192.0.2.1', mask: 32 }, { address: '192.0.2.2', mask: 24 } ] });
+	assert.deepEqual(codes(wanRedirect({ name: 'P', src_dport: '2222', dest_ip: 'lan', dest_port: '22' }, [ own, WAN_DEV ])), [ 'admin-open:P' ]);
+	/* both families: local when either one's target is the router */
+	const v6own = Object.assign({}, LAN_DEV, { 'ipv6-address': [ { address: '2001:db8::1', mask: 128 } ] });
+	assert.equal(wanRedirect({ src_dport: '2222', dest_ip: 'lan', dest_port: '22' }, [ v6own, WAN_DEV ]).open[0].local, true);
+});
+
+test('no verdict where this does not follow fw4: shared internet devices, covered subnets, sets (CX G1, G2, G3, D1, F1–F3)', () => {
+	const dump = [ LAN_DEV, WAN_DEV, WAN6_DEV ];
+	const why = r => r.complex.map(c => c.why + ':' + c.name + (c.other ? '/' + c.other : ''));
+	for (const [ name, list, d, expected ] of [
+		/* G3: a rejecting zone first takes all of eth1; wan's accept never applies */
+		[ 'shadowing guard', zones({ input: 'REJECT' }, LANZ, { name: 'guard', device: 'eth1', input: 'REJECT' }, { name: 'wan', network: 'wan', input: 'ACCEPT' }), dump, [ 'shared:wan/guard' ] ],
+		/* F1: an accepting catch-all takes what wan's subnet leaves */
+		[ 'accepting catch-all', zones({ input: 'ACCEPT' }, LANZ, { name: 'wan', network: 'wan', subnet: '203.0.113.0/24', input: 'REJECT' }, { name: 'rest', device: 'eth1', input: 'ACCEPT' }), dump,
+			[ 'subnet:wan', 'shared:wan/rest' ] ],
+		/* G1: without the dump a device may be wan's */
+		[ 'no dump, device zone', zones({ input: 'REJECT' }, LANZ, { name: 'rest', device: 'eth1', input: 'ACCEPT' }, { name: 'wan', network: 'wan', input: 'REJECT' }), null, [ 'shared:wan/rest' ] ],
+		/* F3: a wildcard device may take wan's network */
+		[ 'no dump, wildcard', zones({ input: 'ACCEPT' }, { name: 'wan', network: 'wan', input: 'REJECT' }, { name: 'rest', device: 'eth+', input: 'REJECT' }), null, [ 'shared:wan/rest' ] ],
+		/* a zone with covered subnets and no device takes them on every device */
+		[ 'subnet-only zone', zones({ input: 'REJECT' }, { name: 'sources', subnet: '203.0.113.0/24', input: 'ACCEPT' }, LANZ, { name: 'wan', network: 'wan', input: 'REJECT', masq: '1' }), dump,
+			[ 'subnet:sources' ] ],
+		/* a catch-all takes every device it does not exclude */
+		[ 'catch-all by exclusion', zones({ input: 'REJECT' }, LANZ, { name: 'wan', network: 'wan', input: 'REJECT' }, { name: 'all', network: '!lan', input: 'ACCEPT' }), dump, [ 'shared:wan/all' ] ],
+		/* delta4 F1: device names compare as patterns, both ways */
+		[ 'no dump, wildcard wan', zones({ input: 'REJECT' }, { name: 'rest', device: 'eth1', input: 'ACCEPT' }, { name: 'wan', device: 'eth+', input: 'REJECT' }), null, [ 'shared:wan/rest' ] ],
+		/* a wan naming no device takes every one it does not exclude */
+		[ 'no dump, any-device wan', zones({ input: 'REJECT' }, { name: 'rest', device: 'eth1', input: 'ACCEPT' }, { name: 'wan', device: '+', input: 'REJECT' }), null, [ 'shared:wan/rest' ] ],
+		[ 'no dump, wan by exclusion', zones({ input: 'REJECT' }, { name: 'rest', device: 'eth1', input: 'ACCEPT' }, { name: 'wan', device: '!lo', input: 'REJECT' }), null, [ 'shared:wan/rest' ] ],
+		/* delta5 F1: fw4 makes an excluded '+' a device that never matches, not an exclusion of all */
+		[ 'excluded + beside a wildcard', zones({ input: 'REJECT' }, { name: 'lan', device: 'eth1', input: 'ACCEPT' }, { name: 'wan', device: [ 'eth+', '!+' ], input: 'REJECT' }), null, [ 'shared:wan/lan' ] ],
+		[ 'excluded + beside a device', zones({ input: 'REJECT' }, { name: 'lan', device: 'eth1', input: 'ACCEPT' }, { name: 'wan', device: [ 'eth1', '!+' ], input: 'REJECT' }), dump, [ 'shared:wan/lan' ] ],
+		[ 'excluded + on the other zone', zones({ input: 'REJECT' }, { name: 'lan', device: [ '!+', 'eth+' ], input: 'ACCEPT' }, { name: 'wan', device: '!eth0', input: 'REJECT' }), dump, [ 'shared:wan/lan' ] ],
+		/* a device the dump does not list (a VPN's) still exists */
+		[ 'unlisted VPN device', zones({ input: 'REJECT' }, LANZ, { name: 'wan', network: 'wan', input: 'REJECT', masq: '1' },
+			{ name: 'rest', device: 'tun0', input: 'ACCEPT' }, { name: 'vpn', device: 'tun+', input: 'REJECT', masq: '1' }), dump, [ 'shared:vpn/rest' ] ],
+		/* G2/F2: a set's definition may come from a service, a stale section notwithstanding */
+		[ 'set, stale section', BASE.concat([ [ 'ipset', { name: 'mine', match: 'dest_ip', enabled: '0' } ],
+			[ 'rule', { name: 'Probe', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' } ] ]), dump, [ 'set:Probe' ] ],
+		[ 'set on a port forward', BASE.concat([ [ 'redirect', { name: 'P', src: 'wan', proto: 'tcp', src_dport: '2222', dest_port: '22', ipset: 'nosuch' } ] ]), dump, [ 'set:P' ] ],
+		[ 'set on a rule fw4 refuses', BASE.concat([ [ 'rule', { name: 'Odd', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'x', target: 'ACCEPT', enabled: 'Yes' } ] ]), dump, [ 'set:Odd' ] ]
+	]) {
+		const r = fw.analyse(cfg(list), d);
+		assert.deepEqual(why(r), expected, name);
+		noVerdict(r, name);
+	}
+	/* what it would warn about stays visible, unconfirmed */
+	const guard = fw.analyse(cfg(zones({ input: 'REJECT' }, LANZ, { name: 'guard', device: 'eth1', input: 'REJECT' }, { name: 'wan', network: 'wan', input: 'ACCEPT' })), dump);
+	assert.deepEqual(codes({ warnings: guard.unconfirmed }), [ 'input-accept:wan>' ]);
+	const stale = fw.analyse(cfg(BASE.concat([ [ 'ipset', { name: 'mine', match: 'dest_ip', enabled: '0' } ],
+		[ 'rule', { name: 'Probe', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' } ],
+		[ 'rule', { name: 'Web', src: 'wan', proto: 'tcp', dest_port: '443', target: 'ACCEPT' } ] ])), dump);
+	assert.deepEqual(codes({ warnings: stale.unconfirmed }), [ 'admin-open:Web' ], 'not the rule whose set is unknown');
+	/* by section, not by name: another rule of the same name, or another unnamed one, stays */
+	for (const name of [ 'Probe', undefined ]) {
+		const twin = fw.analyse(cfg(BASE.concat([ [ 'rule', { name, src: 'wan', proto: 'tcp', dest_port: '443', ipset: 'nosuch', target: 'ACCEPT' } ],
+			[ 'rule', { name, src: 'wan', proto: 'tcp', dest_port: '22', target: 'ACCEPT' } ] ])), dump);
+		assert.deepEqual(twin.unconfirmed.map(w => w.code + ':' + w.ports), [ 'admin-open:22' ], String(name));
+	}
+	assert.deepEqual(fw.analyse(cfg(STOCK), dump).unconfirmed, []);
+});
+
+test('ordinary setups keep their verdict', () => {
+	const dump = [ LAN_DEV, WAN_DEV, WAN6_DEV ];
+	const plain = (list, d, why) => { const r = fw.analyse(cfg(list), d); assert.deepEqual(r.complex, [], why); return r; };
+	assert.equal(plain(STOCK, dump, 'stock').level, 'ok');
+	assert.equal(plain(STOCK, null, 'stock, no dump').level, 'ok');
+	/* one zone per family on the wan device */
+	plain(zones({ input: 'ACCEPT' }, LANZ, { name: 'wan', network: 'wan', family: 'ipv4', input: 'REJECT', masq: '1' },
+		{ name: 'wan6', network: 'wan6', family: 'ipv6', input: 'REJECT' }), dump, 'split families');
+	/* a second uplink and a VLAN on their own devices; a VPN zone by device */
+	const multi = [ LAN_DEV, WAN_DEV, Object.assign(iface('wanb', '203.0.113.2'), { device: 'eth2', l3_device: 'eth2' }),
+		Object.assign(iface('iot', '198.51.100.1'), { device: 'br-lan.20', l3_device: 'br-lan.20' }) ];
+	assert.equal(plain(zones({ input: 'REJECT' }, LANZ, { name: 'wan', network: [ 'wan', 'wanb' ], input: 'REJECT', masq: '1' },
+		{ name: 'iot', network: 'iot', input: 'REJECT' }, { name: 'vpn', device: 'wg0', input: 'REJECT' }), multi, 'multi-WAN, VLAN, VPN').level, 'ok');
+	/* covered subnets on a zone of its own device: not the internet's business */
+	plain(zones({ input: 'REJECT' }, Object.assign({ subnet: '192.0.2.0/25' }, LANZ), { name: 'wan', network: 'wan', input: 'REJECT', masq: '1' }), dump, 'lan subnet');
+	/* a set this config defines, on an internet rule */
+	assert.equal(plain(BASE.concat([ [ 'ipset', { name: 'mine', match: 'src_ip', family: 'ipv4', entry: [ '203.0.113.5' ] } ],
+		[ 'rule', { name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' } ] ]), dump, 'defined set').level, 'info');
+	/* a set on a rule from inside */
+	plain(BASE.concat([ [ 'rule', { name: 'L', src: 'lan', proto: 'tcp', dest_port: '22', ipset: 'x', target: 'ACCEPT' } ] ]), dump, 'lan set');
+	/* delta4b F1: an internet zone's exclusions keep it apart from the zone they leave out */
+	const byDev = zones({ input: 'REJECT' }, { name: 'lan', device: 'eth0', input: 'ACCEPT' }, { name: 'wan', device: [ 'eth+', '!eth0' ], input: 'REJECT', masq: '1' });
+	plain(byDev, dump, 'wan excludes lan');
+	plain(byDev, null, 'wan excludes lan, no dump');
+	plain(zones({ input: 'REJECT' }, { name: 'lan', device: 'eth0', input: 'ACCEPT' }, { name: 'wan', device: [ 'eth+', '!eth0+' ], input: 'REJECT', masq: '1' }), null, 'excluded prefix');
+	plain(zones({ input: 'REJECT' }, { name: 'lan', device: 'eth0', input: 'ACCEPT' }, { name: 'wan', device: [ 'eth0', 'eth1', '!eth0' ], input: 'REJECT', masq: '1' }), null, 'listed and excluded');
+	const vpn = fw.analyse(cfg(zones({ input: 'REJECT' }, LANZ, { name: 'wan', network: 'wan', input: 'REJECT', masq: '1' },
+		{ name: 'mgmt', device: 'tun0', input: 'ACCEPT' }, { name: 'vpn', device: [ 'tun+', '!tun0' ], input: 'REJECT', masq: '1' })), dump);
+	assert.deepEqual(vpn.complex, [], 'vpn excludes another tunnel');
+	assert.equal(vpn.level, 'ok');
+	/* an excluded '+' alone, or with '+', takes no device */
+	plain(zones({ input: 'REJECT' }, { name: 'lan', device: 'eth1', input: 'ACCEPT' }, { name: 'wan', device: '!+', input: 'REJECT', masq: '1' }), null, 'wan takes nothing');
+	plain(zones({ input: 'REJECT' }, { name: 'lan', device: 'eth1', input: 'ACCEPT' }, { name: 'wan', device: [ '+', '!+' ], input: 'REJECT', masq: '1' }), dump, 'wan + and !+');
+	/* what the exclusion leaves can still be shared */
+	assert.deepEqual(fw.analyse(cfg(zones({ input: 'REJECT' }, { name: 'rest', device: 'eth+', input: 'ACCEPT' },
+		{ name: 'wan', device: [ 'eth+', '!eth0' ], input: 'REJECT', masq: '1' })), dump).complex, [ { why: 'shared', name: 'wan', other: 'rest' } ]);
+	/* an access point stays unknown for its own reason */
+	const ap = plain([ [ 'zone', { name: 'lan', network: 'lan' } ] ], [ LAN_DEV ], 'access point');
+	assert.equal(ap.routed, false);
 });
 
 /* ------------------------------------------------------- the overview */
@@ -801,11 +938,12 @@ function text(n) {
 	return /vt-fg-row-name|vt-chip-title/.test(n.attrs && n.attrs.class) ? t + '\n' : t;
 }
 
-async function page(values, dump) {
+async function pageNode(values, dump) {
 	const v = loadView({ 'uci get': () => Promise.resolve({ values }),
 		'network.interface dump': () => dump == null ? Promise.reject(new Error('no dump')) : Promise.resolve({ interface: dump }) });
-	return text(v.render(await v.load()));
+	return v.render(await v.load());
 }
+async function page(values, dump) { return text(await pageNode(values, dump)); }
 
 test('overview: Codex\'s reproductions no longer read "Nothing is open"', async () => {
 	const cases = {
@@ -1027,7 +1165,16 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S5, S6, N1)', { skip: N
 		[ 'N1 log_limit unit' ].concat(skipped({ log_limit: '10/fortnight' })),
 		[ 'N1 extra as a list' ].concat(skipped({ extra: [ 'a', 'b' ] })),
 		[ 'N1 custom_chains Yes' ].concat(skipped({ custom_chains: 'Yes' })),
-		[ 'N1 covered subnet', acceptIn(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' })), [ LAN, WAN ], 'zone-subnet',
+		[ 'G3 shadowed wan', zones({ input: 'REJECT' }, LANZ, { name: 'guard', device: 'eth1', input: 'REJECT' }, { name: 'wan', network: 'wan', input: 'ACCEPT' }), [ LAN, WAN ], 'complex',
+			rs => /iifname "eth1" jump input_guard.*\n(.*\n)*.*iifname "eth1" jump input_wan/.test(chain(rs, 'input')) && /jump reject_from_guard/.test(chain(rs, 'input_guard')) ],
+		[ 'subnet-only zone', zones({ input: 'REJECT' }, { name: 'sources', subnet: '203.0.113.0/24', input: 'ACCEPT' }, LANZ, { name: 'wan', network: 'wan', input: 'REJECT', masq: '1' }), [ LAN, WAN ], 'complex',
+			rs => /meta nfproto ipv4 ip saddr 203\.0\.113\.0\/24 jump input_sources/.test(chain(rs, 'input')) ],
+		[ 'wan excludes lan', zones({ input: 'REJECT' }, { name: 'lan', device: 'eth0', input: 'ACCEPT' }, { name: 'wan', device: [ 'eth+', '!eth0' ], input: 'REJECT', masq: '1' }), [ LAN, WAN ], null,
+			rs => /iifname "eth0" jump input_lan/.test(chain(rs, 'input')) && /iifname "eth\*" iifname != "eth0" jump input_wan/.test(chain(rs, 'input')) ],
+		[ 'unlisted VPN device', zones({ input: 'REJECT' }, LANZ, { name: 'wan', network: 'wan', input: 'REJECT', masq: '1' },
+			{ name: 'rest', device: 'tun0', input: 'ACCEPT' }, { name: 'vpn', device: 'tun+', input: 'REJECT', masq: '1' }), [ LAN, WAN ], 'complex',
+			rs => /iifname "tun0" jump input_rest.*\n(.*\n)*.*iifname "tun\*" jump input_vpn/.test(chain(rs, 'input')) && /jump accept_from_rest/.test(chain(rs, 'input_rest')) ],
+		[ 'N1 covered subnet', acceptIn(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' })), [ LAN, WAN ], 'complex',
 			rs => /policy accept;/.test(chain(rs, 'input')) && /meta nfproto ipv4 iifname "eth1" ip saddr 203\.0\.113\.0\/24 jump input_wan/.test(chain(rs, 'input')) ]
 	];
 	for (const [ name, list, dump, code, check ] of cases) {
@@ -1035,8 +1182,10 @@ test('fw4 itself: the 1.0.7 final check\'s cases (CX S4, S5, S6, N1)', { skip: N
 		const rs = fw4Ruleset(values, dump);
 		assert.ok(check(rs), name + ':\n' + rs.slice(0, 4000));
 		const r = fw.analyse(values, dump);
-		if (code) assert.ok(r.warnings.some(w => w.code === code), name + ': model ' + codes(r));
+		if (code === 'complex') assert.ok(r.complex.length && !r.warnings.length, name + ': model ' + JSON.stringify(r.complex));
+		else if (code) assert.ok(r.warnings.some(w => w.code === code), name + ': model ' + codes(r));
 		else assert.deepEqual(r.warnings, [], name + ': model ' + codes(r));
+		if (code !== 'complex') assert.deepEqual(r.complex, [], name);
 	}
 });
 
@@ -1051,6 +1200,11 @@ test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S5, 
 	assert.match(dst, /Router admin open: SSH/);
 	assert.match(dst, /SSH\nIPv4 TCP 22 · from anywhere/);
 	assert.doesNotMatch(dst, /@mine/);
+	const unknownSet = MASQ.concat([ [ 'rule', { name: 'SSH', src: 'wan', proto: 'tcp', dest_port: '22', ipset: 'mine', target: 'ACCEPT' } ] ]);
+	const unk = await page(cfg(unknownSet), [ LAN_DEV, WAN_DEV ]);
+	assert.match(unk, /This setup is beyond what this overview checks\nWhat is open depends on how firewall4 handles the set in SSH, which this page does not follow\. Check the firewall pages\./);
+	assert.doesNotMatch(unk, /Router admin open|Nothing is open|Open from the internet|settings below/);
+	assert.match(JSON.stringify(await pageNode(cfg(unknownSet), [ LAN_DEV, WAN_DEV ])), /vt-orb-unknown/);
 	const masked = cfg(MASQ.concat([ [ 'redirect', { name: 'Router masked', src: 'wan', proto: 'tcp', src_dport: '2222', dest_ip: '192.0.2.1/32', dest_port: '22' } ] ]));
 	const local = await page(masked, [ LAN_DEV, WAN_DEV ]);
 	assert.match(local, /On this router\nRouter masked\nIPv4 TCP 2222 · from anywhere\nrouter port 22/);
@@ -1065,8 +1219,17 @@ test('overview: the 1.0.7 final check\'s cases read as fw4 has them (CX S4, S5, 
 	assert.match(log, /Zone wan\nzone · ignored: option log has a value firewall4 refuses/);
 	assert.doesNotMatch(log, /Nothing is open/);
 	const sub = await page(cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24' }))), [ LAN_DEV, WAN_DEV ]);
-	assert.match(sub, /wan covers only some addresses/);
-	assert.doesNotMatch(sub, /Nothing is open/);
+	assert.match(sub, /This setup is beyond what this overview checks\nWhat is open depends on how firewall4 handles the covered subnets of zone wan, which this page does not follow\./);
+	assert.doesNotMatch(sub, /Nothing is open|Open from the internet|need attention/);
+	assert.match(sub, /Zones\nGeneral Settings/);
+	assert.doesNotMatch(sub, /settings below/, 'nothing to check');
+	/* the warning it would give, as a setting to check */
+	const open = cfg(acceptIn(zoneOpts(MASQ, 'wan', { subnet: '203.0.113.0/24', input: 'ACCEPT' })));
+	const subOpen = await page(open, [ LAN_DEV, WAN_DEV ]);
+	assert.match(subOpen, /which this page does not follow\. Check the firewall pages\. The settings below apply if traffic reaches them as configured\.\n+wan accepts every connection\n/);
+	const node = JSON.stringify(await pageNode(open, [ LAN_DEV, WAN_DEV ]));
+	assert.match(node, /"aria-label":"Settings to check"/);
+	assert.doesNotMatch(node, /vt-chip-err/);
 });
 
 /* --------------------------- M1: ubus errors through LuCI's own rpc.js
