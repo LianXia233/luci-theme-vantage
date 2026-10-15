@@ -10,8 +10,10 @@ name: CI
 # repositories published on GitHub Pages let users install and upgrade
 # without --allow-untrusted (apk) or with opkg's signature check on.
 #
-# Every action is pinned to a full commit SHA. Secrets reach only the tag
-# build's signing step; write tokens only the release and Pages jobs.
+# Every action is pinned to a full commit SHA. The signing keys are secrets
+# of the release-signing environment, which only v* tags may use and whose
+# runs the maintainer approves; they reach only the tag build's signing
+# step. Write tokens go only to the release and Pages jobs.
 
 on:
   push:
@@ -98,6 +100,9 @@ jobs:
     needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    # a tag push builds in the release-signing environment (approved per
+    # run, v* tags only); everything else builds unsigned outside it
+    environment: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && 'release-signing' || '' }}
     strategy:
       fail-fast: false
       matrix:

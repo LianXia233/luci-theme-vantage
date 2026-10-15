@@ -378,6 +378,10 @@ key-build.pub`); the index is then `Packages` with `Packages.sig`, and
 `BUILDINFO` records the key's fingerprint. The 24.10 repository is signed
 this way, with the fingerprint given under [OpenWrt 24.10](#openwrt-2410).
 
+In CI, both private keys are secrets of the GitHub environment
+`release-signing`: only a pushed `v*` tag can use it, and I approve each
+such run before the build sees the keys.
+
 On the router, once: install the public key after checking its SHA-256
 against the published value:
 
