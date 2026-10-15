@@ -104,8 +104,8 @@ without the app.
 ## Install
 
 For OpenWrt 25.12 (apk). Both packages are architecture-independent, so
-the same files install on any target. For 24.10, see
-[OpenWrt 24.10](docs/INSTALL.md#openwrt-2410).
+the same files install on any target. For 24.10 (opkg, signed `.ipk`
+repository), see [OpenWrt 24.10](docs/INSTALL.md#openwrt-2410).
 
 From the signed repository, on the router (once; later versions come with
 `apk upgrade`):
@@ -232,7 +232,7 @@ node security-tests/test_acl_policy.js
 | OpenWrt | Status |
 |---|---|
 | 25.12 | Built with the 25.12 SDK and tested |
-| 24.10 | 1.0.7 fixes the differences found on a 24.10.8 test router (x86, no Wi-Fi); no prebuilt packages yet, [build them yourself](docs/INSTALL.md#openwrt-2410) |
+| 24.10 | Signed `.ipk` packages since 1.0.8, built with the 24.10 SDK and tested on a 24.10.8 router without Wi-Fi ([install](docs/INSTALL.md#openwrt-2410)) |
 
 ## Languages
 

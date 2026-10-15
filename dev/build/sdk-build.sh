@@ -55,6 +55,10 @@ pinned_sdk() {
 		sdk_image=ghcr.io/openwrt/sdk@sha256:820d614294e64d048059cfe3dac58049fc0ce621a9d3ac21217c2caafb7d9616
 		sdk_sum='28e004c1be4d215d19c1f12a6aa4c8d8f80689549eb707d0ff5a71f16fa8d05f *openwrt-sdk-25.12.4-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst'
 		;;
+	24.10.8)
+		sdk_image=ghcr.io/openwrt/sdk@sha256:b28d5e4087dbd3f815a8bf5440a11e54e6bbd3d7400c3729d872e7940a4a77c1
+		sdk_sum='ac4a0405d2eea821b06f93c14ba13ffa90ad0457648903df7dde02570027ab21 *openwrt-sdk-24.10.8-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst'
+		;;
 	*) return 1 ;;
 	esac
 }
@@ -151,13 +155,14 @@ rm -f private-key.pem public-key.pem key-build
 cp feeds.conf /artifacts/tools/feeds.conf 2>/dev/null
 cp feeds/luci/luci.mk /artifacts/tools/luci.mk 2>/dev/null
 grep -E "^(# )?CONFIG_LUCI_(JSMIN|CSSTIDY|SRCDIET)[ =]" .config > /artifacts/tools/luci.config 2>/dev/null
-# host/bin/apk is a wrapper around the relocated binary; the binary itself
-# only needs the host C library
+# host/bin/apk and host/bin/usign are wrappers around the relocated
+# binaries; the binaries themselves only need the host C library
 [ ! -f staging_dir/host/bin/.apk.bin ] || cp staging_dir/host/bin/.apk.bin /artifacts/tools/apk
 j=$(find staging_dir -path "*/bin/jsmin" -type f 2>/dev/null | head -n 1)
 [ -z "$j" ] || cp "$j" /artifacts/tools/jsmin
 p=$(find staging_dir -path "*/bin/po2lmo" -type f 2>/dev/null | head -n 1)
 [ -z "$p" ] || cp "$p" /artifacts/tools/po2lmo
+[ ! -f staging_dir/host/bin/.usign.bin ] || cp staging_dir/host/bin/.usign.bin /artifacts/tools/usign
 exit "$rc"
 '
 
@@ -260,6 +265,7 @@ verify=(--src "$work/feed" --require-tools --luci-mk "$tools/luci.mk")
 [ ! -x "$tools/jsmin" ] || verify+=(--jsmin "$tools/jsmin")
 [ ! -x "$tools/po2lmo" ] || verify+=(--po2lmo "$tools/po2lmo")
 [ ! -f "$tools/luci.config" ] || verify+=(--luci-config "$tools/luci.config")
+[ "$sign" != usign ] || [ -x "$tools/usign" ] || die "the SDK's usign was not handed out; log: $work/build.log"
 if [ "$sign" = apk ]; then
 	mkdir "$work/keys"
 	cp -- "$tools/public-key.pem" "$work/keys/vantage.pem"
@@ -284,6 +290,7 @@ fi
 		echo "signing_public_key_sha256=$(sha256sum < "$tools/public-key.pem" | cut -d' ' -f1)"
 	elif [ "$sign" = usign ]; then
 		echo "signed_index=Packages.sig"
+		echo "signing_key_fingerprint=$("$tools/usign" -F -x "$work/out/Packages.sig")"
 	else
 		echo "signed_index=none"
 	fi
@@ -308,7 +315,7 @@ extra=$(find "$out" -mindepth 1 -maxdepth 1 ! -name 'luci-*-vantage[-_]*' ! -nam
 # re-check dist/ later without an SDK (dist/ is not committed)
 tcache="$repo/dist/.tools/$release"
 mkdir -p "$tcache"
-for t in apk jsmin po2lmo luci.config luci.mk; do
+for t in apk jsmin po2lmo usign luci.config luci.mk; do
 	[ ! -f "$tools/$t" ] || install -m "$(case $t in *.*) echo 0644 ;; *) echo 0755 ;; esac)" -- "$tools/$t" "$tcache/$t"
 done
 

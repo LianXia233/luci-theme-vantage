@@ -137,7 +137,8 @@ function reduceWireless(status) {
 
 /* The uci work of set_alias against a minimal cursor:
      { sections(): [ { '.name', '.type', ... } ], add(type) -> sid,
-       set(sid, opt, value), del(sid, opt?), commit() -> bool } */
+       set(sid, opt, value), del(sid, opt?), commit() -> bool,
+       revert()? } */
 function setAlias(uci, args) {
 	const mac = normMac(args.mac);
 	if (!mac || isMulticast(mac)) return { ok: false, error: 'invalid-mac' };
@@ -171,7 +172,11 @@ function setAlias(uci, args) {
 		if (icon !== '') uci.set(sid, 'icon', icon);
 		op = 'add';
 	}
-	if (!uci.commit()) return { ok: false, error: 'failed' };
+	if (!uci.commit()) {
+		/* a failed commit leaves the change pending: drop it */
+		if (uci.revert) uci.revert();
+		return { ok: false, error: 'failed' };
+	}
 	return { ok: true, op, mac };
 }
 

@@ -213,7 +213,7 @@ SVG cannot see page CSS. Vantage generates both from `dev/icons/build.js`.
 
 Checked on OpenWrt 24.10.8 (LuCI from the openwrt-24.10 branch, on an x86 VM
 without a radio, with 1.0.6 installed and 1.0.7's theme files loaded into
-the pages). The templates, menu, dispatcher hooks, dynlists,
+the pages; 1.0.8's `.ipk` packages since installed there with opkg). The templates, menu, dispatcher hooks, dynlists,
 dropdowns, modals and row actions behave as on 25.12. Where the markup
 differs, the theme handles both forms. It detects them by markup, never by
 version, and each place carries a `LuCI 24.10:` comment:

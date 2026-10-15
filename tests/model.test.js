@@ -152,6 +152,13 @@ test('hintAddrs: IPv4 outside the uplink subnets is dropped', () => {
 	assert.deepEqual(ips, [ '192.0.2.44', 'fe80::1' ]);
 });
 
+test('hintAddrs: at most 8 addresses per device (SEC-001)', () => {
+	const v6 = Array.from({ length: 50 }, (_, i) => '2001:db8::' + (i + 1).toString(16));
+	const ips = model.hintAddrs({ ipaddrs: [ '192.0.2.44' ], ip6addrs: v6 }, [ '192.0.2.10/24' ]);
+	assert.equal(ips.length, 8);
+	assert.equal(ips[0], '192.0.2.44');
+});
+
 /* a two-radio AP: 2.4 GHz with two SSIDs, 6 GHz with one */
 function raw() {
 	return {

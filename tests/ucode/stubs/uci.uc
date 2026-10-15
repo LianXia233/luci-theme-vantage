@@ -1,5 +1,6 @@
 // Test double for ucode's uci module (tests/plugin.test.js): one config
-// held in global STUB = { sections: [ ... ], seq, committed, fail_commit }.
+// held in global STUB = { sections: [ ... ], seq, committed, fail_commit,
+// reverted }.
 'use strict';
 
 function find(sid) {
@@ -59,6 +60,11 @@ function cursor() {
 				return null;
 
 			global.STUB.committed = true;
+			return true;
+		},
+
+		revert: function(conf) {
+			global.STUB.reverted = true;
 			return true;
 		}
 	};

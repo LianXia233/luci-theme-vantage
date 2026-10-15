@@ -634,6 +634,9 @@ return view.extend({
 		Object.keys(st.clientHist).forEach(function(mac) {
 			if (!p.state.firstSeen[mac]) delete st.clientHist[mac];
 		});
+		Object.keys(st.bestStd).forEach(function(mac) {
+			if (!p.state.firstSeen[mac]) delete st.bestStd[mac];
+		});
 
 		/* per-station history is kept for the session (60 points each,
 		   stations seen in the last minutes only) */
@@ -689,6 +692,13 @@ return view.extend({
 	resolveMore: function(m) {
 		var st = this.st, self = this;
 		var ips = [];
+		/* answers are kept for the session, but only for addresses still
+		   in use once there are many */
+		if (Object.keys(st.rdns).length > 1024) {
+			var keep = Object.create(null);
+			m.clients.forEach(function(c) { c.ips.forEach(function(ip) { if (ip in st.rdns) keep[ip] = st.rdns[ip]; }); });
+			st.rdns = keep;
+		}
 		m.clients.forEach(function(c) {
 			c.ips.forEach(function(ip) { if (!(ip in st.rdns) && ips.indexOf(ip) < 0 && ips.length < 64) ips.push(ip); });
 		});
@@ -2630,9 +2640,11 @@ return view.extend({
 	},
 
 	/* Checked here for a quick answer, then sent to luci.vantage
-	   set_alias, which checks again, keeps one section per MAC and writes
-	   /etc/config/vantage directly (no staged uci changes, so LuCI's
-	   apply/rollback lock does not block it). The names are reloaded after
+	   set_alias, which checks again, keeps one section per MAC and commits
+	   /etc/config/vantage at once, outside LuCI's Save & Apply (so LuCI's
+	   apply/rollback lock does not block it; libuci's change store is
+	   shared, so changes to that config still pending in LuCI go in with
+	   it). The names are reloaded after
 	   every attempt, failed or not, so the next one starts from what the
 	   device holds.
 	   -> Promise<true | false | string (error text)> */

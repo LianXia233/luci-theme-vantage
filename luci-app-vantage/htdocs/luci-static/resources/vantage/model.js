@@ -298,17 +298,19 @@ return baseclass.extend({
 
 	/* host-hint IPv4 addresses inside one of the given subnets
 	   ([ 'a.b.c.d/nn', ... ]); hints are keyed by MAC only, so a hint may
-	   name any address. IPv6 link-local and global addresses are kept. */
+	   name any address. IPv6 link-local and global addresses are kept, at
+	   most 8 addresses in all: a device cannot fill the page or the
+	   reverse DNS queue with addresses. */
 	hintAddrs: function(hint, subnets) {
-		var self = this, out = [];
+		var self = this, out = [], MAX = 8;
 		hint = obj(hint);
 		arr(hint.ipaddrs).forEach(function(ip) {
-			if (typeof ip !== 'string' || out.indexOf(ip) >= 0) return;
+			if (typeof ip !== 'string' || out.indexOf(ip) >= 0 || out.length >= MAX) return;
 			if (!subnets.length || subnets.some(function(s) { var p = s.split('/'); return +p[1] >= 8 && self.ipv4InSubnet(ip, p[0], p[1]); }))
 				out.push(ip);
 		});
 		arr(hint.ip6addrs).forEach(function(ip) {
-			if (typeof ip === 'string' && /^[0-9a-f:]+$/i.test(ip) && ip.length <= 45 && out.indexOf(ip) < 0) out.push(ip);
+			if (typeof ip === 'string' && /^[0-9a-f:]+$/i.test(ip) && ip.length <= 45 && out.indexOf(ip) < 0 && out.length < MAX) out.push(ip);
 		});
 		return out;
 	},

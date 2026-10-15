@@ -10,7 +10,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-theme-vantage
-PKG_VERSION:=1.0.7
+PKG_VERSION:=1.0.8
 PKG_RELEASE:=1
 PKG_LICENSE:=GPL-3.0-or-later
 
@@ -36,6 +36,10 @@ PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 
 define Package/luci-theme-vantage/postrm
 #!/bin/sh
+# opkg (24.10) also runs the old package's postrm on an upgrade, as
+# "postrm upgrade <new version>": the theme stays then (PKG_UPGRADE too,
+# should a package manager mark an upgrade only that way)
+[ "$${1:-}" != upgrade ] && [ "$${PKG_UPGRADE:-}" != 1 ] || exit 0
 [ -n "$${IPKG_INSTROOT}" ] || {
 	# never leave LuCI pointing at a theme that is gone: fall back to
 	# Bootstrap when it is registered, else to any other registered theme

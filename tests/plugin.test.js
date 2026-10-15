@@ -62,21 +62,22 @@ function runUcode(cases) {
 function runShim(cases) {
 	return cases.map(c => {
 		const orig = JSON.parse(JSON.stringify(c.sections || []));
-		let sections = JSON.parse(JSON.stringify(orig)), seq = 0, committed = false;
+		let sections = JSON.parse(JSON.stringify(orig)), seq = 0, committed = false, reverted = false;
 		const find = sid => sections.find(s => s['.name'] === sid);
 		const cursor = {
 			sections: () => sections.map(s => Object.assign({}, s)),
 			add: type => { const sid = 'cfg' + (++seq).toString(16).padStart(6, '0'); sections.push({ '.name': sid, '.type': type, '.anonymous': true }); return sid; },
 			set: (sid, opt, v) => { const s = find(sid); if (s) s[opt] = v; },
 			del: (sid, opt) => { if (opt != null) { const s = find(sid); if (s) delete s[opt]; } else sections = sections.filter(s => s['.name'] !== sid); },
-			commit: () => { if (c.fail_commit) return false; committed = true; return true; }
+			commit: () => { if (c.fail_commit) return false; committed = true; return true; },
+			revert: () => { reverted = true; }
 		};
-		if (!Object.prototype.hasOwnProperty.call(shim.POLICY, c.method)) return { status: 3, reply: null, sections: orig };
-		if (!shim.argsOk(c.method, c.args)) return { status: 2, reply: null, sections: orig };
+		if (!Object.prototype.hasOwnProperty.call(shim.POLICY, c.method)) return { status: 3, reply: null, sections: orig, reverted };
+		if (!shim.argsOk(c.method, c.args)) return { status: 2, reply: null, sections: orig, reverted };
 		const reply = c.method === 'wireless'
 			? shim.reduceWireless((c.ubus || {})['network.wireless status'])
 			: shim.setAlias(cursor, c.args || {});
-		return { status: 0, reply, sections: committed ? sections : orig };
+		return { status: 0, reply, sections: committed ? sections : orig, reverted };
 	});
 }
 
@@ -212,6 +213,8 @@ test('stand-in: set_alias keeps one section per MAC, caps at 512, refuses bad in
 	assert.deepEqual(r.slice(10, 14).map(x => x.reply.error), [ 'invalid-mac', 'invalid-mac', 'invalid-name', 'name-too-long' ]);
 	assert.deepEqual(r[14].reply, { ok: false, error: 'failed' });
 	assert.deepEqual(r[14].sections, [], 'nothing committed');
+	assert.equal(r[14].reverted, true, 'a failed commit drops the pending change (SEC-002)');
+	assert.equal(r[0].reverted, false);
 	assert.deepEqual(r.slice(15, 19).map(x => x.status), [ 2, 2, 2, 3 ]);
 	assert.deepEqual(r[19].reply, { ok: false, error: 'too-many' });
 	assert.equal(r[19].sections.length, 512);
