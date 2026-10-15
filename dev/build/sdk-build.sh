@@ -55,6 +55,10 @@ pinned_sdk() {
 		sdk_image=ghcr.io/openwrt/sdk@sha256:820d614294e64d048059cfe3dac58049fc0ce621a9d3ac21217c2caafb7d9616
 		sdk_sum='28e004c1be4d215d19c1f12a6aa4c8d8f80689549eb707d0ff5a71f16fa8d05f *openwrt-sdk-25.12.4-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst'
 		;;
+	24.10.8)
+		sdk_image=ghcr.io/openwrt/sdk@sha256:b28d5e4087dbd3f815a8bf5440a11e54e6bbd3d7400c3729d872e7940a4a77c1
+		sdk_sum='ac4a0405d2eea821b06f93c14ba13ffa90ad0457648903df7dde02570027ab21 *openwrt-sdk-24.10.8-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst'
+		;;
 	*) return 1 ;;
 	esac
 }
