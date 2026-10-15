@@ -66,7 +66,14 @@ present) and results must be built as text nodes like everything else.
   loaded (`nft -j list ruleset`, through a read-only rpcd call) instead of
   predicting it from the config. It ends the "can't tell" cases and the
   1.0.7 known limit on sets that services define (`docs/SPEC.md`), and the
-  page no longer has to follow fw4's matching rules.
+  page no longer has to follow fw4's matching rules. Plan: one new method on
+  the `luci.vantage` rpcd plugin, read-only and without arguments, that
+  returns a summary (zones, their devices, what is open), never the raw
+  ruleset. First try loading fw4 in the plugin (`require("fw4")`), which
+  spawns nothing; `nft -j` only if fw4's internals change too much between
+  releases. The browser gets no `file exec`: the ACL adds that one method to
+  the app's read section, beside the firewall config it already reads, and
+  `test_acl_policy.js` checks it stays read-only and argument-free.
 
 ## Upstream
 
