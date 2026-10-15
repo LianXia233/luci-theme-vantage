@@ -58,8 +58,14 @@ present) and results must be built as text nodes like everything else.
   neighbour tables, not just the local path.
 - **luci-app-statistics integration:** show collectd history in the
   dashboard when it is installed.
-- **OpenWrt 24.10 support:** test the `.ipk` build and the widget
-  differences listed in `docs/luci-contract.md`.
+- **OpenWrt 24.10 packages:** 1.0.7 fixes the differences found so far
+  (`docs/luci-contract.md` §9). Still to do: `.ipk` files in each release, a
+  signed 24.10 repository, a full install with opkg upgrades and removal,
+  and a check of the Wi-Fi pages on 24.10.
+- **Firewall overview, sets from services:** read the sets services define
+  (the data fw4 reads from them), so that a service defining a set under the
+  same name as the firewall config gives "can't tell" instead of the
+  config's reading (a known limit in 1.0.7, see `docs/SPEC.md`).
 
 ## Upstream
 

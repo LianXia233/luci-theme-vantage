@@ -211,6 +211,22 @@ SVG cannot see page CSS. Vantage generates both from `dev/icons/build.js`.
 
 ## 9. 24.10
 
-Unverified — no 24.10 LuCI tree was checked. Likely differences: dynlist
-drag/drop and `::after` removal, table filter row, action column width,
-`addTimeLimitedNotification`.
+Checked on OpenWrt 24.10.8 (LuCI from the openwrt-24.10 branch, on an x86 VM
+without a radio, with 1.0.6 installed and 1.0.7's theme files loaded into
+the pages). The templates, menu, dispatcher hooks, dynlists,
+dropdowns, modals and row actions behave as on 25.12. Where the markup
+differs, the theme handles both forms. It detects them by markup, never by
+version, and each place carries a `LuCI 24.10:` comment:
+
+- Status → Overview's sections have no `.cbi-title`: the `h3` is the
+  section's first child. Both the header row and the memory and storage
+  meters look for either form.
+- A named table section (Traffic Rules, Port Forwards, NAT Rules) keeps the
+  name only in `tr[data-title]` and leaves drawing it to the theme. Vantage
+  draws it as a `::before` cell; 25.12 renders a real cell.
+- LuCI itself lacks some things on 24.10: Status → Overview has no
+  per-card Hide button and shows the local time unformatted, and DHCP and
+  DNS is one page.
+
+Not checked: wireless pages, the apply/rollback dialog, 404 and CSRF pages,
+and opkg upgrades.

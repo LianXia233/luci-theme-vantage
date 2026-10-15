@@ -78,7 +78,7 @@ msgstr ""
 msgid "%d on %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:197
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:218
 msgid "%d on this router, %d into your network"
 msgstr ""
 
@@ -100,7 +100,7 @@ msgid "%d sent · %s retried · %s failed"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/vantage/insight.js:128
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:192
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:213
 msgid "%d things need attention"
 msgstr ""
 
@@ -124,9 +124,9 @@ msgstr ""
 msgid "%s (%s) is enabled but not up"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:186
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:221
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:345
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:201
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:242
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:362
 msgid "%s (IPv%d)"
 msgstr ""
 
@@ -154,7 +154,7 @@ msgstr ""
 msgid "%s Mbit/s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:209
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:230
 msgid "%s accepts every connection"
 msgstr ""
 
@@ -169,10 +169,6 @@ msgstr ""
 #: luci-app-vantage/htdocs/luci-static/resources/vantage/insight.js:78
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:1761
 msgid "%s available"
-msgstr ""
-
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:225
-msgid "%s covers only some addresses"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:2088
@@ -212,11 +208,11 @@ msgstr ""
 msgid "%s is disabled"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:213
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:234
 msgid "%s is forwarded into %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:221
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:242
 msgid "%s is in no zone and accepts every connection"
 msgstr ""
 
@@ -232,7 +228,7 @@ msgstr ""
 msgid "%s is wider"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:237
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:254
 msgid "%s lets the internet into %s"
 msgstr ""
 
@@ -240,7 +236,7 @@ msgstr ""
 msgid "%s link"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:242
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:259
 msgid "%s may open the router's admin"
 msgstr ""
 
@@ -376,7 +372,7 @@ msgid "1 radio"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/vantage/insight.js:128
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:192
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:213
 msgid "1 thing needs attention"
 msgstr ""
 
@@ -432,17 +428,17 @@ msgstr ""
 msgid "All good"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:213
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:234
 msgid "Any zone"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:214
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:235
 msgid ""
 "Anything on the internet can reach that network. Remove the forwarding "
 "unless you mean it."
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:210
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:231
 msgid ""
 "Anything on the internet can reach the router itself. Set this zone's Input "
 "to reject."
@@ -567,7 +563,7 @@ msgstr ""
 msgid "Core %d: %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:158
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:165
 msgid "Could not read the firewall configuration"
 msgstr ""
 
@@ -583,7 +579,7 @@ msgstr ""
 msgid "Country"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:314
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:331
 msgid ""
 "Custom rule files are configured (%s); rules in them are not listed here."
 msgstr ""
@@ -744,11 +740,11 @@ msgstr ""
 msgid "Firmware"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:358
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:375
 msgid "Forwarding %s to %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:217
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:238
 msgid "Forwarding is accepted by default"
 msgstr ""
 
@@ -772,7 +768,7 @@ msgstr ""
 msgid "From network"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:318
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:335
 msgid ""
 "From the firewall configuration. Ports opened by UPnP or by custom rule "
 "files are not shown."
@@ -787,7 +783,7 @@ msgstr ""
 msgid "Gbit/s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:349
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:366
 msgid "General Settings"
 msgstr ""
 
@@ -853,7 +849,7 @@ msgstr ""
 msgid "Identity"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:346
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:363
 msgid "In no zone: the default policies apply."
 msgstr ""
 
@@ -861,7 +857,7 @@ msgstr ""
 msgid "In use"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:336
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:353
 msgid "Input"
 msgstr ""
 
@@ -881,33 +877,26 @@ msgstr ""
 msgid "Internet"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:193
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:201
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:214
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:222
 msgid "Internet-facing: %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:295
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:312
 msgid "Into your network"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:238
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:255
 msgid ""
 "It accepts every port from any address, like a zone forwarding. Limit it to "
 "the ports and addresses you need."
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:243
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:260
 msgid ""
 "It forwards SSH or web ports from any address on the internet to %s. The "
 "interface list could not be read, so this page cannot tell whether that is "
 "the router itself."
-msgstr ""
-
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:226
-msgid ""
-"Its Covered subnets setting leaves other internet traffic to the default "
-"Input policy, which accepts, so it can reach the router itself. Set Input to "
-"reject in General Settings."
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:2751
@@ -1123,7 +1112,7 @@ msgstr ""
 msgid "Networks"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:343
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:360
 msgid "Networks: %s"
 msgstr ""
 
@@ -1176,7 +1165,7 @@ msgstr ""
 msgid "No interface with a route is up."
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:188
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:209
 msgid "No internet-facing zone found"
 msgstr ""
 
@@ -1203,7 +1192,7 @@ msgstr ""
 msgid "No radios reported"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:298
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:315
 msgid ""
 "No rule or port forward opens anything; the warnings above say what does."
 msgstr ""
@@ -1224,14 +1213,14 @@ msgstr ""
 msgid "No wireless radios are reported by this device."
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:189
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:210
 msgid ""
 "No zone masquerades, holds the uplink or is called wan, so this page cannot "
 "tell which side faces the internet. On an access point that is expected; on "
 "a router, check the zones below."
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:348
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:365
 msgid "No zones are configured."
 msgstr ""
 
@@ -1272,7 +1261,7 @@ msgstr ""
 msgid "Not connected"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:366
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:383
 msgid "Not in effect"
 msgstr ""
 
@@ -1288,11 +1277,11 @@ msgstr ""
 msgid "Nothing better known; the address is randomised"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:200
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:221
 msgid "Nothing is open in your firewall rules"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:299
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:316
 msgid "Nothing is open in your firewall rules."
 msgstr ""
 
@@ -1308,7 +1297,7 @@ msgstr ""
 msgid "Older Wi-Fi generation than the radio; uses more airtime"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:294
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:311
 msgid "On this router"
 msgstr ""
 
@@ -1316,7 +1305,7 @@ msgstr ""
 msgid "Online"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:201
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:222
 msgid "Only standard housekeeping (ping, DHCP renewals and the like): %d rule"
 msgid_plural ""
 "Only standard housekeeping (ping, DHCP renewals and the like): %d rules"
@@ -1331,11 +1320,11 @@ msgstr ""
 msgid "Open details of %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:319
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:336
 msgid "Open from the internet"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:196
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:217
 msgid "Open from the internet: %d"
 msgstr ""
 
@@ -1347,7 +1336,7 @@ msgstr ""
 msgid "OpenWrt device"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:234
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:251
 msgid ""
 "Option %s in General Settings has a value firewall4 refuses, so it loads no "
 "new rules: what is open is unknown."
@@ -1377,7 +1366,7 @@ msgstr ""
 msgid "PiB"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:303
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:320
 msgid ""
 "Ping and other control messages, multicast, DHCP renewals and IPsec passed "
 "on to your network: what every router lets in."
@@ -1479,11 +1468,11 @@ msgstr ""
 msgid "Root (overlay)"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:247
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:264
 msgid "Router admin open: %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:248
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:265
 msgid ""
 "SSH or the web interface answers any address on the internet. Limit the rule "
 "to the addresses you use."
@@ -1503,6 +1492,10 @@ msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:1030
 msgid "Separate lanes"
+msgstr ""
+
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:174
+msgid "Settings to check"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:1144
@@ -1555,7 +1548,7 @@ msgstr ""
 msgid "Speed"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:302
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:319
 msgid "Standard housekeeping: %d rule"
 msgid_plural "Standard housekeeping: %d rules"
 msgstr[0] ""
@@ -1594,7 +1587,7 @@ msgstr ""
 msgid "Swap"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:366
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:383
 msgid "Switched off"
 msgstr ""
 
@@ -1616,7 +1609,7 @@ msgstr ""
 msgid "Temporary (RAM)"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:222
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:243
 msgid ""
 "The default Input policy applies there and accepts, so anything on the "
 "internet can reach the router itself. Add it to the wan zone or set Input to "
@@ -1632,11 +1625,11 @@ msgid ""
 "The driver reports a placeholder value, so no noise floor or SNR is shown"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:233
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:250
 msgid "The firewall cannot load these settings"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:230
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:247
 msgid ""
 "The interface list could not be read, and the default Input policy accepts: "
 "an uplink in no zone would be open. Set Input to reject in General Settings."
@@ -1646,11 +1639,15 @@ msgstr ""
 msgid "The name the device announces (WPS)"
 msgstr ""
 
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:206
+msgid "The settings below apply if traffic reaches them as configured."
+msgstr ""
+
 #: luci-app-vantage/htdocs/luci-static/resources/vantage/names.js:156
 msgid "The stored name has an invalid section id"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:229
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:246
 msgid "The uplinks could not be checked"
 msgstr ""
 
@@ -1658,7 +1655,7 @@ msgstr ""
 msgid "This access point"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:346
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:363
 msgid "This address family is in no zone: the default policies apply."
 msgstr ""
 
@@ -1674,7 +1671,7 @@ msgstr ""
 msgid "This device reports no radios"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:159
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:166
 msgid ""
 "This page cannot tell what is open. Reload it; if that does not help, check "
 "the firewall pages."
@@ -1682,6 +1679,10 @@ msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:2668
 msgid "This radio is not reported any more."
+msgstr ""
+
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:203
+msgid "This setup is beyond what this overview checks"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:2473
@@ -1735,12 +1736,12 @@ msgstr ""
 msgid "Traffic"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:319
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:366
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:336
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:383
 msgid "Traffic Rules"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:218
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:239
 msgid ""
 "Traffic from the internet that no forwarding covers still reaches your other "
 "networks. Set Forward to reject in General Settings."
@@ -1756,7 +1757,7 @@ msgstr ""
 msgid "Tx power"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:311
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:328
 msgid ""
 "UPnP is installed: devices on your network can open ports on their own while "
 "it runs, and those are not listed here."
@@ -1779,7 +1780,7 @@ msgid "Unnamed port forward"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:116
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:237
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:254
 msgid "Unnamed rule"
 msgstr ""
 
@@ -1956,7 +1957,7 @@ msgstr ""
 msgid "WPS device name"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:164
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:171
 msgid "Warnings"
 msgstr ""
 
@@ -1976,6 +1977,12 @@ msgstr ""
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:1536
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:1538
 msgid "Weakest signal"
+msgstr ""
+
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:204
+msgid ""
+"What is open depends on how firewall4 handles %s, which this page does not "
+"follow. Check the firewall pages."
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/vantage/insight.js:100
@@ -1999,11 +2006,11 @@ msgstr ""
 msgid "Your name for this device"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:360
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:377
 msgid "Zone %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:349
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:366
 msgid "Zones"
 msgstr ""
 
@@ -2023,11 +2030,15 @@ msgstr ""
 msgid "all up"
 msgstr ""
 
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:128
+msgid "an unnamed rule"
+msgstr ""
+
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:112
 msgid "any zone"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:328
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:345
 msgid "any zone (default policy)"
 msgstr ""
 
@@ -2056,7 +2067,7 @@ msgstr ""
 msgid "collecting…"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:362
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:379
 msgid "custom rule file"
 msgstr ""
 
@@ -2076,7 +2087,7 @@ msgstr ""
 msgid "except %s"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:329
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:346
 msgid "forwards nowhere"
 msgstr ""
 
@@ -2108,31 +2119,31 @@ msgstr ""
 msgid "idle"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:127
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:134
 msgid "ignored: a port forward needs one source zone, not any zone"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:128
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:135
 msgid "ignored: its address families conflict"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:129
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:136
 msgid "ignored: no source zone"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:126
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:133
 msgid "ignored: not marked as compatible with firewall4"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:132
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:139
 msgid "ignored: option %s has a value firewall4 refuses"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:131
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:138
 msgid "ignored: zone %s does not exist or is switched off"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:335
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:352
 msgid "internet"
 msgstr ""
 
@@ -2237,7 +2248,7 @@ msgstr ""
 msgid "per core"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:364
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:381
 msgid "port forward"
 msgstr ""
 
@@ -2265,15 +2276,23 @@ msgstr ""
 msgid "short GI"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:356
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:373
 msgid "switched off"
+msgstr ""
+
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:126
+msgid "the covered subnets of zone %s"
+msgstr ""
+
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:128
+msgid "the set in %s"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:107
 msgid "this router"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:364
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:381
 msgid "traffic rule"
 msgstr ""
 
@@ -2285,12 +2304,16 @@ msgstr ""
 msgid "who uses the bandwidth"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:360
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:377
 msgid "zone"
 msgstr ""
 
-#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:358
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:375
 msgid "zone forwarding"
+msgstr ""
+
+#: luci-app-vantage/htdocs/luci-static/resources/view/vantage/firewall.js:127
+msgid "zones %s and %s if they share a device"
 msgstr ""
 
 #: luci-app-vantage/htdocs/luci-static/resources/view/vantage/overview.js:1531

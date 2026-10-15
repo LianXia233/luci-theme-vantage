@@ -28,7 +28,6 @@ port in one click, finding anything by typing — not from their look.
 - Replacing LuCI's forms or views; Vantage styles and wraps them.
 - Device-changing actions from the dashboard (v2, behind their own ACLs).
 - History/graphs (v2 plugin), topology maps (later).
-- 24.10 support (after 25.12 is solid; contract differences are unverified).
 
 ## 2. Packages
 
@@ -267,7 +266,23 @@ text around it so it looks the same size.
   when luci-app-upnp is installed (its menu entry exists), custom rule
   files when the config names any (said to be configured: fw4 ignores a
   script include without `fw4_compatible`, shown as not in effect), and
-  otherwise a footnote names both.
+  otherwise a footnote names both. Some setups depend on how fw4
+  dispatches traffic in ways the overview does not follow: covered
+  subnets on an internet zone (or on a zone that names no device, which
+  takes them on every one), another zone that does or, without the
+  interface dump, may take traffic on an internet zone's device (the
+  first in config order wins; device names compare as patterns, a zone
+  that names no device takes every one it does not exclude, and a named
+  device counts even when the dump does not list it), and rules or port
+  forwards from the internet that use a set the config does not define
+  and enable (its definition may come from a service the overview cannot
+  see; a service that defines a set under the same name as the config
+  goes unnoticed, since fw4 uses the first definition). For those
+  it gives no verdict: a neutral "This setup is beyond what this
+  overview checks", naming what it does not follow, with the zones, and
+  the warnings it would give shown in amber as settings to check (they
+  apply if traffic reaches them as configured), except for a rule whose
+  set it cannot find.
 - **Controls** (buttons, filter, chips, sort headers, icon buttons) take
   the theme's control height through `--v-ctl-h` (36 px, 44 px on
   touch) and the theme's control radius (`--v-r`); under another theme
@@ -313,7 +328,7 @@ text around it so it looks the same size.
 - **v2**: one-click actions (restart radio, kick/ban client, toggle SSID)
   each behind a separate narrow write ACL and a confirmation;
   optional rpcd plugin keeping a small ring buffer for history, alerts.
-- **v3**: topology view, luci-app-statistics integration, 24.10 support.
+- **v3**: topology view, luci-app-statistics integration.
 
 ## 6. Security requirements
 

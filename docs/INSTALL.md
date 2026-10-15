@@ -60,7 +60,8 @@ page you see after login. Every step is explained below.
 | OpenWrt | Package manager | Status |
 |---|---|---|
 | 25.12.x | apk (`.apk`) | Supported. Built with the 25.12 SDK and tested. |
-| 24.10.x, 23.05.x | opkg (`.ipk`) | Untested. `dev/build/sdk-build.sh` can build `.ipk` files for these releases, but the LuCI differences have not been checked and nothing is guaranteed. |
+| 24.10.x | opkg (`.ipk`) | Checked on a test router; no prebuilt packages yet. See [OpenWrt 24.10](#openwrt-2410). |
+| 23.05.x | opkg (`.ipk`) | Untested. `dev/build/sdk-build.sh` can build `.ipk` files for it, but the LuCI differences have not been checked and nothing is guaranteed. |
 | Snapshots | apk | Untested. |
 
 Check what your router runs:
@@ -69,9 +70,30 @@ Check what your router runs:
 ssh root@192.0.2.1 'cat /etc/openwrt_release'
 ```
 
-`DISTRIB_RELEASE` must start with `25.12`. Both packages are
-architecture-independent (`noarch`), so the same two files install on every
-target: MIPS, ARM, x86 and the rest.
+`DISTRIB_RELEASE` must start with `25.12` for the release files and the
+repository. Both packages are architecture-independent (`noarch`), so the
+same two files install on every target: MIPS, ARM, x86 and the rest.
+
+### OpenWrt 24.10
+
+I checked the 34 pages a 24.10.8 test router (x86, without Wi-Fi or
+add-ons) has, with Vantage 1.0.6 installed. The three differences found
+there are fixed in 1.0.7, and I verified the fixes by loading 1.0.7's
+theme files into those pages. Some differences come from 24.10's own
+LuCI: Status → Overview has no Hide button per card and shows the local
+time unformatted, and DHCP and DNS is one page. Not tested yet: a full
+1.0.7 install, the Wi-Fi pages and the dashboard's radio and client
+tiles, pages for add-ons, LEDs and mount points, upgrading from one
+Vantage version to the next with opkg, and removal.
+
+Releases and the repository carry 25.12 (apk) packages only. Build the
+`.ipk` files with the 24.10 SDK, as described under **Other SDK releases** in
+[Build from source](#build-from-source), and install them:
+
+```sh
+scp -O luci-theme-vantage_*.ipk luci-app-vantage_*.ipk root@192.0.2.1:/tmp/
+ssh root@192.0.2.1 'opkg install /tmp/luci-theme-vantage_*.ipk /tmp/luci-app-vantage_*.ipk'
+```
 
 ### Packages on the router
 

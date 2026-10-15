@@ -35,6 +35,13 @@ without the app.
   changes count) as keyboard-accessible pills
 - Its own login page, and restyled stock pages, forms, tables, charts and
   status icons; tables become cards on small screens
+- Tidier stock pages: a table row with a main action (Edit, else the
+  highlighted one) and two or more others shows the main one and folds
+  the others into a ⋯ menu; Add, highlighted and an app's own buttons
+  stay visible, and rows of equal actions (Startup, Processes) stay as
+  LuCI drew them; firewall verdicts are coloured badges, with a warning
+  colour where the internet-facing zone lets traffic in; the nftables
+  chains are cards, and tooltips are never cut off
 - One control size (bigger on touch screens) for fields, buttons and
   every tab, one tab style at every level, and field help folded to its
   first line
@@ -97,7 +104,8 @@ without the app.
 ## Install
 
 For OpenWrt 25.12 (apk). Both packages are architecture-independent, so
-the same files install on any target.
+the same files install on any target. For 24.10, see
+[OpenWrt 24.10](docs/INSTALL.md#openwrt-2410).
 
 From the signed repository, on the router (once; later versions come with
 `apk upgrade`):
@@ -224,7 +232,7 @@ node security-tests/test_acl_policy.js
 | OpenWrt | Status |
 |---|---|
 | 25.12 | Built with the 25.12 SDK and tested |
-| 24.10 | Untested; LuCI contract differences are not verified |
+| 24.10 | 1.0.7 fixes the differences found on a 24.10.8 test router (x86, no Wi-Fi); no prebuilt packages yet, [build them yourself](docs/INSTALL.md#openwrt-2410) |
 
 ## Languages
 
