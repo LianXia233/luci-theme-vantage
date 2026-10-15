@@ -92,7 +92,10 @@ opkg install luci-theme-vantage luci-app-vantage
 ```
 
 Upgrade with `opkg update && opkg upgrade luci-theme-vantage
-luci-app-vantage`. opkg checks `Packages.sig` against `/etc/opkg/keys`
+luci-app-vantage`. Upgrading from a self-built 1.0.7 or older `.ipk` switches
+LuCI back to Bootstrap once (opkg runs the old package's removal script
+during the upgrade); choose Vantage again under System → System →
+Language and Style. opkg checks `Packages.sig` against `/etc/opkg/keys`
 and each package against the hash in the index. Remove a language package
 before the app (`opkg remove luci-i18n-vantage-zh-cn luci-app-vantage
 luci-theme-vantage`); opkg leaves the empty directories behind, which is

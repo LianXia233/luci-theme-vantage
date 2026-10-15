@@ -36,6 +36,9 @@ PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 
 define Package/luci-theme-vantage/postrm
 #!/bin/sh
+# opkg (24.10) also runs the old package's postrm on an upgrade, as
+# "postrm upgrade <new version>": the theme stays then
+[ "$${1:-}" != upgrade ] || exit 0
 [ -n "$${IPKG_INSTROOT}" ] || {
 	# never leave LuCI pointing at a theme that is gone: fall back to
 	# Bootstrap when it is registered, else to any other registered theme
