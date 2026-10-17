@@ -4,9 +4,9 @@
 
 # Vantage
 
-**A LuCI theme and live network dashboard for OpenWrt 25.12, built from scratch.**
+**A LuCI theme and live network dashboard for OpenWrt 25.12 and 24.10, built from scratch.**
 
-![OpenWrt 25.12](https://img.shields.io/badge/OpenWrt-25.12-00B5E2?style=flat-square) ![LuCI theme + app](https://img.shields.io/badge/LuCI-theme%20%2B%20app-5a6472?style=flat-square) ![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-3d8b40?style=flat-square)
+![OpenWrt 25.12 and 24.10](https://img.shields.io/badge/OpenWrt-25.12%20%7C%2024.10-00B5E2?style=flat-square) ![LuCI theme + app](https://img.shields.io/badge/LuCI-theme%20%2B%20app-5a6472?style=flat-square) ![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-3d8b40?style=flat-square)
 
 </div>
 
@@ -259,6 +259,7 @@ removed: no real IP addresses, MACs or SSIDs. Report security problems
 privately as described in [`SECURITY.md`](SECURITY.md), not in a public
 issue.
 
+What changed in each release is in [`CHANGELOG.md`](CHANGELOG.md).
 Planned work and ideas are in [`docs/ROADMAP.md`](docs/ROADMAP.md); next
 up is searching clients, radios and networks with <kbd>Ctrl</kbd>+<kbd>K</kbd>.
 

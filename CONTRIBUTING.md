@@ -212,7 +212,8 @@ SDK.
 
 ## Releases
 
-1. Bump `PKG_VERSION` in both Makefiles and commit.
+1. Add the release to `CHANGELOG.md` (user-visible changes, newest
+   first), bump `PKG_VERSION` in both Makefiles and commit.
 2. Build that commit locally: `dev/build/sdk-build.sh 25.12.4`.
 3. Commit `dist/25.12.4/SHA256SUMS` as `.release-manifests/v<version>.sha256`,
    push, then push the tag `v<version>` on that commit.

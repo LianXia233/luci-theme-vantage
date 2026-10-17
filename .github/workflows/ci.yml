@@ -226,7 +226,7 @@ jobs:
             done
           else
             gh release create "$TAG" --repo "$REPO" --verify-tag --title "Vantage ${TAG#v}" \
-              --notes "Packages for OpenWrt ${SDK_APK} (apk) and ${SDK_IPK} (ipk), built by CI from ${GITHUB_SHA}. See SHA256SUMS, SHA256SUMS-24.10, the BUILDINFO files and docs/INSTALL.md." \
+              --notes "Packages for OpenWrt ${SDK_APK} (apk) and ${SDK_IPK} (ipk), built by CI from ${GITHUB_SHA}. What changed: https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md. See SHA256SUMS, SHA256SUMS-24.10, the BUILDINFO files and docs/INSTALL.md." \
               *
           fi
 

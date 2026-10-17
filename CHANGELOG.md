@@ -1,0 +1,189 @@
+# Changelog
+
+User-visible changes per release, newest first. Dates are the tag dates.
+Each release ships both packages, `luci-theme-vantage` and
+`luci-app-vantage`, at the same version; the packages are listed at
+<https://github.com/anothaDev/luci-theme-vantage/releases> and in the
+[signed repositories](https://anothadev.github.io/luci-theme-vantage/).
+
+## Unreleased
+
+- **Dashboard: the uplink is the interface carrying the default route.**
+  Interfaces named `wan`, `wan6` or `*wan*` still win among those, so
+  routers are unchanged. An access point whose WAN port was bridged into
+  LAN and kept an up, unmanaged `wan` interface no longer shows "No
+  default route" and keeps its gateway, DNS and management address. A
+  router whose WAN has no default route of its own, with all traffic
+  routed through a VPN tunnel, now shows the tunnel as the uplink, with
+  its counters and addresses, labelled Gateway instead of Internet.
+  (#32, [@ronger-x](https://github.com/ronger-x))
+- **Tooling:** the device recorder is no longer part of the repository.
+  The replay's README describes the recording format instead; the request
+  policy it shared with the replay moved to `dev/replay/policy.js`.
+
+## 1.0.8 - 2026-10-15
+
+- **OpenWrt 24.10.** Signed `.ipk` packages and an opkg repository next
+  to the 25.12 apk one, built with the pinned 24.10.8 SDK. The 24.10
+  signing key is in `keys/vantage-24.10.usign.pub`; its fingerprint is in
+  the [install guide](docs/INSTALL.md#openwrt-2410). Tested on a 24.10.8
+  router without Wi-Fi: install, upgrade, removal, tampered index refused.
+- **Theme:** an opkg upgrade keeps Vantage selected; before, the theme's
+  removal script could switch LuCI back to Bootstrap during the upgrade.
+- **Security:** fixes for the Low findings of the 1.0.7 review. The
+  dashboard prunes per-client signal history and reverse-DNS results it
+  no longer needs and caps the addresses kept per host hint; the name
+  plugin's `set_alias` reverts its staged change after a failed commit;
+  the spec states that DHCP, mDNS and WPS names are self-reported by the
+  client and that an alias always wins.
+- **Release signing** runs only in the approved `release-signing`
+  environment and only for `v*` tags.
+
+## 1.0.7 - 2026-10-15
+
+- **Firewall overview reads the config the way firewall4 does.** Zones
+  match on devices, not network names (a modem's dynamic `wan_4` is no
+  longer "in no zone"); a redirect to any of the router's own addresses
+  is local; an ipset restricts the source only when it matches the
+  source; every zone option fw4 parses is validated and a value fw4
+  refuses skips the zone; disabled zones do not exist; IKE/ESP/AH to the
+  router is an opening; a ubus error is a failed read, never "Nothing is
+  open". When a setup is beyond what the page checks (shared internet
+  devices, covered subnets, sets a service defines) it says so and lists
+  the settings to check instead of guessing (#28).
+- **Theme, row action menus:** a row folds its buttons into a ⋯ menu
+  only when it has a main action (Edit, else the highlighted one) and at
+  least two others; Add, highlighted and an app's own buttons stay
+  visible, so Wake on LAN, Startup, Processes and radio rows are back to
+  their 1.0.5 layout. The menu shows LuCI's busy state, closes on Escape
+  and Tab, follows label and disabled changes, and never covers its own
+  button.
+- **Theme, firewall pages:** badge text keeps 4.5:1 contrast on hovered
+  rows; switched-off rules are greyed instead of faded; the zones table
+  fits down to about 880 px and wide tables show a scroll shade; the
+  rule on/off box has a 44 px target on phones; port status tooltips are
+  no longer clipped (#26).
+- **Theme, other LuCI versions:** Status → Firewall (nftables) and the
+  log filters of LuCI 26.x are styled; OpenWrt 24.10's Status overview
+  and its firewall tables (which render no name cell) display correctly;
+  fixes from a sweep of OpenWrt 25.12.5 (Interfaces tooltip, crumb caret,
+  phone cards, Diagnostics, Software, Connections, Repo Public Keys,
+  forms).
+- **Dashboard:** lane charts label each lane at its top; the chart
+  picker spans the bar on phones; links to pages the router lacks are
+  hidden; narrow tiles get a one-row handle bar; the CPU sparkline moves
+  under the numbers when narrow; restored history is bounded to the
+  rate ceiling.
+- **Docs:** the install guide and security policy describe 24.10. The
+  Simplified Chinese catalogue covers the new strings.
+
+## 1.0.6 - 2026-10-14
+
+- **Dashboard: five throughput chart styles** under Customize: overlaid,
+  log scale, mirrored, separate lanes and the previous one (the chart
+  part of #7).
+- **New Network → Firewall → Overview tab** (`luci-app-vantage`): what is
+  open from the internet, which zone reaches which, what is switched off
+  or ignored, and warnings for the risky cases, each item linking to the
+  LuCI page that changes it. Read-only; shown only to sessions that hold
+  LuCI's `luci-app-firewall` group. The app grants nothing new.
+- **Theme, firewall pages:** verdicts and policies are coloured badges,
+  with a warning colour where the internet-facing zone accepts traffic;
+  rules that are off are dimmed; table rows with three or more actions
+  put the extra ones under a ⋯ menu.
+
+## 1.0.5 - 2026-10-13
+
+- **Theme: one tab style at every level** (a segmented control that
+  wraps instead of scrolling tabs out of sight); page tabs sit at the top
+  of the content and the current breadcrumb becomes a page switcher, a
+  dropdown or the bottom sheet on phones (#21).
+- **Theme, phones and add-ons:** the bottom bar reaches every category
+  and keeps its layout; phone cards keep their names and grow with their
+  content; modal tables become cards; adblock and banIP follow the theme
+  toggle; Save & Apply opens upwards; wide tables no longer scroll the
+  page; visible focus on fields; log viewers take the full width;
+  contrast fixes; tabs, crumbs and top-bar buttons meet 36/44 px (#22).
+- **Lighter polling:** the "Refreshing" and "Live" pulses animate on the
+  compositor; the dashboard updates in place and no longer forces a
+  layout per poll (idle frames per 11 s: 637 → 12).
+- **Dev tooling:** `dev/replay/addons.sh` renders 15 official LuCI
+  add-ons with fixture data; `check_dom_sinks.js` also checks
+  `el.animate()` keyframes.
+
+## 1.0.4 - 2026-10-12
+
+- **Theme: calmer forms.** One control height for fields, buttons, tabs
+  and chips, 36 px with a mouse and 44 px on touch, with 16 px text in
+  touch fields; a 180 px label column and fields up to 360 px; one look
+  per tab level; a type scale shared with the dashboard. Field help and
+  long page or section intros fold to their first line with an (i)
+  button; a heading that only repeats the breadcrumb is hidden visually
+  and kept for screen readers (#18).
+- **Theme, Channel Analysis:** the device's own network is drawn in the
+  accent colour.
+- **Fixes:** "Generate QR" was a blank tile; tables in nested sections
+  had a stray scrollbar.
+- Screenshots retaken for the new sizes and tabs.
+
+## 1.0.3 - 2026-10-12
+
+- **Fix stale dashboard styles after an upgrade:** the app stylesheet is
+  revalidated on every load, so a browser no longer keeps the 1.0.1
+  sheet after upgrading (broken layout controls, overlapping scale
+  labels).
+- **Throughput chart:** download and upload in their own colours in
+  every row, a legend, coloured arrows in the readouts and a tooltip
+  with one row per direction (#14).
+- Simplified Chinese: "Uplink" translated as the link, not as upload.
+- Install guide: reload with Ctrl+Shift+R after an upgrade.
+
+## 1.0.2 - 2026-10-11
+
+- **Wired-only layout** for devices without radios: no empty Radios
+  tile or Wi-Fi checks; the device's other interfaces show in the
+  network path with live rates (#9, from #7). The replay gets `--wired`.
+- **Mirrored throughput chart:** download above the middle line, upload
+  below, each with its own scale, instead of a Download/Upload toggle
+  (#10). The network path spans the row; System heads the right column.
+- **Arrange the dashboard:** a Layout button lets you drag tiles, change
+  their width or hide them; saved in the browser per screen size, with a
+  reset to the default. Nothing is written to the device (#11).
+
+## 1.0.1-r3 - 2026-10-01
+
+- **Simplified Chinese** translation of the dashboard, shipped as
+  `luci-i18n-vantage-zh-cn` (#1, [@ntbowen](https://github.com/ntbowen)).
+- **Translation support:** each `po/<lang>/` becomes a language package
+  (`luci-i18n-vantage-<lang>`, `luci-i18n-vantage-theme-<lang>`);
+  `dev/i18n/update.sh` maintains the templates and catalogues with
+  LuCI's own tools; CI checks they are current; the replay previews a
+  language with `--lang` (#2).
+
+## 1.0.1-r2 - 2026-09-28
+
+- **Signed apk repository** published from CI to GitHub Pages, so the
+  packages install and upgrade with `apk` without `--allow-untrusted`.
+  Releases also carry `packages.adb`. The install guide documents the
+  repository, the key fingerprint and upgrades; `docs/ROADMAP.md` added.
+
+## 1.0.1 - 2026-09-28
+
+First public release.
+
+- **`luci-theme-vantage`:** icon rail with flyouts, bottom bar on phones,
+  breadcrumb and page tabs, Ctrl+K command palette, light, dark and auto
+  modes without a flash, host chip and indicator pills, its own login
+  page, restyled stock pages, forms, tables, charts and status icons;
+  system fonts and self-drawn icons, no CDNs.
+- **`luci-app-vantage`:** the dashboard at `admin/dashboard` with health
+  checks, the network path, live throughput, radio cards, clients with
+  human names and an experience score, the client inspector, top
+  talkers, wireless networks and the system tile. Read-only rpcd ACL;
+  wireless data comes from the app's own rpcd plugin without keys; device
+  names are the one write, through the plugin, into
+  `/etc/config/vantage`.
+- **Tooling:** read-only recorder, offline replay with a pseudonymising
+  demo mode, reproducible SDK builds verified against the source, the
+  test suite and the four security checks, GitHub Actions CI publishing
+  releases only when the build matches the committed manifest.
