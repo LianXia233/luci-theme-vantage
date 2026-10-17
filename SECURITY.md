@@ -42,9 +42,9 @@ In scope:
 - the dashboard's rpcd ACL: permissions broader than documented, or writes
   outside `/etc/config/vantage`
 - packaging: the install and removal scripts, file permissions
-- the dev tooling that handles recorded device data (`dev/mirror/`,
-  `dev/replay/`), for example secrets or real identifiers leaking into
-  recordings, demo output or the repository
+- the dev tooling that handles recorded device data (`dev/replay/`),
+  for example real identifiers leaking into demo output or the
+  repository
 
 Out of scope:
 

@@ -62,7 +62,7 @@ The replay listens on 127.0.0.1 only, and on top of that:
 
 Inputs:
 
-- `--mirror`: output of `dev/mirror/record-browser.js` / `record-ssh.js`.
+- `--mirror`: a recording directory, see [Recording format](#recording-format).
   All `browser-*` and `ssh-*` directories are merged, newer wins.
 - `--rootfs` (or `$VANTAGE_ROOTFS`, default: `../vantage-rootfs` next to
   the repository; a directory or symlink holding an unpacked OpenWrt 25.12
@@ -125,7 +125,7 @@ within the JS-compatible subset of ucode (all upstream themes do).
 
 Routing follows the device dispatcher: the recorded menu
 (`/admin/menu`) resolves the path (`firstchild`, `alias`, `rewrite`,
-`view`, `template`). Menu nodes blanked by the recorder's secret filter
+`view`, `template`). Menu nodes blanked by the recording's secret filter
 (e.g. `admin/system/admin/password`) are restored from `menu.d`.
 
 ## ubus / HTTP replay
@@ -160,7 +160,7 @@ Routing follows the device dispatcher: the recorded menu
   prints the loaded plugins at start
   (`vantage-plugin.js`: `luci.vantage`, luci-app-vantage's plugin).
 - Mirrored static files that are uhttpd's 404 page are served as 404, as on
-  the device (the recorder keeps bodies, not statuses).
+  the device (recordings keep bodies, not statuses).
 
 stderr lists coverage gaps once each: `unknown call`, `approximate (args
 differ)`, `unrecorded exec`, `write dropped`, `static not found`. Record the
@@ -191,8 +191,8 @@ calls then answer from the recording or NOT_FOUND as before).
 - `luci getConntrackList`: ~25-30 invented flows between documentation
   addresses (192.0.2.0/24 -> 198.51.100.0/24, 203.0.113.0/24,
   2001:db8::/32), in rpcd's field layout.
-- `iwinfo scan <radio>` (Status -> Channel Analysis; the recorder blocks
-  scans on purpose): the AP's own sibling BSSIDs on that radio (read from
+- `iwinfo scan <radio>` (Status -> Channel Analysis; never recorded, a
+  scan disturbs clients): the AP's own sibling BSSIDs on that radio (read from
   the recorded `network.wireless status` at run time, never written to the
   repo) plus 12 (2.4 GHz) / 7 (6 GHz, channels 1-93) invented neighbours
   with example SSIDs (`ExampleNet`, `Office-Demo`, ...) and locally
@@ -377,44 +377,29 @@ The recorded device still runs the old UniWRT theme; its menu entries
 (Dashboard, System → Vantage Theme) are views that only work with that
 theme's CSS, so they are dropped from the menu unless `--keep-uniwrt`.
 
-## Recording (`dev/mirror/`)
+## Recording format
 
-Do not run the recorders unless you mean to read your own device, over the
-wired management path.
+A mirror is a directory of recordings. The replay loads every
+`browser-<timestamp>/` and `ssh-<timestamp>/` directory in it, oldest
+first, so newer recordings win for identical keys. The recorder that makes
+them is not part of this repository; what matters is the layout:
 
-`record-browser.js` opens Chromium with a throwaway profile and a
-browser-wide DevTools interceptor (a pipe, no TCP port): every request of
-every tab, popup, worker and service worker is decided by
-`dev/mirror/policy.js` before it leaves the browser. Reads on the allowlist
-are forwarded with the body re-serialised exactly as checked and recorded;
-writes, applies, scans, uploads, other hosts and other spellings of the
-device are refused and listed in `blocked.log`. The profile is removed on
-every exit (window closed, Ctrl+C, SIGTERM, SIGHUP, an error); if the
-recorder is killed outright, the browser exits with it (the pipe closes),
-but the profile stays in `$TMPDIR/vantage-rec-profile-*`.
+- `browser-*/rpc.jsonl`: one JSON object per line for each ubus call the
+  LuCI session made: `at` (ms since the epoch), `object`, `method`, `args`
+  and the device's `result` array (or `error`), as `/ubus` returned them.
+- `browser-*/http.jsonl`: one object per line for other responses: `url`
+  and `body` for a page or file, or `argv` and `body` for a `cgi-exec`
+  command. Bodies are kept, statuses are not.
+- `browser-*/static/`: the device's static files as served (LuCI's
+  `luci-static/` tree), used where the rootfs dump has no copy.
+- `ssh-*/snapshots.jsonl`: repeated ubus calls over SSH, one object per
+  line with `at`, `object`, `method`, `args` and `result`; the replay turns
+  rows with the same key into a time series and samples it at their median
+  spacing (`Live` data).
 
-It needs the device certificate's pin, obtained over SSH (whose host key
-you have verified), never from the TLS connection itself:
-
-    scp -O root@<device>:/etc/uhttpd.crt /tmp/device.crt
-    node dev/mirror/record-browser.js --cert /tmp/device.crt https://<device> ../vantage-mirror
-
-or, as a pin (`--spki` or `$VANTAGE_DEVICE_SPKI`; uhttpd's generated
-certificate is DER, drop `-inform der` for a PEM one):
-
-    ssh root@<device> cat /etc/uhttpd.crt | openssl x509 -inform der -pubkey -noout \
-      | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl base64
-
-Chromium then accepts only that key (`--ignore-certificate-errors-spki-list`)
-instead of ignoring certificate errors. Secrets are scrubbed before
-anything is written (see the header of `policy.js`); `file.read` contents
-are kept only for a short list of non-secret system files (`/proc`, `/sys`,
-`board.json`, `rt_tables`, `sysupgrade.conf`, ...), so `rc.local` and
-crontabs replay as `<redacted>`.
-
-The recorder is an accident guard for a person clicking through stock
-LuCI, not a sandbox for hostile page JavaScript: it does not see
-WebSockets, for example. `tests/recorder-policy.test.js` covers the policy;
-`VANTAGE_BROWSER_TESTS=1 node --test tests/recorder-browser.test.js` runs
-the recorder against a local mock device in headless Chromium (second tab,
-popup, workers, profile removal, the pin).
+A recording holds everything the session saw, so it never goes into a
+repository. Secrets (Wi-Fi keys, password hashes, tokens, private keys)
+must be removed before a recording is written; `policy.js` holds the
+scrub rules and the read-only allowlist a recorder is expected to apply,
+and `tests/policy.test.js` covers them. Scans (`iwinfo scan`) are never
+recorded: they take radios off channel; the replay generates them.

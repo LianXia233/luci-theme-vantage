@@ -15,7 +15,6 @@ Two OpenWrt 25.12 LuCI packages plus offline tooling. No npm, no
 | `luci-theme-vantage/` | Theme: ucode templates (`ucode/template/themes/vantage/*.ut`), CSS and icons (`htdocs/luci-static/vantage/`), shell script (`htdocs/luci-static/resources/menu-vantage.js`, `vantage-theme/host.js`), `root/etc/uci-defaults/30_luci-theme-vantage`, `postrm` in the `Makefile` |
 | `luci-app-vantage/` | Dashboard at `admin/dashboard`: views (`htdocs/.../view/vantage/overview.js`; `firewall.js`, the Network → Firewall → Overview tab), modules (`htdocs/.../vantage/*.js`), `app.css`, menu entry, rpcd ACL (`root/usr/share/rpcd/acl.d/`), rpcd ucode plugin `luci.vantage` (`root/usr/share/rpcd/ucode/luci.vantage`), default `/etc/config/vantage` |
 | `dev/replay/` | Offline LuCI server that replays a recording; see its README |
-| `dev/mirror/` | Recorders that read a real device. Do not run them (rule 1) |
 | `dev/build/` | `sdk-build.sh`: reproducible build in the OpenWrt SDK image (podman) |
 | `dev/icons/build.js` | Generates the status icon set; edit the generator, not the SVGs |
 | `dev/i18n/` | `update.sh`: translation templates and catalogues (`po/`) with LuCI's i18n tools; `catalog.js`: LuCI's catalogue format (tests, replay `--lang`) |
@@ -25,8 +24,8 @@ Two OpenWrt 25.12 LuCI packages plus offline tooling. No npm, no
 
 ## Hard rules
 
-1. **No real devices.** Do not SSH to, copy to, browse, or run
-   `dev/mirror/` against a router or access point unless the human asks for
+1. **No real devices.** Do not SSH to, copy to, browse, or run any
+   recorder against a router or access point unless the human asks for
    exactly that in the current conversation. All UI work goes through the
    replay.
 2. **No real network data in the tree.** Recordings live outside the
@@ -83,7 +82,8 @@ Needs Node.js (the maintainer uses a current release; there are no
 dependencies to install).
 
 The replay needs two local inputs that are not in the repository: a
-recording (`--mirror`, made with `dev/mirror/`) and a LuCI 25.12 root
+recording (`--mirror`, in the format described in `dev/replay/README.md`
+under Recording format) and a LuCI 25.12 root
 filesystem for the core templates and static files (`--rootfs` or
 `$VANTAGE_ROOTFS`). If either is missing, say so and stick to the tests; do
 not fake them.

@@ -5,7 +5,7 @@
    luci-bwc; the recorded firmware lacks it for load/conntrack, and the rows
    that were recorded for interface/wireless carry old timestamps, so a
    replayed graph never advances. Status -> Channel Analysis reads
-   `iwinfo scan`, which the recorder blocks on purpose (it disturbs clients).
+   `iwinfo scan`, which a recording never holds (a scan disturbs clients).
    Everything here is generated, labelled "synthetic" once on stderr, and
    switched off with --no-synthetic.
 

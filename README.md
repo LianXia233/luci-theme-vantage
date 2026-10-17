@@ -159,14 +159,13 @@ inputs. Optional index signing and the details are in the
 The UI is developed offline against recorded device data, never against a
 live device:
 
-1. **Record** – `dev/mirror/` records a real LuCI session read-only
-   (browser and SSH snapshots). Writes, applies, scans and uploads are
-   refused before they leave the browser, and secrets are removed before
-   anything is written. Recordings stay outside the repository.
-2. **Replay** – `dev/replay/` serves the complete LuCI UI from a recording on
-   `127.0.0.1`, with the theme and app loaded from this tree; reload to see
-   an edit. Save & Apply works against an in-memory overlay.
-3. **Demo mode** – `--demo` pseudonymises the recording as it loads:
+1. **Replay** – `dev/replay/` serves the complete LuCI UI on `127.0.0.1`
+   from a recording of a real LuCI session (ubus replies, HTTP responses
+   and static files; the format is in the replay's README) or from
+   hand-written fixtures, with the theme and app loaded from this tree;
+   reload to see an edit. Save & Apply works against an in-memory overlay.
+   Recordings stay outside the repository.
+2. **Demo mode** – `--demo` pseudonymises the recording as it loads:
    documentation MACs and addresses (`00:00:5E:00:53:xx`, `192.0.2.0/24`,
    `2001:db8::/32`), neutral hostname, SSIDs and client names. The
    screenshots above were taken this way.
