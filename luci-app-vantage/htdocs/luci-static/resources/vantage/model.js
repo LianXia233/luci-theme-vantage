@@ -173,10 +173,10 @@ return baseclass.extend({
 	},
 
 	/* Pick the interface carrying traffic in/out of this device, and the
-	   physical device its counters live on. Routers: wan/wan6/*wan*.
-	   Access points: the interface with the default route, else the first
-	   one that is up. A bridge is followed to its wired member (wireless
-	   members are skipped; netifd 'ethernet' members preferred); DSA with
+	   physical device its counters live on. Prefer interfaces with a default
+	   route, keeping wan/wan6/*wan* priority within that set. Fall back to
+	   WAN names, then the first up interface. A bridge is followed to its
+	   wired member (wireless members skipped; netifd 'ethernet' preferred); DSA with
 	   hardware offload uses the conduit's counters. */
 	resolveUplink: function(ifaces, devs, wirelessNames) {
 		var self = this;
@@ -186,15 +186,19 @@ return baseclass.extend({
 		var up = ifaces.filter(function(i) {
 			return i && i.up && i.interface !== 'loopback' && (i.l3_device || i.device);
 		});
-		function named(re) { return up.filter(function(i) { return re.test(i.interface); })[0]; }
+		function named(list, re) { return list.filter(function(i) { return re.test(i.interface); })[0]; }
+		function preferredWan(list) {
+			return named(list, /^wan$/) || named(list, /^wan6$/) || named(list, /wan/i);
+		}
 		function defRoute(i) {
 			return arr(i.route).filter(function(r) {
 				return r && +r.mask === 0 && (r.target === '0.0.0.0' || r.target === '::');
 			})[0] || null;
 		}
 
-		var wan = named(/^wan$/) || named(/^wan6$/) || named(/wan/i);
-		var pick = wan || up.filter(defRoute)[0] || up[0];
+		/* An AP may retain an up, unmanaged WAN port without any routes. */
+		var routed = up.filter(defRoute);
+		var pick = preferredWan(routed) || routed[0] || preferredWan(up) || up[0];
 		if (!pick) return null;
 
 		var l3 = pick.l3_device || pick.device, dev = l3, d = devs[dev];
@@ -216,7 +220,7 @@ return baseclass.extend({
 			l3dev: l3,
 			dev: dev,
 			statsDev: statsDev,
-			isWan: !!wan,
+			isWan: /wan/i.test(pick.interface),
 			proto: pick.proto || null,
 			uptime: finite(pick.uptime) ? pick.uptime : null,
 			up: !!pick.up,

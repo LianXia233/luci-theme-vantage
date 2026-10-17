@@ -113,11 +113,51 @@ test('resolveUplink: AP bridge -> wired member, gateway and addresses', () => {
 });
 
 test('resolveUplink: router prefers wan, DSA offload uses conduit', () => {
-	const u = model.resolveUplink([ ...IFACES, { interface: 'wan', up: true, l3_device: 'wan', device: 'wan' } ],
+	const u = model.resolveUplink([ ...IFACES, { interface: 'wan', up: true, l3_device: 'wan', device: 'wan',
+		route: [ { target: '0.0.0.0', mask: 0, nexthop: '198.51.100.1' } ] } ],
 		{ wan: { devtype: 'dsa', 'hw-tc-offload': true, conduit: 'eth1' }, eth1: {} });
 	assert.equal(u.iface, 'wan');
 	assert.equal(u.isWan, true);
 	assert.equal(u.statsDev, 'eth1');
+});
+
+test('resolveUplink: AP default route wins over unmanaged WAN interfaces', () => {
+	const wan = [ 'wan', 'wan6' ].map(name => ({
+		interface: name, up: true, device: 'eth0', proto: 'none', route: []
+	}));
+	for (const ifaces of [ [ ...wan, ...IFACES ], [ ...IFACES, ...wan ] ]) {
+		const u = model.resolveUplink(ifaces, DEVS);
+		assert.equal(u.iface, 'lan');
+		assert.equal(u.isWan, false);
+		assert.equal(u.gateway, '192.0.2.1');
+		assert.deepEqual(u.dns, [ '192.0.2.1' ]);
+		assert.deepEqual(u.ipv4, [ '192.0.2.10/24' ]);
+		assert.equal(u.l3dev, 'br-lan');
+		assert.equal(u.dev, 'eth0');
+	}
+});
+
+test('resolveUplink: routed wan6 wins over an unrouted wan and routed LAN', () => {
+	const u = model.resolveUplink([ ...IFACES,
+		{ interface: 'wan', up: true, device: 'eth1' },
+		{ interface: 'wan6', up: true, device: 'eth1',
+			route: [ { target: '::', mask: 0, nexthop: '2001:db8::1' } ] }
+	], {});
+	assert.equal(u.iface, 'wan6');
+	assert.equal(u.isWan, true);
+	assert.equal(u.gateway, '2001:db8::1');
+});
+
+test('resolveUplink: no default route retains WAN and first-up fallbacks', () => {
+	const lan = { interface: 'lan', up: true, device: 'br-lan' };
+	const wan = { interface: 'wan', up: true, device: 'eth1' };
+	const down = { interface: 'wan6', up: false, device: 'eth2',
+		route: [ { target: '::', mask: 0, nexthop: '2001:db8::1' } ] };
+	const u = model.resolveUplink([ lan, wan, down ], {});
+	assert.equal(u.iface, 'wan');
+	assert.equal(u.isWan, true);
+	assert.equal(u.gateway, null);
+	assert.equal(model.resolveUplink([ down, lan ], {}).iface, 'lan');
 });
 
 test('networks: other interfaces, not loopback or the uplink, one per device', () => {
