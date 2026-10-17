@@ -3,7 +3,7 @@
 /* Offline LuCI replay server for theme work.
 
    Serves the LuCI web UI on 127.0.0.1 entirely from a recorded mirror
-   (dev/mirror/record-*.js), the device rootfs dump (core templates,
+   (see README, Recording format), the device rootfs dump (core templates,
    bootstrap, menu.d) and optionally a theme under development. Nothing is
    forwarded anywhere; writes land in an in-memory uci overlay.
 
@@ -55,7 +55,7 @@ const { Engine } = require('./ut');
 const { Store, safe } = require('./store');
 const { Fixtures } = require('./fixtures');
 const i18n = require('../i18n/catalog');
-const policy = require('../mirror/policy');
+const policy = require('./policy');
 const wired = require('./wired');
 
 /* ------------------------------------------------------------ arguments */
@@ -153,7 +153,7 @@ const version = (() => {
 	return res;
 })();
 
-/* recorded menu; nodes the recorder's secret filter blanked out (e.g. a
+/* recorded menu; nodes the recording's secret filter blanked out (e.g. a
    node named "password") are restored from the rootfs menu.d */
 const menuSpecs = {};
 for (const f of fs.readdirSync(path.join(rootfs, 'usr/share/luci/menu.d')).filter(f => f.endsWith('.json'))) {
@@ -506,7 +506,7 @@ const MIME = {
 	'.html': 'text/html; charset=UTF-8', '.txt': 'text/plain; charset=UTF-8', '.map': 'application/json'
 };
 
-/* the recorder keeps response bodies, not statuses: a mirrored file that is
+/* a recording keeps response bodies, not statuses: a mirrored file that is
    uhttpd's 404 page was a 404 on the device too */
 function recorded404(file, size) {
 	if (size > 512) return false;

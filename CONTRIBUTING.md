@@ -30,13 +30,12 @@ The UI is developed offline against recorded device data, never against a
 live router. You need Node.js (there are no dependencies to install) and,
 to build packages, podman.
 
-1. **Record** a device once with `dev/mirror/` (read-only: it refuses
-   writes, and strips secrets before writing anything). Keep the
-   recording outside this repository, e.g. in `../vantage-mirror`.
-   The browser recorder pins the device's TLS certificate: copy it over
-   SSH (`scp -O root@<device>:/etc/uhttpd.crt /tmp/device.crt`) and pass
-   `--cert /tmp/device.crt` (or `--spki <pin>`; see the header of
-   `dev/mirror/record-browser.js`).
+1. **Device data.** The replay reads a recording of a LuCI session in
+   the format described under Recording format in
+   [`dev/replay/README.md`](dev/replay/README.md#recording-format), or
+   hand-written fixtures (`--fixtures`, `dev/replay/addons.sh`). Keep a
+   recording outside this repository, e.g. in `../vantage-mirror`, and
+   never commit one: it holds your network's addresses and names.
 2. **Replay** it with the theme and app from your working tree, plus a
    LuCI 25.12 root filesystem for LuCI's own templates and static files
    (`--rootfs`, see [`dev/replay/README.md`](dev/replay/README.md)):

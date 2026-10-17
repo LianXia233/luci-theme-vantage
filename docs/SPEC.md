@@ -374,10 +374,13 @@ text around it so it looks the same size.
 
 ## 7. Development workflow
 
-- `dev/mirror/`: read-only recorders (browser + SSH). Private data stays in
-  `~/Work/vantage-mirror` (mode 0700), never in the repo.
-- `dev/replay/`: offline LuCI served from the mirror; `--theme-dir` loads
-  the theme from the working tree, reload to see edits.
+- Recordings of the device (browser session + SSH snapshots) are made
+  with a private read-only tool that is not part of the repository.
+  Private data stays in `~/Work/vantage-mirror` (mode 0700), never in the
+  repo.
+- `dev/replay/`: offline LuCI served from the mirror (format in its
+  README); `--theme-dir` loads the theme from the working tree, reload to
+  see edits.
 - Tests: node unit tests for data logic, headless screenshot suite over a
   fixed page list (light/dark/mobile) for visual review.
 - Build: OpenWrt SDK 25.12 in podman, same reproducible pipeline as before.

@@ -1,10 +1,10 @@
 'use strict';
-/* dev/mirror/policy.js: what the recording browser may send to the device,
-   how bodies are parsed (like json-c and cgi-io do on the device), and what
-   is scrubbed before anything is written to the mirror. */
+/* dev/replay/policy.js: which LuCI requests are read-only, how bodies are
+   parsed (like json-c and cgi-io do on the device), and what is scrubbed
+   from recorded data. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const policy = require('../dev/mirror/policy');
+const policy = require('../dev/replay/policy');
 
 const BASE = 'https://device.example';
 const SID = '0123456789abcdef0123456789abcdef';

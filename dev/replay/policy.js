@@ -1,5 +1,6 @@
 'use strict';
-/* Recording policy for the LuCI data mirror.
+/* Policy for the LuCI data mirror: what a recording may contain. The
+   replay uses the parsers; a recorder applies the whole policy.
 
    1. Only read-only requests may reach the device while recording. Every
       request the recording browser makes (any tab, popup or worker) is
