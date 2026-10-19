@@ -22,6 +22,7 @@ var POLL_S = 5;
 var WINDOW_MS = 5 * 60 * 1000;        /* throughput history shown */
 var HIST_MAX = 90;
 var GONE_KEEP_MS = 5 * 60 * 1000;     /* disconnected stations stay listed */
+var TALKERS = 3;                      /* top talkers shown; the tile keeps room for all */
 var STORE_KEY = 'vantage.hist.v1';
 var SVGNS = 'http://www.w3.org/2000/svg';
 var HOSTAPD_OBJ = /^[A-Za-z0-9_.-]{1,64}$/;
@@ -651,7 +652,7 @@ return view.extend({
 		st.health = insight.health(m, { cpu: st.cpu, uplinkRate: st.uplinkRate });
 		st.summary = insight.summary(st.health);
 		st.radioInsights = insight.radioInsights(m.radios, st.radioRates);
-		st.talkers = insight.topTalkers(m.clients, st.staRates, 5);
+		st.talkers = insight.topTalkers(m.clients, st.staRates, TALKERS);
 		this.m = m;
 		this.lastRaw = raw;
 		this.resolveMore(m);
@@ -742,7 +743,7 @@ return view.extend({
 		this.markWired(m, null);
 		this.stickyGen(m);
 		m.clients.forEach(function(c) { c.exp = insight.experience(c); c.firstSeen = st.presence && st.presence.firstSeen[c.mac]; c.isNew = !!st.isNew[c.mac]; });
-		st.talkers = insight.topTalkers(m.clients, st.staRates, 5);
+		st.talkers = insight.topTalkers(m.clients, st.staRates, TALKERS);
 		st.health = insight.health(m, { cpu: st.cpu, uplinkRate: st.uplinkRate });
 		st.summary = insight.summary(st.health);
 		this.m = m;
@@ -2334,14 +2335,26 @@ return view.extend({
 		]);
 	},
 
+	/* always TALKERS rows tall: unused rows stay as hidden slots, so the
+	   tile keeps its height as talkers come and go */
 	paintTalkers: function() {
 		var self = this, m = this.m, t = this.st.talkers || [];
+		var byMac = {}, slots = [];
+		m.clients.forEach(function(c) { byMac[c.mac] = c; });
+		for (var k = t.length; k < TALKERS; k++)
+			slots.push(E('div', { 'class': 'vt-talk-row vt-talk-slot', 'aria-hidden': 'true' }, [
+				E('span', { 'class': 'vt-talk-rank vt-tn' }, [ ' ' ]),
+				avatar({}, true),
+				E('span', { 'class': 'vt-talk-main' }, [
+					E('span', { 'class': 'vt-talk-top' }, [ E('span', { 'class': 'vt-talk-name' }, [ ' ' ]) ]),
+					E('span', { 'class': 'vt-talk-bar' }),
+					E('span', { 'class': 'vt-talk-sub vt-tn' }, [ E('b', {}, [ ' ' ]), E('span', { 'class': 'vt-talk-share' }, [ ' ' ]) ])
+				])
+			]));
 		if (!t.length) {
-			dom.content(this.el.talkers, [ E('p', { 'class': 'vt-empty-inline' }, [ m.clients.length ? _('Nobody is moving data right now.') : _('No clients connected.') ]) ]);
+			dom.content(this.el.talkers, [ E('p', { 'class': 'vt-empty-inline' }, [ m.clients.length ? _('Nobody is moving data right now.') : _('No clients connected.') ]) ].concat(slots));
 			return;
 		}
-		var byMac = {};
-		m.clients.forEach(function(c) { byMac[c.mac] = c; });
 		dom.content(this.el.talkers, t.map(function(x, i) {
 			var c = byMac[x.mac] || { mac: x.mac, name: x.name, icon: 'device' };
 			var fill = E('span', { 'class': 'vt-talk-fill' });
@@ -2356,7 +2369,7 @@ return view.extend({
 						E('b', {}, [ fmt.bits(x.total) ]), E('span', { 'class': 'vt-talk-share' }, [ fmt.pct(x.share * 100) ]), '↓ ' + fmt.bitsShort(x.down) + '  ↑ ' + fmt.bitsShort(x.up) ])
 				])
 			]);
-		}));
+		}).concat(slots));
 	},
 
 	/* ------------------------------------------------------------ SSIDs */
