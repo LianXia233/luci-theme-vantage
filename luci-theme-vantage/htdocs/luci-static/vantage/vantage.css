@@ -175,6 +175,7 @@ html[data-darkmode="true"] {
 	--v-r-lg: var(--r-lg);
 	--v-ctl-h: var(--ctl-h);             /* every control: 36px, 44px on touch */
 	--v-shadow: 0 1px 2px rgba(20, 23, 26, .06), 0 1px 0 rgba(20, 23, 26, .03);
+	--v-shadow-pop: var(--shadow-pop);   /* lists and menus that open over the page */
 	/* where sticky content may start: below the top bar (page tabs scroll) */
 	--v-stick-top: var(--stick-top);
 
@@ -2586,6 +2587,187 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 .nft-rules .td > div > span:first-child:not(.ifacebadge) { margin-right: 6px; color: var(--text-3); }
 .nft-rules em { font-style: normal; color: var(--text-3); }
 
+/* Status -> Firewall as a flow chart (vantage-theme/nftflow.js): a Flow /
+   Rules table switch over LuCI's view; Flow hides LuCI's tables (they stay
+   in the DOM). The chart: one row, in -> prerouting -> a fork (input, this
+   device, output | forward) -> postrouting -> out, the fork drawn as a
+   bracket each side; a stage's top edge is red where unmatched packets are
+   dropped, amber where some rules drop, grey on the bridged path when no
+   bridge chain filters it; bridge and netdev stages dashed.
+   Narrow, the row runs down and the fork's branches stand side by side.
+   The chains: a card each (details), its rules as numbered steps on a
+   rail, the verdict on the right; a jump opens its chain beneath. */
+.v-nft-flowmode > .nft-table { display: none; }
+:not(.v-nft-flowmode) > .v-nft > .v-nft-panel { display: none; }
+.v-nft-panel > h3 { margin: var(--sp-5) 0 var(--sp-3); font-size: var(--fs-md); }
+.v-nft-panel > h3:first-child { margin-top: 0; }
+.v-nft-chains { display: grid; gap: var(--sp-2); }
+.v-nft-chart, .v-nft-card {
+	background: var(--s1);
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	box-shadow: var(--v-shadow);
+}
+.v-nft-chart { container-type: inline-size; display: grid; gap: var(--sp-3); padding: 14px var(--card-px); overflow-x: auto; }
+.v-nft-chart-row { display: flex; align-items: center; min-width: min-content; }
+.v-nft-chart-row + .v-nft-chart-row { padding-top: var(--sp-3); border-top: 1px dashed var(--line); }
+.v-nft-endpoint {
+	flex: none;
+	padding: 4px 10px;
+	border-radius: 999px;
+	background: var(--s3); color: var(--text-2);
+	font-size: var(--fs-sm); font-weight: 600; white-space: nowrap;
+}
+.v-nft-endpoint[data-where="device"] { background: var(--accent-soft); color: var(--accent-text); }
+.v-nft-arrow { position: relative; flex: 0 0 18px; height: 2px; margin-right: 6px; background: var(--line-2); }
+.v-nft-arrow::after {
+	content: ""; position: absolute; right: -6px; top: -4px;
+	border: 5px solid transparent; border-left: 6px solid var(--line-2); border-right: 0;
+}
+/* a line that carries a branch on to the bracket */
+.v-nft-pass { flex: 1 0 12px; height: 2px; background: var(--line-2); }
+.v-nft-stage {
+	flex: none; max-width: 210px;
+	padding: 6px 10px 8px;
+	background: var(--s2);
+	border: 1px solid var(--line); border-top: 3px solid var(--ok);
+	border-radius: var(--r);
+}
+.v-nft-stage[data-drops="all"] { border-top-color: var(--err); }
+.v-nft-stage[data-drops="some"] { border-top-color: var(--warn); }
+.v-nft-stage[data-drops="open"] { border-top-color: var(--line-2); }
+.v-nft-stage[data-drops="open"] .v-nft-stage-name small { color: var(--text-2); }
+.v-nft-stage[data-edge="true"] { border-style: dashed; border-top-style: solid; }
+.v-nft-stage-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; margin-bottom: 5px; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
+.v-nft-stage-name small { font-size: var(--fs-micro); font-weight: 500; }
+.v-nft-stage[data-drops="all"] .v-nft-stage-name small { color: var(--err-text); }
+.v-nft-stage[data-drops="some"] .v-nft-stage-name small { color: var(--warn-text); }
+.v-nft-stage-chains { display: flex; flex-wrap: wrap; gap: 4px; }
+.v-nft-none { color: var(--text-3); font-size: var(--fs-micro); }
+.v-nft-link {
+	display: inline-flex; align-items: center; gap: 4px;
+	min-height: 22px; margin: 0; padding: 1px 7px;
+	background: var(--s1); color: var(--text);
+	border: 1px solid var(--line-2); border-radius: var(--r-sm);
+	box-shadow: none; cursor: pointer;
+	font: 500 var(--fs-micro)/1.3 var(--mono); text-transform: none;
+}
+.v-nft-link:hover { border-color: var(--text-3); }
+.v-nft-link small { color: var(--text-3); font: 600 var(--fs-micro)/1 var(--font); letter-spacing: .04em; }
+/* the fork: two branches between brackets; each branch reaches both */
+.v-nft-fork { position: relative; display: grid; grid-auto-rows: 1fr; gap: 10px; flex: 1 1 auto; }
+.v-nft-fork::before, .v-nft-fork::after { content: ""; position: absolute; top: 25%; bottom: 25%; width: 2px; background: var(--line-2); }
+.v-nft-fork::before { left: -6px; }
+.v-nft-fork::after { right: 0; }
+.v-nft-branch { display: flex; align-items: center; }
+.v-nft-branch::before { content: ""; flex: 0 0 8px; height: 2px; margin-left: -6px; background: var(--line-2); }
+.v-nft-branch > .v-nft-pass:last-child { margin-right: 0; }
+@container (max-width: 1000px) {
+	.v-nft-chart-row { flex-direction: column; align-items: stretch; min-width: 0; }
+	.v-nft-endpoint { align-self: center; }
+	.v-nft-arrow { flex-basis: 16px; width: 2px; height: auto; margin: 0 auto 6px; }
+	.v-nft-arrow::after { right: -4px; top: auto; bottom: -6px; border: 5px solid transparent; border-top: 6px solid var(--line-2); border-bottom: 0; }
+	/* one line a stage: its name, then its chains */
+	.v-nft-stage { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; max-width: none; padding: 5px 10px 6px; }
+	.v-nft-stage-name { margin: 0; }
+	.v-nft-fork { grid-auto-rows: auto; grid-template-columns: 1fr 1fr; padding: 2px 0 0; }
+	.v-nft-fork::before, .v-nft-fork::after { left: 25%; right: 25%; width: auto; height: 2px; }
+	.v-nft-fork::before { top: 0; bottom: auto; }
+	.v-nft-fork::after { top: auto; bottom: 0; }
+	.v-nft-branch { flex-direction: column; align-items: stretch; }
+	.v-nft-branch::before { flex: 0 0 10px; width: 2px; height: auto; margin: 0 auto; }
+	.v-nft-pass, .v-nft-branch > .v-nft-pass:last-child { flex: 1 0 10px; width: 2px; height: auto; margin: 0 auto; }
+}
+
+.v-nft-card > summary {
+	display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+	min-height: 44px; padding: 8px var(--card-px);
+	list-style: none; cursor: pointer;
+	border-radius: var(--r-lg);
+}
+.v-nft-card > summary::-webkit-details-marker { display: none; }
+.v-nft-card > summary::before {
+	content: ""; flex: none; width: 7px; height: 7px; margin: 0 4px 2px 0;
+	border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3);
+	transform: rotate(-45deg); transition: transform .15s;
+}
+.v-nft-card[open] > summary::before { transform: rotate(45deg); margin-bottom: 4px; }
+.v-nft-card[open] > summary { border-bottom: 1px solid var(--line); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.v-nft-card > summary > strong { font: 600 var(--fs-base) var(--mono); }
+.v-nft-card > summary > .v-nft-verdict:last-child { margin-left: auto; }
+.v-nft-meta { color: var(--text-3); font-size: var(--fs-sm); }
+
+.v-nft-flow { position: relative; margin: 0; padding: 4px var(--card-px) 6px; list-style: none; }
+/* the rail through the step numbers */
+.v-nft-flow::before { content: ""; position: absolute; left: calc(var(--card-px) + 9px); top: 16px; bottom: 16px; width: 2px; background: var(--line); }
+.v-nft-step {
+	position: relative;
+	display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: start; gap: 2px 12px;
+	padding: 6px 0;
+}
+.v-nft-step + .v-nft-step { border-top: 1px solid var(--line); }
+.v-nft-n {
+	position: relative; z-index: 1;
+	width: 20px; height: 20px;
+	border-radius: 50%;
+	background: var(--s3); color: var(--text-2); box-shadow: 0 0 0 3px var(--s1);
+	font: 600 var(--fs-micro)/20px var(--mono); text-align: center;
+}
+.v-nft-what { min-width: 0; padding-top: 1px; }
+.v-nft-what-name { font-weight: 600; overflow-wrap: anywhere; }
+/* the chain's end: one quiet line */
+.v-nft-step-end { padding: 4px 0 2px; }
+.v-nft-step-end .v-nft-n { width: 10px; height: 10px; margin: 4px 5px; border-radius: 3px; background: var(--line-2); }
+.v-nft-step-end .v-nft-what { color: var(--text-3); font-size: var(--fs-sm); }
+.v-nft-step-end .v-nft-verdict { min-height: 20px; padding: 0 8px; font-size: var(--fs-micro); }
+.v-nft-cond { margin-top: 2px; color: var(--text-2); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.v-nft-what > .v-nft-cond:first-child { margin-top: 0; color: var(--text); font-size: inherit; }
+.v-nft-cond .ifacebadge {
+	display: inline; margin: 0 10px 0 0; padding: 0;
+	background: none; border: 0; border-radius: 0;
+	font-size: inherit; white-space: normal; vertical-align: baseline;
+}
+.v-nft-cond .ifacebadge .ifacebadge { margin-right: 0; }
+/* LuCI's view boxes a set's items at 200px; here they run on as text */
+.v-nft-cond :is(.nft-set, .nft-list, .nft-set-items, .nft-list-items) { display: inline; max-width: none; overflow: visible; vertical-align: baseline; }
+.v-nft-cond em { font-style: normal; color: var(--text-3); }
+.v-nft-cond var { font-style: normal; }
+.v-nft-also { color: var(--text-3); }
+.v-nft-empty { margin: 0; padding: 0 var(--sp-1); color: var(--text-3); font-size: var(--fs-sm); }
+.v-nft-count { color: var(--text-3); font: var(--fs-micro) var(--mono); white-space: nowrap; }
+.v-nft-then { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.v-nft-verdict {
+	display: inline-flex; align-items: center; gap: 4px;
+	min-height: 22px; margin: 0; padding: 1px 9px;
+	background: var(--s3); color: var(--text-2);
+	border: 1px solid transparent; border-radius: 999px;
+	box-shadow: none;
+	font: 600 var(--fs-sm)/1.3 var(--font); white-space: nowrap; text-transform: none;
+}
+.v-nft-verdict[data-kind="accept"] { background: var(--ok-soft); color: var(--ok-text); }
+.v-nft-verdict:is([data-kind="drop"], [data-kind="reject"]) { background: var(--err-soft); color: var(--err-text); }
+.v-nft-verdict[data-kind="nat"] { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info-text); }
+.v-nft-jump { background: var(--s1); border-color: var(--line-2); color: var(--accent-text); font-family: var(--mono); font-weight: 500; cursor: pointer; }
+.v-nft-jump::after {
+	content: ""; width: 5px; height: 5px; margin: 0 1px 2px 3px;
+	border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+	transform: rotate(45deg); transition: transform .15s;
+}
+.v-nft-jump[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent-line); }
+.v-nft-jump[aria-expanded="true"]::after { transform: rotate(-135deg); margin-bottom: -2px; }
+.v-nft-jump:hover { border-color: var(--text-3); }
+/* the chain a rule jumps to, beneath the rule */
+.v-nft-sub {
+	grid-column: 2 / -1;
+	margin: 4px 0 0;
+	background: var(--s2);
+	border: 1px solid var(--line); border-left: 3px solid var(--accent-line);
+	border-radius: var(--r);
+}
+.v-nft-sub > .v-nft-flow { padding: 2px 10px 4px; }
+.v-nft-sub > .v-nft-flow::before { left: 19px; }
+.v-nft-sub .v-nft-n { box-shadow: 0 0 0 3px var(--s2); }
+
 /* Status -> System Log / Kernel Log: LuCI's filter rows (Not, box, label,
    field) as wrapping rows; the gap replaces LuCI's inline margins */
 #content_syslog > div:has(> :is(input, select)) {
@@ -2870,6 +3052,10 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	.table:has(.cbi-section-table-titles.named[data-title]) .cbi-section-table-row[data-title]:hover::before { background: none; }
 	/* nftables rule cards: LuCI's !important cell padding, on the card's edge */
 	#view .nft-rules .tr > .td, #view .nft-rules .tr > .td:is(:first-child, :last-child) { padding: 3px var(--card-px) !important; }
+	/* firewall flow: a step's verdict goes under its text */
+	.v-nft-step { grid-template-columns: 20px minmax(0, 1fr); }
+	.v-nft-then { grid-column: 2; align-items: flex-start; }
+	.v-nft-sub { grid-column: 1 / -1; }
 	/* log filters: each field on its own line under its label */
 	#content_syslog > div > :is(select, input:not([type="checkbox"])) { flex: 1 1 100%; }
 	#content_syslog > div > :is(select, input:not([type="checkbox"])) + label { margin-left: 0 !important; }

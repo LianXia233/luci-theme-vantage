@@ -588,6 +588,14 @@ function setupCharts() {
 	if (/^admin-status-channel_analysis/.test(page) && window.MutationObserver) setupChannelAnalysis();
 }
 
+/* Status -> Firewall: the ruleset as a flow chart (vantage-theme.nftflow,
+   loaded on that page only) */
+function setupNftFlow() {
+	const view = document.getElementById('view');
+	if (!view || !window.MutationObserver || document.body.getAttribute('data-page') !== 'admin-status-nftables') return;
+	L.require('vantage-theme.nftflow').then((m) => m.attach(view)).catch((e) => { if (window.console) console.warn('vantage: firewall flow', e); });
+}
+
 return baseclass.extend({
 	__init__() {
 		this.root = document.documentElement;
@@ -605,6 +613,7 @@ return baseclass.extend({
 		this.setupTooltips();
 		setupStockEnhancers();
 		setupCharts();
+		setupNftFlow();
 		this.setupKeys();
 		this.loadHost();
 

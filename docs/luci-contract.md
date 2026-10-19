@@ -182,6 +182,15 @@ of these breaks behaviour, not just looks.
   close button in `.right`.
 - Mobile: cells carry `data-title` for card layouts; prefer width-based
   media queries.
+- Status → Firewall (`view/status/nftables.js`): `div.nft-table` per
+  table, `div.nft-chain > h4#<table>.<chain>` per chain and
+  `table.nft-rules` with one `tr.tr` per rule, all in the order of
+  `nft --terse --json list ruleset`. A rule row's first cell holds the
+  conditions (every statement but counters and actions; `.nft-comment` and
+  `.nft-counter` marks first), the second its actions in order. The
+  theme's flow view (`vantage-theme/nftflow.js`) runs the same command
+  under the same ACL entry (luci-mod-status) and clones those first cells
+  for its conditions; it maps rows by that order and checks each `h4` id.
 
 ## 7. Dark mode
 
@@ -224,6 +233,12 @@ version, and each place carries a `LuCI 24.10:` comment:
 - A named table section (Traffic Rules, Port Forwards, NAT Rules) keeps the
   name only in `tr[data-title]` and leaves drawing it to the theme. Vantage
   draws it as a `::before` cell; 25.12 renders a real cell.
+- Status → Firewall: 24.10's view counts `goto`, `continue` and
+  `ct helper` as conditions, not actions, and shows a verdict map among
+  the conditions. The flow view shows a rule's extra actions only when
+  the actions cell holds as many as it expects, so on 24.10 those rules
+  show their conditions and verdict without that line (checked against
+  the openwrt-24.10 source, not on the VM).
 - LuCI itself lacks some things on 24.10: Status → Overview has no
   per-card Hide button and shows the local time unformatted, and DHCP and
   DNS is one page.

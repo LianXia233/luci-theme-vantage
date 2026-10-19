@@ -8,6 +8,23 @@ Each release ships both packages, `luci-theme-vantage` and
 
 ## Unreleased
 
+- **Status → Firewall as a flow chart.** A Flow / Rules table switch over
+  LuCI's page; LuCI's tables are one click away. One chart shows the way
+  a packet takes (prerouting, then input, this device and output, or
+  forward, then postrouting), which steps drop unmatched packets, and
+  bridge tables where a packet meets them. A second row shows traffic
+  bridged between ports, such as Wi-Fi and LAN on an access point, which
+  never reaches the forward chain, and says when nothing filters it.
+  Below, each chain lists its rules as steps: fw4's rule name, the
+  conditions as LuCI words them, the verdict and the traffic matched; a
+  jump opens the chain it jumps to in place. It reads the ruleset with
+  the command and permission LuCI's page already uses.
+- **Dashboard: Top talkers keeps its height.** It shows the top three,
+  always three rows tall, names on one line; before, it grew with every
+  extra talker or long name and took long to shrink back.
+- **Dashboard: the throughput chart picker's open list** is drawn like
+  the theme's dropdowns in Chromium (rounded, themed, current choice
+  marked) and keeps one width whatever is chosen.
 - **Dashboard: the uplink is the interface carrying the default route.**
   Interfaces named `wan`, `wan6` or `*wan*` still win among those, so
   routers are unchanged. An access point whose WAN port was bridged into
