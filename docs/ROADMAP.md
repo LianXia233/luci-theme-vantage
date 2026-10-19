@@ -73,6 +73,14 @@ present) and results must be built as text nodes like everything else.
   releases. The browser gets no `file exec`: the ACL adds that one method to
   the app's read section, beside the firewall config it already reads, and
   `test_acl_policy.js` checks it stays read-only and argument-free.
+  Alternative since the Status → Firewall flow chart: it reads the live
+  ruleset with the `nft --terse --json list ruleset` call LuCI's own page
+  makes, under luci-mod-status's ACL, with no new rpcd method and no change
+  to the app's ACL. The overview could do the same: an admin login has that
+  grant; a user without it keeps today's config-only view. That relaxes
+  `test_acl_policy.js` for this one call, and the app needs its own copy of
+  the model (`vantage-theme/nftmodel.js`), since theme and app stay
+  independent. Decide this before building the rpcd method.
 
 ## Upstream
 
