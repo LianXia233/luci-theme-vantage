@@ -2591,12 +2591,15 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
    Rules table switch over LuCI's view; Flow hides LuCI's tables (they stay
    in the DOM). The chart: one row, in -> prerouting -> a fork (input, this
    device, output | forward) -> postrouting -> out, the fork drawn as a
-   bracket each side; a stage's top edge is red where unmatched packets are
-   dropped, amber where some rules drop, grey on the bridged path when no
-   bridge chain filters it; bridge and netdev stages dashed.
-   Narrow, the row runs down and the fork's branches stand side by side.
-   The chains: a card each (details), its rules as numbered steps on a
-   rail, the verdict on the right; a jump opens its chain beneath. */
+   bracket each side, and a row for frames bridged between ports; a
+   stage's top edge is red where unmatched packets are dropped, amber where
+   some rules drop, grey on the bridged path when no bridge chain filters
+   it; ingress, bridge and egress stages dashed. When a row doesn't fit,
+   the script sets .v-nft-vertical: the rows run down and the fork's
+   branches stand side by side. Lines and arrows in --text-3 (they carry
+   the direction). The chains: a card each (details), its rules as
+   numbered steps on a rail, the verdict on the right; a jump opens its
+   chain beneath. */
 .v-nft-flowmode > .nft-table { display: none; }
 :not(.v-nft-flowmode) > .v-nft > .v-nft-panel { display: none; }
 .v-nft-panel > h3 { margin: var(--sp-5) 0 var(--sp-3); font-size: var(--fs-md); }
@@ -2608,9 +2611,10 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	border-radius: var(--r-lg);
 	box-shadow: var(--v-shadow);
 }
-.v-nft-chart { container-type: inline-size; display: grid; gap: var(--sp-3); padding: 14px var(--card-px); overflow-x: auto; }
-.v-nft-chart-row { display: flex; align-items: center; min-width: min-content; }
+.v-nft-chart { display: grid; gap: var(--sp-3); padding: 14px var(--card-px); }
+.v-nft-chart-row { display: flex; align-items: center; min-width: 0; }
 .v-nft-chart-row + .v-nft-chart-row { padding-top: var(--sp-3); border-top: 1px dashed var(--line); }
+.v-nft-note { max-width: 90ch; margin: 0; color: var(--text-2); font-size: var(--fs-sm); }
 .v-nft-endpoint {
 	flex: none;
 	padding: 4px 10px;
@@ -2619,13 +2623,13 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	font-size: var(--fs-sm); font-weight: 600; white-space: nowrap;
 }
 .v-nft-endpoint[data-where="device"] { background: var(--accent-soft); color: var(--accent-text); }
-.v-nft-arrow { position: relative; flex: 0 0 18px; height: 2px; margin-right: 6px; background: var(--line-2); }
+.v-nft-arrow { position: relative; flex: 0 0 18px; height: 2px; margin-right: 6px; background: var(--text-3); }
 .v-nft-arrow::after {
 	content: ""; position: absolute; right: -6px; top: -4px;
-	border: 5px solid transparent; border-left: 6px solid var(--line-2); border-right: 0;
+	border: 5px solid transparent; border-left: 6px solid var(--text-3); border-right: 0;
 }
 /* a line that carries a branch on to the bracket */
-.v-nft-pass { flex: 1 0 12px; height: 2px; background: var(--line-2); }
+.v-nft-pass { flex: 1 0 12px; height: 2px; background: var(--text-3); }
 .v-nft-stage {
 	flex: none; max-width: 210px;
 	padding: 6px 10px 8px;
@@ -2636,48 +2640,51 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 .v-nft-stage[data-drops="all"] { border-top-color: var(--err); }
 .v-nft-stage[data-drops="some"] { border-top-color: var(--warn); }
 .v-nft-stage[data-drops="open"] { border-top-color: var(--line-2); }
-.v-nft-stage[data-drops="open"] .v-nft-stage-name small { color: var(--text-2); }
-.v-nft-stage[data-edge="true"] { border-style: dashed; border-top-style: solid; }
+.v-nft-stage[data-edge="true"] { border-style: dashed; border-top-style: solid; border-color: var(--line-2); }
+.v-nft-stage[data-edge="true"][data-drops="all"] { border-top-color: var(--err); }
+.v-nft-stage[data-edge="true"][data-drops="some"] { border-top-color: var(--warn); }
+.v-nft-stage[data-edge="true"][data-drops="none"] { border-top-color: var(--ok); }
 .v-nft-stage-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; margin-bottom: 5px; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
 .v-nft-stage-name small { font-size: var(--fs-micro); font-weight: 500; }
 .v-nft-stage[data-drops="all"] .v-nft-stage-name small { color: var(--err-text); }
 .v-nft-stage[data-drops="some"] .v-nft-stage-name small { color: var(--warn-text); }
-.v-nft-stage-chains { display: flex; flex-wrap: wrap; gap: 4px; }
+.v-nft-stage[data-drops="open"] .v-nft-stage-name small { color: var(--text-2); }
+.v-nft-stage-chains { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .v-nft-none { color: var(--text-3); font-size: var(--fs-micro); }
 .v-nft-link {
-	display: inline-flex; align-items: center; gap: 4px;
-	min-height: 22px; margin: 0; padding: 1px 7px;
+	display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0 4px;
+	min-height: 22px; max-width: 100%; margin: 0; padding: 1px 7px;
 	background: var(--s1); color: var(--text);
 	border: 1px solid var(--line-2); border-radius: var(--r-sm);
 	box-shadow: none; cursor: pointer;
-	font: 500 var(--fs-micro)/1.3 var(--mono); text-transform: none;
+	font: 500 var(--fs-micro)/1.3 var(--mono); text-transform: none; text-align: left;
+	overflow-wrap: anywhere;
 }
 .v-nft-link:hover { border-color: var(--text-3); }
-.v-nft-link small { color: var(--text-3); font: 600 var(--fs-micro)/1 var(--font); letter-spacing: .04em; }
-/* the fork: two branches between brackets; each branch reaches both */
+.v-nft-link small { color: var(--text-3); font: 600 var(--fs-micro)/1.3 var(--font); letter-spacing: .02em; }
+/* the fork: two branches between brackets; each branch reaches both. The
+   brackets run between the centres of the two branches' lines */
 .v-nft-fork { position: relative; display: grid; grid-auto-rows: 1fr; gap: 10px; flex: 1 1 auto; }
-.v-nft-fork::before, .v-nft-fork::after { content: ""; position: absolute; top: 25%; bottom: 25%; width: 2px; background: var(--line-2); }
+.v-nft-fork::before, .v-nft-fork::after { content: ""; position: absolute; top: calc(25% - 3.5px); bottom: calc(25% - 3.5px); width: 2px; background: var(--text-3); }
 .v-nft-fork::before { left: -6px; }
 .v-nft-fork::after { right: 0; }
-.v-nft-branch { display: flex; align-items: center; }
-.v-nft-branch::before { content: ""; flex: 0 0 8px; height: 2px; margin-left: -6px; background: var(--line-2); }
+.v-nft-branch { display: flex; align-items: center; min-width: 0; }
+.v-nft-branch::before { content: ""; flex: 0 0 8px; height: 2px; margin-left: -6px; background: var(--text-3); }
 .v-nft-branch > .v-nft-pass:last-child { margin-right: 0; }
-@container (max-width: 1000px) {
-	.v-nft-chart-row { flex-direction: column; align-items: stretch; min-width: 0; }
-	.v-nft-endpoint { align-self: center; }
-	.v-nft-arrow { flex-basis: 16px; width: 2px; height: auto; margin: 0 auto 6px; }
-	.v-nft-arrow::after { right: -4px; top: auto; bottom: -6px; border: 5px solid transparent; border-top: 6px solid var(--line-2); border-bottom: 0; }
-	/* one line a stage: its name, then its chains */
-	.v-nft-stage { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; max-width: none; padding: 5px 10px 6px; }
-	.v-nft-stage-name { margin: 0; }
-	.v-nft-fork { grid-auto-rows: auto; grid-template-columns: 1fr 1fr; padding: 2px 0 0; }
-	.v-nft-fork::before, .v-nft-fork::after { left: 25%; right: 25%; width: auto; height: 2px; }
-	.v-nft-fork::before { top: 0; bottom: auto; }
-	.v-nft-fork::after { top: auto; bottom: 0; }
-	.v-nft-branch { flex-direction: column; align-items: stretch; }
-	.v-nft-branch::before { flex: 0 0 10px; width: 2px; height: auto; margin: 0 auto; }
-	.v-nft-pass, .v-nft-branch > .v-nft-pass:last-child { flex: 1 0 10px; width: 2px; height: auto; margin: 0 auto; }
-}
+.v-nft-vertical .v-nft-chart-row { flex-direction: column; align-items: stretch; }
+.v-nft-vertical .v-nft-endpoint { align-self: center; }
+.v-nft-vertical .v-nft-arrow { flex-basis: 16px; width: 2px; height: auto; margin: 0 auto 6px; }
+.v-nft-vertical .v-nft-arrow::after { right: -4px; top: auto; bottom: -6px; border: 5px solid transparent; border-top: 6px solid var(--text-3); border-bottom: 0; }
+/* one line a stage: its name, then its chains */
+.v-nft-vertical .v-nft-stage { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; max-width: none; padding: 5px 10px 6px; }
+.v-nft-vertical .v-nft-stage-name { margin: 0; }
+.v-nft-vertical .v-nft-fork { grid-auto-rows: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 2px 0 0; }
+.v-nft-vertical .v-nft-fork::before, .v-nft-vertical .v-nft-fork::after { left: calc(25% - 3.5px); right: calc(25% - 3.5px); width: auto; height: 2px; }
+.v-nft-vertical .v-nft-fork::before { top: 0; bottom: auto; }
+.v-nft-vertical .v-nft-fork::after { top: auto; bottom: 0; }
+.v-nft-vertical .v-nft-branch { flex-direction: column; align-items: stretch; }
+.v-nft-vertical .v-nft-branch::before { flex: 0 0 10px; width: 2px; height: auto; margin: 0 auto; }
+.v-nft-vertical :is(.v-nft-pass, .v-nft-branch > .v-nft-pass:last-child) { flex: 1 0 10px; width: 2px; height: auto; margin: 0 auto; }
 
 .v-nft-card > summary {
 	display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
@@ -2715,11 +2722,13 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 }
 .v-nft-what { min-width: 0; padding-top: 1px; }
 .v-nft-what-name { font-weight: 600; overflow-wrap: anywhere; }
+.v-nft-what-name[data-muted="true"] { color: var(--text-3); font-weight: 500; }
 /* the chain's end: one quiet line */
 .v-nft-step-end { padding: 4px 0 2px; }
 .v-nft-step-end .v-nft-n { width: 10px; height: 10px; margin: 4px 5px; border-radius: 3px; background: var(--line-2); }
 .v-nft-step-end .v-nft-what { color: var(--text-3); font-size: var(--fs-sm); }
 .v-nft-step-end .v-nft-verdict { min-height: 20px; padding: 0 8px; font-size: var(--fs-micro); }
+.v-nft-step-more { grid-template-columns: 20px auto; }
 .v-nft-cond { margin-top: 2px; color: var(--text-2); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .v-nft-what > .v-nft-cond:first-child { margin-top: 0; color: var(--text); font-size: inherit; }
 .v-nft-cond .ifacebadge {
@@ -2746,7 +2755,7 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 }
 .v-nft-verdict[data-kind="accept"] { background: var(--ok-soft); color: var(--ok-text); }
 .v-nft-verdict:is([data-kind="drop"], [data-kind="reject"]) { background: var(--err-soft); color: var(--err-text); }
-.v-nft-verdict[data-kind="nat"] { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info-text); }
+.v-nft-verdict[data-kind="nat"] { background: var(--info-soft); color: var(--info-text); }
 .v-nft-jump { background: var(--s1); border-color: var(--line-2); color: var(--accent-text); font-family: var(--mono); font-weight: 500; cursor: pointer; }
 .v-nft-jump::after {
 	content: ""; width: 5px; height: 5px; margin: 0 1px 2px 3px;
@@ -3119,6 +3128,7 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	.cbi-dropdown[open] > ul.dropdown { transition-duration: .01s; }
 	.cbi-progressbar > div { transition: none; }
 	.vt-crumb-switch > svg, .vt-rail-caret, .vt-rail-pin svg { transition: none; }
+	.v-nft-card > summary::before, .v-nft-jump::after { transition: none; }
 }
 
 @media print {
