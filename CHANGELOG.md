@@ -11,13 +11,16 @@ Each release ships both packages, `luci-theme-vantage` and
 - **Status → Firewall as a flow chart.** A Flow / Rules table switch over
   LuCI's page; LuCI's tables are one click away. One chart shows the way
   a packet takes (prerouting, then input, this device and output, or
-  forward, then postrouting), which steps drop unmatched packets, and
-  bridge tables where a packet meets them. A second row shows traffic
-  bridged between ports, such as Wi-Fi and LAN on an access point, which
-  never reaches the forward chain, and says when nothing filters it.
+  forward, then postrouting), which steps drop unmatched packets or have
+  rules that drop some, and ingress, bridge and egress chains where a
+  packet meets them. A second row shows traffic bridged between ports,
+  such as Wi-Fi and LAN on an access point, which never reaches the
+  forward chain, and says when no bridge chain filters it; a note says
+  when flow offloading lets established connections skip the chains.
   Below, each chain lists its rules as steps: fw4's rule name, the
   conditions as LuCI words them, the verdict and the traffic matched; a
-  jump opens the chain it jumps to in place. It reads the ruleset with
+  jump opens the chain it jumps to in place, and a return or the end of
+  a chain names where the packet goes next. It reads the ruleset with
   the command and permission LuCI's page already uses.
 - **Dashboard: Top talkers keeps its height.** It shows the top three,
   always three rows tall, names on one line; before, it grew with every
