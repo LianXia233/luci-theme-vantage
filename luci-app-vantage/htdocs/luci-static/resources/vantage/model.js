@@ -214,7 +214,7 @@ return baseclass.extend({
 		if (d && d.devtype === 'dsa' && d['hw-tc-offload'] && d.conduit && devs[d.conduit])
 			statsDev = d.conduit;
 
-		var route = defRoute(pick);
+		var route = defRoute(pick), via = route && route.nexthop;
 		return {
 			iface: pick.interface,
 			l3dev: l3,
@@ -228,7 +228,9 @@ return baseclass.extend({
 			speed: d ? this.parseSpeed(d.speed) : null,
 			ipv4: arr(pick['ipv4-address']).map(function(a) { return a && a.address ? a.address + '/' + a.mask : null; }).filter(Boolean),
 			ipv6: arr(pick['ipv6-address']).map(function(a) { return a && a.address ? a.address + '/' + a.mask : null; }).filter(Boolean),
-			gateway: route && route.nexthop && route.nexthop !== '0.0.0.0' ? route.nexthop : null,
+			gateway: via && via !== '0.0.0.0' && via !== '::' ? via : null,
+			/* a tunnel's default route has no next hop: routed, without a gateway address */
+			defaultRoute: !!route,
 			dns: arr(pick['dns-server']).filter(function(s) { return typeof s === 'string'; }),
 			stats: d && d.statistics ? d.statistics : null
 		};
