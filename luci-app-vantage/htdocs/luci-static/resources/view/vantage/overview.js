@@ -1427,7 +1427,7 @@ return view.extend({
 	updateHero: function() {
 		var self = this, m = this.m, st = this.st, h = this.hero, up = m.uplink, upR = st.uplinkRate, d = m.device;
 		txt(h.gwKicker, up && up.isWan ? _('Internet') : _('Gateway'));
-		txt(h.gwTitle, up && up.gateway ? up.gateway : _('No default route'));
+		txt(h.gwTitle, up && up.gateway ? up.gateway : up && up.defaultRoute ? up.l3dev : _('No default route'));
 		txt(h.gwSub, up && up.dns.length ? _('DNS %s').format(up.dns[0]) : _('Reachability not probed'));
 
 		txt(h.dnVal, upR ? fmt.bitsParts(upR.rx).v : fmt.DASH);

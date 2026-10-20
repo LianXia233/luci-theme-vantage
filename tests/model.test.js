@@ -157,7 +157,20 @@ test('resolveUplink: no default route retains WAN and first-up fallbacks', () =>
 	assert.equal(u.iface, 'wan');
 	assert.equal(u.isWan, true);
 	assert.equal(u.gateway, null);
+	assert.equal(u.defaultRoute, false);
 	assert.equal(model.resolveUplink([ down, lan ], {}).iface, 'lan');
+});
+
+test('resolveUplink: a tunnel\'s default route without a next hop is still a default route', () => {
+	const u = model.resolveUplink([
+		{ interface: 'wan', up: true, l3_device: 'eth1',
+			route: [ { target: '203.0.113.10', mask: 32, nexthop: '198.51.100.1' } ] },
+		{ interface: 'vpn', up: true, l3_device: 'wg0',
+			route: [ { target: '0.0.0.0', mask: 0, nexthop: '0.0.0.0' } ] }
+	], {});
+	assert.equal(u.iface, 'vpn');
+	assert.equal(u.gateway, null);
+	assert.equal(u.defaultRoute, true);
 });
 
 test('networks: other interfaces, not loopback or the uplink, one per device', () => {
