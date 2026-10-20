@@ -6,7 +6,7 @@ Each release ships both packages, `luci-theme-vantage` and
 <https://github.com/anothaDev/luci-theme-vantage/releases> and in the
 [signed repositories](https://anothadev.github.io/luci-theme-vantage/).
 
-## Unreleased
+## 1.0.9 - 2026-10-20
 
 - **Status → Firewall as a flow chart.** A Flow / Rules table switch over
   LuCI's page; LuCI's tables are one click away. One chart shows the way
