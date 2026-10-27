@@ -6,6 +6,18 @@ Each release ships both packages, `luci-theme-vantage` and
 <https://github.com/anothaDev/luci-theme-vantage/releases> and in the
 [signed repositories](https://anothadev.github.io/luci-theme-vantage/).
 
+## Unreleased
+
+- **Larger text no longer breaks a few layouts** (#39), as with
+  Firefox's minimum font size, common for Chinese:
+  - Status → Overview, Port status: the boxes fill their column and
+    share one height, so a counter no longer wraps and pushes its box
+    above the others on ImmortalWrt.
+  - Folded field help and page intros show their whole first line;
+    the bottom was cut off.
+  - A table card that scrolls sideways no longer scrolls up and down by
+    a few pixels.
+
 ## 1.0.9 - 2026-10-20
 
 - **Status → Firewall as a flow chart.** A Flow / Rules table switch over
