@@ -16,7 +16,23 @@ Each release ships both packages, `luci-theme-vantage` and
   - Folded field help and page intros show their whole first line;
     the bottom was cut off.
   - A table card that scrolls sideways no longer scrolls up and down by
-    a few pixels.
+    a few pixels, and a table in a nested section (HomeProxy's
+    subscriptions) keeps the bottom of its last row (#43,
+    [@VIKINGYFY](https://github.com/VIKINGYFY)).
+- **Theme: a card ending in a paragraph** (HomeProxy's status) has the
+  same space below the text as above it (#44,
+  [@VIKINGYFY](https://github.com/VIKINGYFY)).
+- **Theme: buttons and tabs** (#42, [@VIKINGYFY](https://github.com/VIKINGYFY)).
+  LuCI's plain action, reload, edit, find, link and download buttons
+  (Open, Restart and Refresh in add-ons such as AxonHub) are outlined in
+  the accent, as Bootstrap outlines them; in table rows only Edit is, so
+  rows of buttons (System → Startup) stay plain. The selected tab
+  carries the accent in its text and ring.
+- **Theme: Status → Overview, Port status.** Each port shows a link dot
+  by its name and its speed as the figure; a port without link is
+  muted. The ▲ sent and ▼ received arrows take the dashboard's upload
+  and download colours, the zone is a plain bar, and LuCI's port
+  picture, which only repeated the link state, is hidden.
 
 ## 1.0.9 - 2026-10-20
 
