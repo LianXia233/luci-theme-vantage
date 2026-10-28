@@ -6,8 +6,16 @@ Each release ships both packages, `luci-theme-vantage` and
 <https://github.com/anothaDev/luci-theme-vantage/releases> and in the
 [signed repositories](https://anothadev.github.io/luci-theme-vantage/).
 
-## Unreleased
+## 1.0.10 - 2026-10-28
 
+- **Simplified Chinese for the theme**, shipped as
+  `luci-i18n-vantage-theme-zh-cn`, and a reworked, complete dashboard
+  catalogue (#40, [@ntbowen](https://github.com/ntbowen)). Words another
+  package translates differently, such as luci-app-oaf's "Free" (a free
+  tier), have a context of their own, so the dashboard keeps its own
+  wording; words LuCI itself translates still come from LuCI in every
+  language. The Status → Firewall flow chart's labels can now be
+  translated; before, none of them could.
 - **Larger text no longer breaks a few layouts** (#39), as with
   Firefox's minimum font size, common for Chinese:
   - Status → Overview, Port status: the boxes fill their column and
