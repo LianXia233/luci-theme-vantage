@@ -1295,6 +1295,19 @@ input[type="button"], input[type="reset"], input[type="submit"]) {
 :is(.btn, .cbi-button, .cbi-dropdown).cbi-button-save.important:hover {
 	background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
+/* LuCI's emphasis without .important (Bootstrap outlines these, apps mark
+   Open / Restart / Refresh with them): the signal as text and line on the
+   plain fill. In table rows only Edit keeps it: a row of Start / Restart /
+   Reload / Stop on every line (System -> Startup) stays plain */
+:is(.btn, .cbi-button):is(.cbi-button-action, .cbi-button-reload, .cbi-button-find, .cbi-button-link, .cbi-button-download):not(.important, .cbi-dropdown, .td *),
+:is(.btn, .cbi-button).cbi-button-edit:not(.important, .cbi-dropdown) {
+	border-color: var(--accent-line);
+	color: var(--accent-text);
+}
+:is(.btn, .cbi-button):is(.cbi-button-action, .cbi-button-reload, .cbi-button-find, .cbi-button-link, .cbi-button-download):not(.important, .cbi-dropdown, .td *):hover,
+:is(.btn, .cbi-button).cbi-button-edit:not(.important, .cbi-dropdown):hover {
+	background: var(--accent-soft);
+}
 .cbi-value-field :is(.btn, .cbi-button).cbi-button-apply,
 .td :is(.btn, .cbi-button).cbi-button-apply {
 	background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent-text); font-weight: 500;
@@ -1549,7 +1562,9 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 }
 :is(.cbi-tabmenu > li > a, .vt-pagetabs > .vt-tab):hover { color: var(--text); }
 :is(.cbi-tabmenu > li > a, .vt-pagetabs > .vt-tab):focus-visible { outline-offset: -1px; border-radius: calc(var(--r) + 3px); }
-.cbi-tabmenu > li.cbi-tab > a, .vt-pagetabs > .vt-tab[aria-current] { background-color: var(--seg-on); color: var(--text); font-weight: 600; box-shadow: var(--seg-on-ring); }
+/* the selected segment carries the signal (text and ring): white on the
+   grey track alone was hard to pick out; hover keeps it */
+.cbi-tabmenu > li.cbi-tab > a, .cbi-tabmenu > li.cbi-tab > a:hover, .vt-pagetabs > .vt-tab[aria-current] { background-color: var(--seg-on); color: var(--accent-text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-line); }
 .cbi-tabmenu > li[data-errors] > a::after {
 	content: attr(data-errors);
 	display: inline-flex; align-items: center; justify-content: center;
@@ -1684,6 +1699,45 @@ div:has(> .ifacebox > .ifacebox-head.cbi-tooltip-container) > .ifacebox { width:
 .ifacebox-head.active { background: var(--accent-soft); color: var(--accent-text); }
 .ifacebox-body { padding: 8px 10px; font-size: var(--fs-sm); color: var(--text-2); }
 .ifacebox-body img { width: 18px; height: 18px; }
+/* Status -> Port status, each box: a link dot by the name (as on the
+   upstream and radio cards), the speed as its figure, the zone as a bare
+   bar and the counters' arrows in the dashboard's upload and download
+   colours (menu-vantage.js puts them in spans). LuCI's port picture only
+   repeats the link state: hidden. A port without link is muted throughout */
+.ifacebox:has(> .ifacebox-head.cbi-tooltip-container) > .ifacebox-head:first-child {
+	display: flex; align-items: center; gap: 8px;
+	padding: 10px 10px 2px;
+	background: none; border-bottom: 0;
+	font-family: var(--mono); font-weight: 650 !important; text-align: left;
+}
+.ifacebox:has(> .ifacebox-head.cbi-tooltip-container) > .ifacebox-head:first-child::before {
+	content: ""; flex: none;
+	width: 8px; height: 8px; border-radius: 50%;
+	box-shadow: inset 0 0 0 1.5px var(--text-3);
+}
+.ifacebox:has(> .ifacebox-body > img[src$="_down.svg"]) > .ifacebox-head:first-child { color: var(--text-2); }
+.ifacebox:has(> .ifacebox-body > img[src$="_up.svg"]) > .ifacebox-head:first-child::before { background: var(--v-chart-1); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ifacebox:has(> .ifacebox-head.cbi-tooltip-container) > .ifacebox-head:first-child + .ifacebox-body { padding: 2px 10px 6px; color: var(--text-3); }
+.ifacebox:has(> .ifacebox-body > img[src$="_up.svg"]) > .ifacebox-head:first-child + .ifacebox-body { color: var(--text-2); }
+.ifacebox:has(> .ifacebox-head.cbi-tooltip-container) > .ifacebox-head:first-child + .ifacebox-body > :is(img, br) { display: none; }
+.ifacebox:has(> .ifacebox-head.cbi-tooltip-container) > .ifacebox-head:first-child + .ifacebox-body > span {
+	color: var(--text);
+	font: 600 var(--fs-md)/1.4 var(--font); font-variant-numeric: tabular-nums;
+}
+.ifacebox-head.cbi-tooltip-container:has(> .zonebadge) { gap: 3px; padding: 4px 10px; background: none; border-bottom: 0; }
+.ifacebox-head.cbi-tooltip-container > .zonebadge[style*="--zone-color-rgb"] {
+	height: 3px !important; padding: 0;
+	border: 0; border-radius: 2px; box-shadow: none;
+	background-color: rgb(var(--zone-color-rgb)) !important;
+}
+.ifacebox-head.cbi-tooltip-container > .zonebadge:is([style*="--zone-color-rgb: 238, 238, 238"], [style*="--zone-color-rgb:238, 238, 238"], [style*="--zone-color-rgb:238,238,238"]) { background-color: var(--text-3) !important; }
+.ifacebox-head.cbi-tooltip-container + .ifacebox-body { padding: 4px 10px 10px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* the PoE power line comes inline as black: black on the dark card */
+.ifacebox-head.cbi-tooltip-container + .ifacebox-body > .cbi-tooltip-container > span[style*="color:#000"] { color: inherit !important; }
+.ifacebox:has(> .ifacebox-body > img[src$="_down.svg"]) > .ifacebox-head.cbi-tooltip-container + .ifacebox-body { color: var(--text-3); }
+.vt-port-dir[data-dir="tx"] { color: var(--v-chart-5); }
+.vt-port-dir[data-dir="rx"] { color: var(--v-chart-1); }
+.ifacebox:has(> .ifacebox-body > img[src$="_down.svg"]) .vt-port-dir { color: inherit; }
 
 .network-status-table > .ifacebox { display: flex; }
 .network-status-table .ifacebox-head {

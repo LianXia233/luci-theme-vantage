@@ -6,8 +6,16 @@ Each release ships both packages, `luci-theme-vantage` and
 <https://github.com/anothaDev/luci-theme-vantage/releases> and in the
 [signed repositories](https://anothadev.github.io/luci-theme-vantage/).
 
-## Unreleased
+## 1.0.10 - 2026-10-28
 
+- **Simplified Chinese for the theme**, shipped as
+  `luci-i18n-vantage-theme-zh-cn`, and a reworked, complete dashboard
+  catalogue (#40, [@ntbowen](https://github.com/ntbowen)). Words another
+  package translates differently, such as luci-app-oaf's "Free" (a free
+  tier), have a context of their own, so the dashboard keeps its own
+  wording; words LuCI itself translates still come from LuCI in every
+  language. The Status → Firewall flow chart's labels can now be
+  translated; before, none of them could.
 - **Larger text no longer breaks a few layouts** (#39), as with
   Firefox's minimum font size, common for Chinese:
   - Status → Overview, Port status: the boxes fill their column and
@@ -16,7 +24,24 @@ Each release ships both packages, `luci-theme-vantage` and
   - Folded field help and page intros show their whole first line;
     the bottom was cut off.
   - A table card that scrolls sideways no longer scrolls up and down by
-    a few pixels.
+    a few pixels, and a table in a nested section (HomeProxy's
+    subscriptions) keeps the bottom of its last row (#43,
+    [@VIKINGYFY](https://github.com/VIKINGYFY)).
+- **Theme: a card ending in a paragraph** (HomeProxy's status) has the
+  same space below the text as above it (#44,
+  [@VIKINGYFY](https://github.com/VIKINGYFY)).
+- **Theme: buttons and tabs** (#42, [@VIKINGYFY](https://github.com/VIKINGYFY)).
+  LuCI's plain action, reload, edit, find, link and download buttons
+  (Open, Restart and Refresh in add-ons such as AxonHub) are outlined in
+  the accent, as Bootstrap outlines them; in table rows only Edit is, so
+  rows of buttons (System → Startup) stay plain. The selected tab
+  carries the accent in its text and ring.
+- **Theme: Status → Overview, Port status.** Each port shows a link dot
+  by its name and its speed as the figure; a port without link is
+  muted. The ▲ sent and ▼ received arrows take the dashboard's upload
+  and download colours, the zone is a plain bar, and LuCI's port
+  picture, which only repeated the link state, is hidden. A PoE port's
+  power line is readable in dark mode; it was black on black.
 
 ## 1.0.9 - 2026-10-20
 

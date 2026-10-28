@@ -367,6 +367,19 @@ function decorateRadios() {
 	});
 }
 
+/* Port status: the ▲ / ▼ before each counter in a span of its own, for the
+   dashboard's upload and download colours */
+function decoratePorts() {
+	document.querySelectorAll('#view .ifacebox > .ifacebox-head.cbi-tooltip-container + .ifacebox-body > .cbi-tooltip-container').forEach(stats => {
+		Array.prototype.slice.call(stats.childNodes).forEach(n => {
+			const dir = n.nodeType === 3 && { '▲': 'tx', '▼': 'rx' }[n.data.charAt(0)];
+			if (!dir) return;
+			stats.insertBefore(E('span', { 'class': 'vt-port-dir', 'data-dir': dir }, [ n.data.charAt(0) ]), n);
+			n.data = n.data.slice(1);
+		});
+	});
+}
+
 function setupStockEnhancers() {
 	const view = document.getElementById('view');
 	if (!view || !window.MutationObserver) return;
@@ -375,7 +388,7 @@ function setupStockEnhancers() {
 	const run = () => {
 		if (busy) return;
 		busy = true;
-		try { enhanceMemory(); enhanceStorage(); decorateRadios(); }
+		try { enhanceMemory(); enhanceStorage(); decorateRadios(); decoratePorts(); }
 		catch (e) { if (window.console) console.warn('vantage: status enhancer', e); }
 		busy = false;
 	};
