@@ -40,7 +40,8 @@ Each release ships both packages, `luci-theme-vantage` and
   by its name and its speed as the figure; a port without link is
   muted. The ▲ sent and ▼ received arrows take the dashboard's upload
   and download colours, the zone is a plain bar, and LuCI's port
-  picture, which only repeated the link state, is hidden.
+  picture, which only repeated the link state, is hidden. A PoE port's
+  power line is readable in dark mode; it was black on black.
 
 ## 1.0.9 - 2026-10-20
 

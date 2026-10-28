@@ -1563,8 +1563,8 @@ div.right > .btn, div.right > .cbi-button, div.right > button { margin-left: 0; 
 :is(.cbi-tabmenu > li > a, .vt-pagetabs > .vt-tab):hover { color: var(--text); }
 :is(.cbi-tabmenu > li > a, .vt-pagetabs > .vt-tab):focus-visible { outline-offset: -1px; border-radius: calc(var(--r) + 3px); }
 /* the selected segment carries the signal (text and ring): white on the
-   grey track alone was hard to pick out */
-.cbi-tabmenu > li.cbi-tab > a, .vt-pagetabs > .vt-tab[aria-current] { background-color: var(--seg-on); color: var(--accent-text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-line); }
+   grey track alone was hard to pick out; hover keeps it */
+.cbi-tabmenu > li.cbi-tab > a, .cbi-tabmenu > li.cbi-tab > a:hover, .vt-pagetabs > .vt-tab[aria-current] { background-color: var(--seg-on); color: var(--accent-text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-line); }
 .cbi-tabmenu > li[data-errors] > a::after {
 	content: attr(data-errors);
 	display: inline-flex; align-items: center; justify-content: center;
@@ -1732,6 +1732,8 @@ div:has(> .ifacebox > .ifacebox-head.cbi-tooltip-container) > .ifacebox { width:
 }
 .ifacebox-head.cbi-tooltip-container > .zonebadge:is([style*="--zone-color-rgb: 238, 238, 238"], [style*="--zone-color-rgb:238, 238, 238"], [style*="--zone-color-rgb:238,238,238"]) { background-color: var(--text-3) !important; }
 .ifacebox-head.cbi-tooltip-container + .ifacebox-body { padding: 4px 10px 10px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* the PoE power line comes inline as black: black on the dark card */
+.ifacebox-head.cbi-tooltip-container + .ifacebox-body > .cbi-tooltip-container > span[style*="color:#000"] { color: inherit !important; }
 .ifacebox:has(> .ifacebox-body > img[src$="_down.svg"]) > .ifacebox-head.cbi-tooltip-container + .ifacebox-body { color: var(--text-3); }
 .vt-port-dir[data-dir="tx"] { color: var(--v-chart-5); }
 .vt-port-dir[data-dir="rx"] { color: var(--v-chart-1); }
