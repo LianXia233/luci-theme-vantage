@@ -779,6 +779,8 @@ a.vt-crumb:hover { color: var(--text); }
 	box-shadow: var(--v-shadow);
 	min-width: 0;
 }
+/* Card padding supplies the space after the final paragraph. */
+.cbi-section > p:last-child { margin-bottom: 0; }
 /* card header row */
 .cbi-section > h3:first-child, .cbi-section > legend:first-child, .cbi-section > .cbi-title:first-child,
 .cbi-section > .cbi-section-remove:first-child + .cbi-title {
