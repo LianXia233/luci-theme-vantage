@@ -1416,6 +1416,9 @@ table { border-collapse: separate; border-spacing: 0; width: 100%; }
 :is(.cbi-section, .cbi-value) .table .tr > :is(.th, .td):first-child { padding-left: var(--card-px); }
 :is(.cbi-section, .cbi-value) .table .tr > :is(.th, .td):last-child { padding-right: var(--card-px); }
 .cbi-section > .table:last-child, .cbi-section > div:last-child > .table:last-child { margin-bottom: calc(-1 * var(--card-py) + 4px); }
+/* Nested sections have no bottom padding for the table to bleed into. */
+.cbi-section .cbi-section > .table:last-child,
+.cbi-section .cbi-section > div:last-child > .table:last-child { margin-bottom: 0; }
 .table .tr.table-titles > .th, .table .cbi-section-table-titles > .th, thead .th {
 	position: sticky; top: var(--stick-top); z-index: 20;
 }
