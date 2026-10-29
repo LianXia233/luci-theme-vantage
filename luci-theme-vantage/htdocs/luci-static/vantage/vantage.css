@@ -973,12 +973,11 @@ input, select, textarea, button { font: inherit; color: inherit; }
 	line-height: 20px;
 	transition: border-color .12s, box-shadow .12s;
 }
-.vt-main textarea, .cbi-input-textarea, .modal textarea { max-width: calc(2 * var(--field-max)); min-height: 88px; font-family: var(--mono); font-size: var(--fs-sm); resize: vertical; }
+.vt-main textarea, .cbi-input-textarea, .modal textarea { max-width: 100%; min-height: 88px; font-family: var(--mono); font-size: var(--fs-sm); resize: vertical; }
 /* read-only text (System and Kernel log) is a viewer, not a field: full width */
 .vt-main textarea[readonly] { max-width: none; }
-/* a short free-text option (System -> Notes: no rows set) is as wide as the
-   fields beside it; editors that set their rows (Scheduled Tasks) stay wide */
-.cbi-value-field textarea.cbi-input-textarea:not([rows]) { max-width: var(--field-max); }
+/* System notes follow the neighbouring single-line fields. */
+body[data-page="admin-system-system"] .cbi-value[data-name="notes"] textarea { max-width: var(--field-max); }
 .vt-main select, .cbi-input-select, .modal select {
 	appearance: none; -webkit-appearance: none;
 	padding-right: 30px;
