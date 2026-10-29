@@ -396,6 +396,17 @@ test('LuCI 24.10: Status -> Overview headings keep the card\'s header row', () =
 	assert.match(menuJs, /'#view \.cbi-section > \.cbi-title > h3, #view \.cbi-section > h3:first-child'/);
 });
 
+test('status tables meet their card heading without changing other card spacing', () => {
+	const rule = themeRules.find((r) => r.sel.includes('#view .cbi-section > .cbi-title:has(+ div > .table:first-child)') &&
+		r.sel.includes('#view > .cbi-section > h3:first-child:has(+ div > .table:first-child)') &&
+		r.sel.includes('#view .cbi-section:not(.cbi-tblsection, .cbi-section .cbi-section) > h3:first-child:has(+ .table)'));
+	assert.ok(rule, 'both LuCI heading forms are covered');
+	assert.match(rule.body, /margin-bottom:\s*0/);
+	assert.equal(rule.sel.length, 3, 'only headers immediately followed by a table are selected');
+	assert.ok(rule.sel.every(s => s.startsWith('#view')), 'scoped to views');
+	assert.match(rule.sel[2], /:not\(\.cbi-tblsection, \.cbi-section \.cbi-section\)/, 'form tables and nested sections keep their existing layout');
+});
+
 test('touch: short row buttons are at least a touch target wide (Processes Kill was 39 px)', () => {
 	const r = themeRules.find((x) => x.media === '(pointer: coarse)' && x.sel.includes('.td.cbi-section-actions :is(.btn, .cbi-button):not(.drag-handle)'));
 	assert.ok(r, 'rule present');
