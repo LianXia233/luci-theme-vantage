@@ -25,7 +25,6 @@ const callWirelessDevices = rpc.declare({ object: 'luci-rpc', method: 'getWirele
 
 const THEME_KEY = 'vantage.theme';
 const RAIL_KEY = 'vantage.rail';
-const RAIL_SCROLL_KEY = 'vantage.rail.scroll';
 
 /* 24px stroke icons, drawn for this theme: constant [tag, attributes] lists,
    built with createElementNS (no markup parsing, no user data) */
@@ -615,7 +614,6 @@ return baseclass.extend({
 		this.root = document.documentElement;
 		this.mqMobile = window.matchMedia('(max-width: 720px)');
 		this.mqNarrow = window.matchMedia('(max-width: 900px)');
-		this.mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
 		this.closeTimer = null;
 		this.openTimer = null;
 		this.entries = [];
@@ -630,7 +628,6 @@ return baseclass.extend({
 		setupCharts();
 		setupNftFlow();
 		this.setupKeys();
-		this.setupRailScroll();
 		this.loadHost();
 
 		ui.menu.load().then(L.bind(this.render, this));
@@ -773,69 +770,23 @@ return baseclass.extend({
 			sync();
 		}
 
-		this.restoreRailScroll();
+		/* phones: the bar scrolls sideways, and each page load (or switch to
+		   the bottom bar) starts it at its first entry */
+		this.fitRailActive();
+		if (this.mqMobile.addEventListener) this.mqMobile.addEventListener('change', () => this.fitRailActive());
 	},
 
-	/* the bar is a horizontal scroller on phones and every navigation is a
-	   full page load, so the offset is kept across them; a stored offset out
-	   of range (fewer entries, a wider bar) is clamped, not dropped */
-	setupRailScroll() {
+	/* a clipped active entry is brought to the middle of the bar, at once,
+	   and only the bar moves: scrollIntoView() would scroll the page too */
+	fitRailActive() {
 		const list = document.getElementById('vt-rail-list');
-		if (!list) return;
+		const li = list && list.querySelector('.vt-rail-item.is-active');
+		if (!li || !this.mqMobile.matches || list.scrollWidth <= list.clientWidth) return;
 
-		this.railList = list;
-		let queued = 0;
+		const l = list.getBoundingClientRect(), r = li.getBoundingClientRect();
+		if (r.left >= l.left - 1 && r.right <= l.right + 1) return;
 
-		list.addEventListener('scroll', () => {
-			if (queued) return;
-			queued = requestAnimationFrame(() => { queued = 0; this.saveRailScroll(); });
-		}, { passive: true });
-
-		list.addEventListener('focusin', () => this.fitRailActive(false));
-
-		/* rotating, zooming and the keyboard change how much of the bar fits */
-		const recheck = () => requestAnimationFrame(() => this.fitRailActive(true));
-		window.addEventListener('resize', recheck);
-		window.addEventListener('orientationchange', recheck);
-		if (this.mqMobile.addEventListener) this.mqMobile.addEventListener('change', recheck);
-		if (window.visualViewport) window.visualViewport.addEventListener('resize', recheck);
-	},
-
-	saveRailScroll() {
-		const list = this.railList;
-		if (!list || !this.mqMobile.matches) return;
-		storageSet(RAIL_SCROLL_KEY, list.scrollWidth - list.clientWidth > 1 ? String(Math.round(list.scrollLeft)) : null);
-	},
-
-	restoreRailScroll() {
-		const list = this.railList;
-		if (!list || !this.mqMobile.matches) return;
-
-		const max = list.scrollWidth - list.clientWidth;
-		if (max <= 1) { list.scrollLeft = 0; return; }
-
-		list.scrollLeft = Math.min(max, Math.max(0, parseInt(storageGet(RAIL_SCROLL_KEY), 10) || 0));
-		this.fitRailActive(true);
-	},
-
-	/* scrolls only as far as it takes to show the active entry: an entry that
-	   already fits is left where it is, and scrollTo() rather than
-	   scrollIntoView(), which would scroll the page along with the bar */
-	fitRailActive(instant) {
-		const list = this.railList;
-		if (!list || !this.mqMobile.matches) return;
-
-		const max = list.scrollWidth - list.clientWidth;
-		const li = list.querySelector('.vt-rail-item.is-active');
-		if (max <= 1) { list.scrollLeft = 0; return; }
-		if (!li) return;
-
-		const l = list.getBoundingClientRect(), r = li.getBoundingClientRect(), pad = 8;
-		if (r.left >= l.left + pad && r.right <= l.right - pad) return;
-
-		const target = Math.min(max, Math.max(0, list.scrollLeft + (r.left + r.width / 2) - (l.left + l.width / 2)));
-		if (list.scrollTo) list.scrollTo({ left: target, behavior: instant || this.mqReduce.matches ? 'auto' : 'smooth' });
-		else list.scrollLeft = target;
+		list.scrollLeft += (r.left + r.right - l.left - l.right) / 2;
 	},
 
 	handleRailClick(ev, cat, li, link) {
