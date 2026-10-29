@@ -1945,6 +1945,8 @@ body.modal-overlay-active #modal_overlay { display: block; }
 	font-size: var(--fs-lg);
 }
 #modal_overlay > .modal.cbi-modal { width: min(960px, 100%); }
+#modal_overlay > .modal:has(> textarea[readonly]) { width: min(1080px, 100%); }
+#modal_overlay > .modal > textarea[readonly] { max-width: 100%; }
 #modal_overlay > .modal .cbi-section { background: none; border: 0; padding: 0; margin: 0; box-shadow: none; }
 /* a modal's sections have no card padding, so nothing in them bleeds out
    by it: tables keep the modal's width (a bleed scrolled the section
