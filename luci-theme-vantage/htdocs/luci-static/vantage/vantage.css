@@ -2076,6 +2076,10 @@ body.modal-overlay-active #modal_overlay { display: block; }
    heading first (25.12 wraps it in .cbi-title): it keeps the header row's
    bleed, which the rule above would replace */
 #view > .cbi-section > h3:first-child { margin: calc(-1 * var(--card-py)) calc(-1 * var(--card-px)) var(--card-py); }
+/* Table cells supply the spacing below a card header. */
+#view .cbi-section > .cbi-title:has(+ div > .table:first-child),
+#view > .cbi-section > h3:first-child:has(+ div > .table:first-child),
+#view .cbi-section:not(.cbi-tblsection, .cbi-section .cbi-section) > h3:first-child:has(+ .table) { margin-bottom: 0; }
 #view > h2:not(:first-child), #view > h3:not(:first-child) { margin-top: var(--sp-6); }
 .cbi-section > .table + h3, .cbi-section > .table + .cbi-title, .cbi-section > div + h3 { margin-top: var(--sp-6); }
 .includes { margin-top: var(--sp-4); }
