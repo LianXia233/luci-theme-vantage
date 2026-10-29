@@ -2940,10 +2940,14 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	}
 	.vt-rail > .vt-brand, .vt-rail-foot { display: none; }
 	body.vt-auth .vt-shell::before { display: none; }
+	/* a swipe past either end must not swipe the page. The hairline
+	   scrollbar stays: in a narrow desktop window it is the mouse's way to
+	   the entries past the edge */
 	.vt-rail-list {
 		flex-direction: row; justify-content: flex-start;
 		gap: 0; padding: 0 var(--sp-1);
 		overflow-x: auto; overflow-y: hidden;
+		overscroll-behavior-x: contain;
 	}
 	/* the buttons stay a centred group on wider screens. Centred with auto
 	   margins, not justify-content: center, which would push an overflowing
