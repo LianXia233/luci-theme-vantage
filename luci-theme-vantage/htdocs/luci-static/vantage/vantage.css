@@ -1202,7 +1202,8 @@ input[type="button"], input[type="reset"], input[type="submit"]) {
 	border-radius: var(--r);
 	box-shadow: var(--shadow-pop);
 	overflow-x: hidden; overflow-y: auto;
-	transition: max-height .12s ease-out;
+	/* LuCI focuses the selected item on transitionend; avoid animating its scroll range. */
+	transition: max-height .001s;
 }
 .cbi-dropdown[open] > ul.dropdown[style*="bottom"] { top: auto; }
 .cbi-dropdown[open] > ul.dropdown > li {
@@ -2877,6 +2878,8 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 
 /* Network -> Diagnostics: the three tools in equal columns, top aligned */
 .table:has(.diag-action) { table-layout: fixed; }
+/* LuCI measures the scroll parent before opening a diagnostic menu. */
+#view .cbi-map > .table:has(.diag-action .cbi-dropdown) { overflow: visible; }
 .table:has(.diag-action) .tr > .td { width: calc(100% / 3); vertical-align: top; }
 .table:has(.diag-action) .td > input { max-width: none; }   /* fields fill them: even gaps */
 
@@ -3217,7 +3220,7 @@ select[id^="widget.cbid.firewall."] > option { color: var(--text); font-weight: 
 	.spinning::before { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
 	.alert-message { transition-duration: .01s; }
 	/* ui.Dropdown moves focus on transitionend: keep a (near-instant) transition */
-	.cbi-dropdown[open] > ul.dropdown { transition-duration: .01s; }
+	.cbi-dropdown[open] > ul.dropdown { transition-duration: .001s; }
 	.cbi-progressbar > div { transition: none; }
 	.vt-crumb-switch > svg, .vt-rail-caret, .vt-rail-pin svg { transition: none; }
 	.v-nft-card > summary::before, .v-nft-jump::after { transition: none; }
