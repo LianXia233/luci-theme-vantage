@@ -761,12 +761,11 @@ a.vt-crumb:hover { color: var(--text); }
 }
 .vt-main > h2[name="content"] { margin-bottom: var(--sp-5); }
 .cbi-map-descr {
-	max-width: 76ch;
 	margin: 0 0 var(--sp-6);
 	color: var(--text-2);
 	font-size: var(--fs-base); line-height: 1.55;
 }
-.cbi-section-descr { max-width: 80ch; margin: 0 0 var(--sp-4); color: var(--text-2); }
+.cbi-section-descr { margin: 0 0 var(--sp-4); color: var(--text-2); }
 .cbi-map-descr:empty, .cbi-section-descr:empty { display: none; }
 .cbi-map > h2:not(.vt-repeat) + .cbi-tabmenu, .cbi-map > h2:not(.vt-repeat) + .cbi-map-descr:empty + .cbi-tabmenu { margin-top: var(--sp-4); }
 
@@ -845,7 +844,6 @@ legend { font-size: var(--fs-md); font-weight: 600; padding: 0; margin-bottom: v
 .cbi-value-field > div:not([class]) { min-height: var(--ctl-h); display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
 .cbi-value-description {
 	margin-top: 6px;
-	max-width: 70ch;
 	color: var(--text-3);
 	font-size: var(--fs-sm);
 	line-height: 1.5;
