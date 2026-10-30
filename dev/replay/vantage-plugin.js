@@ -6,6 +6,9 @@
    Same object, methods, argument typing and replies:
      luci.vantage wireless   network.wireless status (from the recording),
                              reduced to the fields the dashboard reads
+     luci.vantage thermal    the thermal zones of the --fixtures file
+                             system (root/sys/class/thermal), read as the
+                             plugin reads sysfs; none without one
      luci.vantage set_alias  { mac, name, icon } -> uci vantage in the
                              store's overlay, committed at once
    tests/plugin.test.js checks this file, the real plugin (when a host
@@ -22,6 +25,8 @@ const NAME_MAX = 48;
 const NAME_MAX_UNITS = NAME_MAX * 8;
 const MAX_ALIASES = 512;
 const ICONS = [ 'phone', 'laptop', 'tablet', 'desktop', 'tv', 'speaker', 'printer', 'camera', 'console', 'watch', 'iot', 'router', 'device' ];
+const THERMAL = '/sys/class/thermal';
+const MAX_ZONES = 16;
 
 /* rpcd ubus status codes */
 const INVALID_ARGUMENT = 2;
@@ -30,6 +35,7 @@ const METHOD_NOT_FOUND = 3;
 /* argument policy of each method (rpcd rejects unknown names and wrong types) */
 const POLICY = {
 	wireless: {},
+	thermal: {},
 	set_alias: { mac: 'string', name: 'string', icon: 'string' }
 };
 
@@ -193,6 +199,22 @@ function argsOk(method, args) {
 	return true;
 }
 
+/* thermal: [ { zone, type, temp } ] from a fixtures.js Fixtures (or
+   nothing), as the plugin's thermal(): readfile with the same limits */
+function thermal(fixtures) {
+	const text = (p, limit) => { const b = fixtures.read(p); return b ? b.subarray(0, limit).toString('utf8') : ''; };
+	const zones = ((fixtures && fixtures.list(THERMAL)) || []).map(e => e.name).filter(n => /^thermal_zone[0-9]{1,3}$/.test(n));
+	const out = [];
+	for (const n of zones.sort((a, b) => a.slice(12) - b.slice(12))) {
+		if (out.length >= MAX_ZONES) break;
+		const temp = text(THERMAL + '/' + n + '/temp', 16).trim();
+		if (!/^-?[0-9]{1,7}$/.test(temp)) continue;
+		const kind = text(THERMAL + '/' + n + '/type', 64).trim();
+		out.push({ zone: n, type: /^[A-Za-z0-9_.-]{1,40}$/.test(kind) ? kind : '', temp: parseInt(temp, 10) });
+	}
+	return out;
+}
+
 /* a uci cursor on the replay store's overlay for one config */
 function storeCursor(store) {
 	const u = (method, a) => store.uci(method, Object.assign({ config: CONFIG }, a));
@@ -215,8 +237,9 @@ function call(store, method, args) {
 	if (!Object.prototype.hasOwnProperty.call(POLICY, method)) return { result: [ METHOD_NOT_FOUND ] };
 	if (!argsOk(method, args)) return { result: [ INVALID_ARGUMENT ] };
 	if (method === 'wireless') return { result: [ 0, reduceWireless(store.data('network.wireless', 'status', {})) ] };
+	if (method === 'thermal') return { result: [ 0, { zones: thermal(store.fixtures) } ] };
 	if (store.uciSeed) store.uciSeed(CONFIG, { main: { '.anonymous': false, '.type': 'vantage', '.name': 'main' } });
 	return { result: [ 0, setAlias(storeCursor(store), args) ] };
 }
 
-module.exports = { OBJECT, POLICY, MAX_ALIASES, NAME_MAX, ICONS, normMac, validateName, reduceWireless, setAlias, argsOk, call };
+module.exports = { OBJECT, POLICY, MAX_ALIASES, NAME_MAX, ICONS, normMac, validateName, reduceWireless, thermal, setAlias, argsOk, call };

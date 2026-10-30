@@ -27,6 +27,17 @@ test('health: healthy AP is all ok; idle SSID is explicitly fine', () => {
 	assert.equal(insight.summary(h).count, 0);
 });
 
+test('health: the CPU check adds the hottest sensor when there is one', () => {
+	const live = { cpu: { pct: 7, cores: [ 1, 2 ] } };
+	const plain = byId(insight.health(baseModel(), live), 'cpu');
+	assert.doesNotMatch(plain.reason + plain.detail, /°C/);
+	const hot = byId(insight.health(baseModel(), Object.assign({ temps: [ { name: 'cpu-thermal', celsius: 77.6 }, { name: 'gpu', celsius: 50 } ] }, live)), 'cpu');
+	assert.equal(hot.reason, 'Load 1.00 · 2 cores · 78\u00a0°C');
+	assert.equal(hot.detail, 'Load 1.00 on 2 cores · Temperature 78\u00a0°C');
+	assert.equal(hot.level, 'ok', 'a temperature alone never raises the level');
+	assert.equal(byId(insight.health(baseModel(), { cpu: { pct: 7, cores: [ 1 ] }, temps: [] }), 'cpu').reason, 'Load 1.00 · 1 cores');
+});
+
 test('health: weak client, slow uplink, disabled radio, high memory', () => {
 	const m = baseModel();
 	m.clients.push({ mac: 'c', name: 'Weak one', signal: -81 });

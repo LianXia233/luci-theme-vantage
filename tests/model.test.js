@@ -137,8 +137,9 @@ test('resolveUplink: AP default route wins over unmanaged WAN interfaces', () =>
 	}
 });
 
-test('resolveUplink: routed wan6 wins over an unrouted wan and routed LAN', () => {
-	const u = model.resolveUplink([ ...IFACES,
+test('resolveUplink: routed wan6 wins over an unrouted wan and LAN', () => {
+	const lan = { ...IFACES[1], route: [ { target: '192.0.2.0', mask: 24 } ] };
+	const u = model.resolveUplink([ IFACES[0], lan,
 		{ interface: 'wan', up: true, device: 'eth1' },
 		{ interface: 'wan6', up: true, device: 'eth1',
 			route: [ { target: '::', mask: 0, nexthop: '2001:db8::1' } ] }
@@ -146,6 +147,69 @@ test('resolveUplink: routed wan6 wins over an unrouted wan and routed LAN', () =
 	assert.equal(u.iface, 'wan6');
 	assert.equal(u.isWan, true);
 	assert.equal(u.gateway, '2001:db8::1');
+});
+
+test('resolveUplink: an IPv4 default route beats an IPv6-only one, whatever the metrics', () => {
+	const u = model.resolveUplink([ ...IFACES,
+		{ interface: 'wan6', up: true, device: 'eth1', metric: 0,
+			route: [ { target: '::', mask: 0, nexthop: '2001:db8::1' } ] }
+	], {});
+	assert.equal(u.iface, 'lan');
+	assert.equal(u.gateway, '192.0.2.1');
+});
+
+test('resolveUplink: a DS-Lite or MAP-E softwire shows the IPv6 line, not the tunnel', () => {
+	for (const proto of [ 'dslite', 'map', '464xlat' ]) {
+		const u = model.resolveUplink([ ...IFACES.slice(0, 1),
+			{ interface: 'wan', up: true, proto: 'dhcp', device: 'eth1' },
+			{ interface: 'wan6', up: true, proto: 'dhcpv6', device: 'eth1', l3_device: 'eth1',
+				route: [ { target: '::', mask: 0, nexthop: 'fe80::1' } ] },
+			{ interface: 'wan6_4', up: true, proto, l3_device: proto === 'map' ? 'map-wan6_4' : 'ds-wan6_4',
+				route: [ { target: '0.0.0.0', mask: 0, nexthop: '0.0.0.0' } ] }
+		], {});
+		assert.equal(u.iface, 'wan6', proto);
+		assert.equal(u.dev, 'eth1');
+		assert.equal(u.gateway, 'fe80::1');
+	}
+});
+
+test('resolveUplink: multi-WAN picks the lowest metric, not the name (#56)', () => {
+	/* two PPPoE uplinks, usb preferred by metric; their IPv6 aliases keep
+	   metric 0, the modem links have no default route */
+	const pppoe = (name, metric, addr) => ({ interface: name, up: true, proto: 'pppoe', device: 'eth0', l3_device: 'pppoe-' + name, metric,
+		'ipv4-address': [ { address: addr, mask: 32 } ], route: [ { target: '0.0.0.0', mask: 0, nexthop: '198.51.100.1', source: '0.0.0.0/0' } ] });
+	const alias = (name, of) => ({ interface: name, up: true, proto: 'dhcpv6', device: '@' + of, l3_device: 'pppoe-' + of, metric: 0,
+		route: [ { target: '::', mask: 0, nexthop: '2001:db8::1' } ] });
+	const ifaces = [
+		{ ...IFACES[1], route: [ { target: '192.0.2.0', mask: 24 } ] },
+		{ interface: 'mao', up: true, proto: 'dhcp', l3_device: 'eth0', metric: 0, route: [] },
+		pppoe('wan', 20, '203.0.113.20'), alias('wan6', 'wan'),
+		pppoe('usb', 10, '203.0.113.10'), alias('usb6', 'usb')
+	];
+	for (const list of [ ifaces, [ ...ifaces ].reverse() ]) {
+		const u = model.resolveUplink(list, {});
+		assert.equal(u.iface, 'usb');
+		assert.equal(u.l3dev, 'pppoe-usb');
+		assert.deepEqual(u.ipv4, [ '203.0.113.10/32' ]);
+		assert.deepEqual(model.networks(list, u).map(n => n.name), [ 'lan', 'mao', 'wan' ]);
+	}
+	/* a metric on the route itself beats the interface's */
+	const routeMetric = ifaces.map(i => i.interface === 'wan' ? { ...i, route: [ { ...i.route[0], metric: 5 } ] } : i);
+	assert.equal(model.resolveUplink(routeMetric, {}).iface, 'wan');
+	/* equal metrics: the name decides, as before */
+	const tie = ifaces.map(i => i.interface === 'usb' ? { ...i, metric: 20 } : i);
+	assert.equal(model.resolveUplink(tie, {}).iface, 'wan');
+	/* a default in another table (a VPN's own, for policy routing) does not compete */
+	const vpn = { interface: 'vpn', up: true, proto: 'wireguard', l3_device: 'wg0', metric: 1, route: [ { target: '0.0.0.0', mask: 0, nexthop: '0.0.0.0', table: 100 } ] };
+	assert.equal(model.resolveUplink([ ...ifaces, vpn ], {}).iface, 'usb');
+	assert.equal(model.resolveUplink([ ...ifaces, { ...vpn, route: [ { ...vpn.route[0], table: undefined } ], ip4table: '100' } ], {}).iface, 'usb');
+	assert.equal(model.resolveUplink([ ...ifaces, { ...vpn, route: [ { ...vpn.route[0], table: 254 } ] } ], {}).iface, 'vpn');
+});
+
+test('resolveUplink: an IPv6 metric of 0 counts as 1024, as the kernel stores it', () => {
+	const v6 = (name, metric) => ({ interface: name, up: true, device: 'eth' + metric, metric, route: [ { target: '::', mask: 0, nexthop: '2001:db8::1' } ] });
+	assert.equal(model.resolveUplink([ v6('backup6', 0), v6('wan6', 100) ], {}).iface, 'wan6');
+	assert.equal(model.resolveUplink([ v6('backup6', 2000), v6('wan6', 0) ], {}).iface, 'wan6');
 });
 
 test('resolveUplink: no default route retains WAN and first-up fallbacks', () => {
@@ -192,6 +256,19 @@ test('networks: other interfaces, not loopback or the uplink, one per device', (
 		{ name: 'vpn', proto: 'wireguard', dev: 'wg0', up: true, ipv4: '203.0.113.1/24' }
 	]);
 	assert.deepEqual(model.networks(null, null), []);
+});
+
+test('temps: hottest first, millidegrees to degrees, implausible readings left out', () => {
+	assert.deepEqual(model.temps([
+		{ zone: 'thermal_zone0', type: 'cpu-thermal', temp: 52100 },
+		{ zone: 'thermal_zone1', type: '', temp: 77800 },
+		{ zone: 'thermal_zone2', type: 'x', temp: 200000 },
+		{ zone: 'thermal_zone3', type: 'y', temp: '60000' },
+		{ zone: 'thermal_zone4', type: 'z', temp: NaN },
+		{ zone: 'thermal_zone5', type: 'cold', temp: -45000 },
+		null
+	]), [ { name: 'thermal_zone1', celsius: 77.8 }, { name: 'cpu-thermal', celsius: 52.1 } ]);
+	assert.deepEqual(model.temps(null), []);
 });
 
 test('deviceModel: board_name beats a reference-design model string', () => {

@@ -6,6 +6,55 @@ Each release ships both packages, `luci-theme-vantage` and
 <https://github.com/anothaDev/luci-theme-vantage/releases> and in the
 [signed repositories](https://anothadev.github.io/luci-theme-vantage/).
 
+## 1.0.11 - 2026-10-30
+
+- **Dashboard: the uplink in use when there are several** (#56,
+  [@wolvth](https://github.com/wolvth)). With two WANs the dashboard
+  showed the one named wan, even when traffic left through the other,
+  preferred by its lower metric. It now picks as the kernel does for
+  ordinary traffic: a default route in the main table, IPv4 before IPv6,
+  then the lowest metric; the name only breaks a tie. With DS-Lite or
+  MAP-E it shows the IPv6 line, not the tunnel.
+- **Dashboard: temperature** (#56). The CPU check and the System tile
+  show the hottest temperature sensor, and the tile's tooltip lists each
+  one. A new read-only plugin method, `luci.vantage thermal`, reads the
+  thermal zones in `/sys/class/thermal` and nothing else; LuCI grants it
+  at login, so the reading appears after your next login. A device
+  without thermal zones shows none.
+- **Theme: login page backgrounds and an Appearance menu.** Behind the
+  login form, lime packets run along the grid lines (the default) or a
+  starfield flies past, and logging in speeds them up. One canvas and no
+  libraries; it pauses while the window is in the background and stays
+  still with reduced motion. The colour-scheme button in the header now
+  opens an Appearance menu: colour (auto, light or dark) and login
+  background (grid packets, starfield or none), kept per browser; the
+  command palette (Ctrl+K) offers both.
+- **Theme: field help.** Descriptions use the full width of the form
+  (#51, [@VIKINGYFY](https://github.com/VIKINGYFY)). Help that needs
+  more than one line folds to its first line, ending after the first
+  sentence where that fits, and the ⓘ beside it opens the whole text.
+- **Theme: dropdowns.** In Chrome, Edge and other Chromium browsers,
+  plain dropdowns such as Language and Design open a themed list; on
+  them ↓ opens the list instead of stepping to the next value, as
+  Chromium handles styled lists, and Escape in a dialog closes only the
+  list. Firefox and Safari keep their own list, now with readable
+  colours. LuCI's dropdowns in a card that scrolls sideways open at full
+  height below the field (DHCP and DNS → Log facility, Firewall →
+  offloading), Save & Apply's menu reaches "Apply unchecked" by
+  keyboard, and lists on touch screens stay on screen. The Network →
+  Diagnostics dropdowns open past their card and no longer jump while
+  they open (#55, [@VIKINGYFY](https://github.com/VIKINGYFY)).
+- **Theme: phones.** The bottom bar brings a clipped active entry into
+  view after every page load (#47, #48,
+  [@LianXia233](https://github.com/LianXia233)).
+- **Theme: layout fixes** ([@VIKINGYFY](https://github.com/VIKINGYFY)):
+  no extra gap under a status card header above a table (#49);
+  multi-line editors such as Scheduled Tasks fill their form column
+  (#50); progress bar labels stay clear of the heading above at larger
+  font sizes (#52); read-only log dialogs widen to 1080 px (#53); wide
+  tables such as DHCP leases scroll inside their card instead of being
+  cut off (#54).
+
 ## 1.0.10 - 2026-10-28
 
 - **Simplified Chinese for the theme**, shipped as

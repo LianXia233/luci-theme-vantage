@@ -82,8 +82,8 @@ test('form chrome: never stands between LuCI nodes, never changes their text', (
 		return src.slice(start, end);
 	};
 	const field = part('\taddFieldHelp(desc) {', '\taddIntroHelp(desc) {');
-	const intro = part('\taddIntroHelp(desc) {', '\thelpToggle(desc, holder, label, title) {');
-	const toggle = part('\thelpToggle(desc, holder, label, title) {', '\tfitHelp(desc) {');
+	const intro = part('\taddIntroHelp(desc) {', '\thelpToggle(desc, holder, label) {');
+	const toggle = part('\thelpToggle(desc, holder, label) {', '\tfitHelp(desc) {');
 	const placing = /insertBefore|insertAdjacent|appendChild|\.before\(|\.after\(|\.prepend\(|\.append\(/g;
 	/* field help goes after the field: LuCI's label click finds its widget
 	   through nextElementSibling */

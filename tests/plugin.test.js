@@ -251,6 +251,54 @@ test('the model accepts what wireless returns', () => {
 	assert.deepEqual(m.ssids.map(s => [ s.ssid, s.bssid, s.security.short, s.hidden ]), [ [ 'Home', '02:00:5E:00:53:A0', 'WPA2/3', true ], [ 'Upstream', '', 'WPA2-Ent', false ] ]);
 });
 
+/* a fake /sys/class/thermal under a fixtures root: [ zone, type, temp ] */
+const ZONES = [
+	[ 'thermal_zone0', 'cpu-thermal\n', '52100\n' ],
+	[ 'thermal_zone1', 'gpu thermal\n', '-5000\n' ],       /* not a plain word: sent as '' */
+	[ 'thermal_zone2', 'off\n', null ],                     /* no reading: left out */
+	[ 'thermal_zone10', 'tsens_tz_sensor11\n', '77100\n' ], /* numeric order */
+	[ 'thermal_zone3', 'x\n', 'hot\n' ],                    /* not a number: left out */
+	[ 'cooling_device0', 'fan\n', '1\n' ]                   /* not a zone */
+];
+const ZONES_OUT = [
+	{ zone: 'thermal_zone0', type: 'cpu-thermal', temp: 52100 },
+	{ zone: 'thermal_zone1', type: '', temp: -5000 },
+	{ zone: 'thermal_zone10', type: 'tsens_tz_sensor11', temp: 77100 }
+];
+function fakeThermal() {
+	const dir = mkTmp('vantage-thermal-');
+	const sys = path.join(dir, 'root/sys/class/thermal');
+	for (const [ zone, type, temp ] of ZONES) {
+		fs.mkdirSync(path.join(sys, zone), { recursive: true });
+		fs.writeFileSync(path.join(sys, zone, 'type'), type);
+		if (temp != null) fs.writeFileSync(path.join(sys, zone, 'temp'), temp);
+	}
+	return { dir, sys };
+}
+
+test('stand-in: thermal reads the zones of a fixtures file system, none without one', () => {
+	const { Fixtures } = require('../dev/replay/fixtures');
+	const { dir } = fakeThermal();
+	assert.deepEqual(shim.call({ fixtures: new Fixtures([ dir ]) }, 'thermal', {}), { result: [ 0, { zones: ZONES_OUT } ] });
+	assert.deepEqual(shim.call({ fixtures: null }, 'thermal', {}), { result: [ 0, { zones: [] } ] });
+	assert.deepEqual(load('vantage.model').temps(ZONES_OUT).map(t => t.name), [ 'tsens_tz_sensor11', 'cpu-thermal', 'thermal_zone1' ]);
+});
+
+test('ucode plugin: thermal reads the same file system alike', { skip: NO_UCODE }, () => {
+	const { dir, sys } = fakeThermal();
+	const src = fs.readFileSync(PLUGIN, 'utf8');
+	assert.match(src, /^const THERMAL = '\/sys\/class\/thermal';$/m);
+	const copy = path.join(dir, 'luci.vantage');
+	fs.writeFileSync(copy, src.replace(/^const THERMAL = .*$/m, () => 'const THERMAL = ' + JSON.stringify(sys) + ';'));
+	const args = [ '-L', path.join(__dirname, 'ucode/stubs') ];
+	const lib = path.join(path.dirname(UCODE), '../lib/ucode');
+	if (fs.existsSync(lib)) args.push('-L', lib);
+	args.push('-e', "printf('%J', loadfile(" + JSON.stringify(copy) + ", { raw_mode: true })()['luci.vantage'].thermal.call())");
+	const r = spawnSync(UCODE, args, { encoding: 'utf8' });
+	assert.equal(r.status, 0, r.stderr);
+	assert.deepEqual(JSON.parse(r.stdout), { zones: ZONES_OUT });
+});
+
 test('ucode plugin: same results as the stand-in for every case', { skip: NO_UCODE }, () => {
 	const u = runUcode(ALL), s = runShim(ALL);
 	assert.equal(u.length, ALL.length);

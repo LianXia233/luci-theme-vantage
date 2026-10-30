@@ -25,7 +25,9 @@
  *   the only grant beyond reads is luci.vantage set_alias;
  * - the plugin (root/usr/share/rpcd/ucode/luci.vantage) registers exactly
  *   the luci.vantage methods the ACL grants, opens config `vantage` only,
- *   and imports nothing but uci and ubus (no fs, no process execution);
+ *   and imports nothing but uci, ubus and fs's lsdir and readfile, which
+ *   it calls on paths under /sys/class/thermal only (luci.vantage
+ *   thermal); no other file access, no process execution;
  * - every rpc.declare({ object, method }) in the app's JavaScript is
  *   granted, and every grant is used by a declare (no stale privilege);
  *   `session access` is the only call left to the platform (rpcd grants it
@@ -74,7 +76,7 @@ const READ_UBUS = {
 	'network.interface': [ 'dump' ],
 	'network.device': [ 'status' ],
 	'luci-rpc': [ 'getHostHints' ],
-	'luci.vantage': [ 'wireless' ],
+	'luci.vantage': [ 'thermal', 'wireless' ],
 	'iwinfo': [ 'assoclist', 'info' ],
 	'hostapd.*': [ 'get_clients', 'get_status' ],
 	'umdns': [ 'hosts' ],
@@ -217,14 +219,22 @@ test('the plugin registers exactly the granted luci.vantage methods and touches 
 	for (const g of Object.values(acl)) for (const kind of [ 'read', 'write' ])
 		for (const m of ((g[kind] || {}).ubus || {})[PLUGIN_OBJECT] || []) granted.add(m);
 	assert.deepEqual(methods, [ ...granted ].sort());
-	assert.deepEqual(methods, [ 'set_alias', 'wireless' ]);
+	assert.deepEqual(methods, [ 'set_alias', 'thermal', 'wireless' ]);
 	assert.ok(pairs(acl[READ_GROUP].read.ubus).has(PLUGIN_OBJECT + ' wireless'));
+	assert.ok(pairs(acl[READ_GROUP].read.ubus).has(PLUGIN_OBJECT + ' thermal'));
 	assert.ok(pairs(acl[WRITE_GROUP].write.ubus).has(PLUGIN_OBJECT + ' set_alias'));
 
-	/* imports: uci and ubus, nothing that reaches files or processes */
+	/* imports: uci, ubus and two read-only fs functions; nothing that
+	   writes files or starts processes */
 	const imports = [ ...plugin.matchAll(/^import .* from '([^']+)';$/gm) ].map(m => m[1]).sort();
-	assert.deepEqual(imports, [ 'ubus', 'uci' ]);
+	assert.deepEqual(imports, [ 'fs', 'ubus', 'uci' ]);
+	assert.match(plugin, /^import \{ lsdir, readfile \} from 'fs';$/m);
 	assert.doesNotMatch(plugin, /\b(system|popen|exec|require|loadfile|loadstring|include|render|writefile|unlink)\s*\(/);
+	/* fs: only under /sys/class/thermal */
+	assert.match(plugin, /^const THERMAL = '\/sys\/class\/thermal';$/m);
+	const fsCalls = [ ...plugin.matchAll(/\b(lsdir|readfile)\(([^,)]*)/g) ].map(m => m[1] + '(' + m[2]);
+	assert.ok(fsCalls.length >= 3, 'found the fs calls');
+	for (const c of fsCalls) assert.match(c, /^(lsdir\(THERMAL$|readfile\(THERMAL \+ '\/' \+ n \+ '\/(temp|type)')$/, c);
 
 	/* uci: every cursor call names CONFIG, and CONFIG is 'vantage' */
 	assert.match(plugin, /^const CONFIG = 'vantage';$/m);
